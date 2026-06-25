@@ -759,6 +759,24 @@ export default function App() {
         }
         setGolfCourses(uniqueCourses);
         localStorage.setItem("golfsana_golfCourses", JSON.stringify(uniqueCourses));
+
+        // Auto-seed: si falta algun camp starter a Firestore (p.ex. els competidors
+        // no s'hi van escriure mai), l'afegim automàticament. Així el comparador
+        // sempre mostra els 7 camps encara que Firestore en tingués només alguns.
+        (async () => {
+          const existingNames = new Set(uniqueCourses.map(c => c.name));
+          for (let i = 0; i < STARTER_GOLF_CORES.length; i++) {
+            const starter = STARTER_GOLF_CORES[i];
+            if (!existingNames.has(starter.name)) {
+              const id = `gc-${i}`;
+              try {
+                await saveDoc(doc(db, "golfCourses", id), { ...starter, id });
+              } catch (e) {
+                console.warn(`No s'ha pogut afegir el camp starter "${starter.name}":`, e);
+              }
+            }
+          }
+        })();
         
         // Auto-heal ONLY if a golf course has completely corrupt/missing hourlyRates or hourlyTariffs
         (async () => {

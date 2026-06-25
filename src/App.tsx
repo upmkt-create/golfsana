@@ -2062,8 +2062,13 @@ export default function App() {
                       <button
                         key={proj.id}
                         onClick={() => {
+                          // Si el projecte és d'un altre espai, canvia també l'espai actiu
+                          if (proj.workspaceId && proj.workspaceId !== activeWorkspaceId) {
+                            setActiveWorkspaceId(proj.workspaceId);
+                          }
                           setActiveProjectId(proj.id);
                           setFilterAssigneeId(null);
+                          setActiveTab("list"); // Obre directament la vista de tasques del projecte
                           setIsMobileSidebarOpen(false);
                         }}
                         className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
@@ -2630,7 +2635,7 @@ export default function App() {
                                           key={n.id} 
                                           onClick={() => {
                                             // Si la notificació és d'una acta de reunió,
-                                            // portar el membre a la pestanya d'actes.
+                                            // portar a la pestanya Acta de Reunió.
                                             const minuteObj = meetingMinutes.find(m => m.id === n.taskId);
                                             if (minuteObj) {
                                               setActiveTab("minutes");

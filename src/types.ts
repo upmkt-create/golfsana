@@ -154,3 +154,27 @@ export interface GolfCourse {
   availableSlotsToday?: number; // e.g. 11 tee times remaining
   teeTimeInterval?: number; // Minute interval between tee times (e.g. 9 or 10 min)
 }
+
+// ----------------------------------------------------------------------------
+// ACTA DE REUNIÓ — reunions individuals Rocío ↔ membre
+// ----------------------------------------------------------------------------
+export interface MeetingAgreement {
+  id: string;
+  text: string;            // L'acord / tasca acordada
+  dueDate?: string;        // Data límit opcional
+  taskCreated?: boolean;   // Si el membre ja ha convertit aquest acord en tasca
+  recurring?: boolean;     // Si és de seguiment setmanal
+}
+
+export interface MeetingMinute {
+  id: string;
+  memberId: string;        // Membre amb qui s'ha fet la reunió
+  memberName: string;      // Nom (per mostrar sense buscar)
+  date: string;            // Data de la reunió (YYYY-MM-DD)
+  title?: string;          // Títol opcional de la reunió
+  notes?: string;          // Notes generals / context
+  agreements: MeetingAgreement[]; // Llista d'acords/tasques
+  createdBy: string;       // Qui ha creat l'acta (Rocío/admin)
+  createdAt: string;
+  updatedAt?: string;
+}

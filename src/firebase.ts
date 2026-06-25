@@ -1,19 +1,46 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { getFirestore, doc, getDocFromServer, setDoc, type DocumentReference } from "firebase/firestore";
 import firebaseConfig from "../firebase-applet-config.json";
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 
 // CRITICAL: The app will break if this does not pass the correct database ID
-// Si el databaseId és "(default)" o buit, usem la base de dades per defecte
-// (getFirestore sense segon argument). Si és un ID amb nom, el passem explícit.
 const _dbId = firebaseConfig.firestoreDatabaseId;
 export const db = (!_dbId || _dbId === "(default)")
   ? getFirestore(app)
   : getFirestore(app, _dbId);
 export const auth = getAuth(app);
+
+// ----------------------------------------------------------------------------
+// cleanUndefined: Firestore REBUTJA qualsevol valor `undefined`. Aquesta funció
+// elimina recursivament tots els camps undefined d'un objecte abans d'escriure.
+// Soluciona l'error "Unsupported field value: undefined (found in field X)"
+// que feia caure l'app en mode offline.
+// ----------------------------------------------------------------------------
+export function cleanUndefined<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map((item) => cleanUndefined(item)) as unknown as T;
+  }
+  if (typeof obj === "object") {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      if (value === undefined) continue; // saltar undefined
+      cleaned[key] = cleanUndefined(value);
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
+// saveDoc: wrapper segur de setDoc que neteja undefined automàticament.
+// Usa'l en lloc de setDoc per a qualsevol escriptura de dades de l'app.
+export async function saveDoc(ref: DocumentReference, data: any, options?: { merge?: boolean }) {
+  const clean = cleanUndefined(data);
+  return options ? setDoc(ref, clean, options) : setDoc(ref, clean);
+}
 
 // Connectivity validation check as requested by skill
 async function testConnection() {

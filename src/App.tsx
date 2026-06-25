@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   db,
   auth,
+  saveDoc,
   OperationType,
   handleFirestoreError
 } from "./firebase";
@@ -437,7 +438,7 @@ export default function App() {
     const updatePresenceStatus = async (status: "online" | "offline") => {
       try {
         const presenceRef = doc(db, "presence", currentUser.id);
-        await setDoc(presenceRef, {
+        await saveDoc(presenceRef, {
           userId: currentUser.id,
           name: currentUser.name,
           email: currentUser.email,
@@ -509,7 +510,7 @@ export default function App() {
     const updatePresenceTab = async () => {
       try {
         const presenceRef = doc(db, "presence", currentUser.id);
-        await setDoc(presenceRef, {
+        await saveDoc(presenceRef, {
           currentTab: getTabLabel(activeTab),
           lastActive: Timestamp.now()
         }, { merge: true });
@@ -553,13 +554,13 @@ export default function App() {
           const idx = merged.findIndex(u => u.id === starter.id);
           if (idx === -1) {
             merged.push(starter);
-            setDoc(doc(db, "users", starter.id), starter).catch(err => console.warn(err));
+            saveDoc(doc(db, "users", starter.id), starter).catch(err => console.warn(err));
           } else {
             const existing = merged[idx];
             const hasDeptChanged = existing.departmentId !== starter.departmentId || JSON.stringify(existing.departmentIds) !== JSON.stringify(starter.departmentIds);
             if (existing.name !== starter.name || existing.avatar !== starter.avatar || existing.email !== starter.email || existing.role !== starter.role || hasDeptChanged) {
               merged[idx] = { ...existing, ...starter };
-              setDoc(doc(db, "users", starter.id), starter).catch(err => console.warn(err));
+              saveDoc(doc(db, "users", starter.id), starter).catch(err => console.warn(err));
             }
           }
         });
@@ -687,7 +688,7 @@ export default function App() {
           // Delete from projects collection in Firestore
           await deleteDoc(doc(db, "projects", proj.id)).catch(err => console.warn("Failed to delete project doc:", err));
           // Log deleted items
-          await setDoc(doc(db, "deletedItems", proj.id), { type: "project", id: proj.id, deletedAt: new Date().toISOString() }).catch(err => console.warn("Failed to write to deletedItems:", err));
+          await saveDoc(doc(db, "deletedItems", proj.id), { type: "project", id: proj.id, deletedAt: new Date().toISOString() }).catch(err => console.warn("Failed to write to deletedItems:", err));
         });
       }
       
@@ -976,7 +977,7 @@ export default function App() {
       createdAt: new Date().toISOString()
     };
     try {
-      await setDoc(doc(db, "notifications", newNotif.id), newNotif);
+      await saveDoc(doc(db, "notifications", newNotif.id), newNotif);
     } catch (err) {
       console.warn("Offline notification write:", err);
     }
@@ -987,32 +988,32 @@ export default function App() {
   // --- Seed initial data helper loaders in Firestore ---
   const seedInitialUsers = async () => {
     for (const member of STARTER_MEMBERS) {
-      await setDoc(doc(db, "users", member.id), member);
+      await saveDoc(doc(db, "users", member.id), member);
     }
   };
 
   const seedInitialWorkspaces = async () => {
     for (const ws of STARTER_WORKSPACES) {
-      await setDoc(doc(db, "workspaces", ws.id), ws);
+      await saveDoc(doc(db, "workspaces", ws.id), ws);
     }
   };
 
   const seedInitialProjects = async () => {
     for (const proj of STARTER_PROJECTS) {
-      await setDoc(doc(db, "projects", proj.id), proj);
+      await saveDoc(doc(db, "projects", proj.id), proj);
     }
   };
 
   const seedInitialTasks = async () => {
     for (const task of STARTER_TASKS) {
-      await setDoc(doc(db, "tasks", task.id), task);
+      await saveDoc(doc(db, "tasks", task.id), task);
     }
   };
 
   const seedInitialGolfCourses = async () => {
     for (const score of STARTER_GOLF_CORES) {
       const id = "course_" + score.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-      await setDoc(doc(db, "golfCourses", id), { ...score, id });
+      await saveDoc(doc(db, "golfCourses", id), { ...score, id });
     }
   };
 
@@ -1108,7 +1109,7 @@ export default function App() {
     addToast(`Espai "${newWS.name}" creat correctament`, "success");
 
     try {
-      await setDoc(doc(db, "workspaces", id), newWS);
+      await saveDoc(doc(db, "workspaces", id), newWS);
     } catch (err) {
       console.warn("[Firestore Write Warning] workspaces: saved in client sandbox", err);
     }
@@ -1166,16 +1167,16 @@ export default function App() {
     // 3. Send deletes to Firestore asynchronously
     try {
       // Create deletedItems logs so other clients can also sync the delete-by-id instantly
-      await setDoc(doc(db, "deletedItems", workspaceId), { type: "workspace", id: workspaceId, deletedAt: new Date().toISOString() });
+      await saveDoc(doc(db, "deletedItems", workspaceId), { type: "workspace", id: workspaceId, deletedAt: new Date().toISOString() });
       await deleteDoc(doc(db, "workspaces", workspaceId));
 
       for (const pId of wsProjectIds) {
-        await setDoc(doc(db, "deletedItems", pId), { type: "project", id: pId, deletedAt: new Date().toISOString() }).catch(() => {});
+        await saveDoc(doc(db, "deletedItems", pId), { type: "project", id: pId, deletedAt: new Date().toISOString() }).catch(() => {});
         await deleteDoc(doc(db, "projects", pId)).catch(() => {});
       }
 
       for (const tId of wsTaskIds) {
-        await setDoc(doc(db, "deletedItems", tId), { type: "task", id: tId, deletedAt: new Date().toISOString() }).catch(() => {});
+        await saveDoc(doc(db, "deletedItems", tId), { type: "task", id: tId, deletedAt: new Date().toISOString() }).catch(() => {});
         await deleteDoc(doc(db, "tasks", tId)).catch(() => {});
       }
     } catch (err) {
@@ -1213,7 +1214,7 @@ export default function App() {
     addToast(`Projecte "${newProj.name}" creat correctament`, "success");
 
     try {
-      await setDoc(doc(db, "projects", id), newProj);
+      await saveDoc(doc(db, "projects", id), newProj);
     } catch (err) {
       console.warn("[Firestore Write Warning] projects: saved in client sandbox", err);
     }
@@ -1244,7 +1245,7 @@ export default function App() {
           await updateDoc(doc(db, "tasks", task.id), { projectId: "" }).catch(e => console.warn("Task update error:", e));
         }
         try {
-          await setDoc(doc(db, "deletedItems", projectId), { type: "project", id: projectId, deletedAt: new Date().toISOString() });
+          await saveDoc(doc(db, "deletedItems", projectId), { type: "project", id: projectId, deletedAt: new Date().toISOString() });
         } catch (setErr) {
           console.warn("Could not save to deletedItems collection:", setErr);
         }
@@ -1279,7 +1280,7 @@ export default function App() {
       const pDoc = projects.find(p => p.id === projectId);
       if (pDoc) {
         const fullProj = { ...pDoc, ...updates };
-        await setDoc(doc(db, "projects", projectId), fullProj);
+        await saveDoc(doc(db, "projects", projectId), fullProj);
       }
     } catch (err) {
       console.warn("[Firestore Write Warning] update project: saved in client sandbox", err);
@@ -1315,7 +1316,7 @@ export default function App() {
     addToast(`Tasca "${title}" creada correctament`, "success");
 
     try {
-      await setDoc(doc(db, "tasks", id), newTask);
+      await saveDoc(doc(db, "tasks", id), newTask);
     } catch (err) {
       console.warn("[Firestore Write Warning] tasks: saved in client sandbox", err);
     }
@@ -1442,12 +1443,12 @@ export default function App() {
     try {
       const origTask = finalTaskList.find((x) => x.id === taskId);
       if (origTask) {
-        await setDoc(doc(db, "tasks", taskId), origTask);
+        await saveDoc(doc(db, "tasks", taskId), origTask);
       }
 
       // Write any newly created recurrent tasks to Firebase
       for (const tCont of extraTasksToCreate) {
-        await setDoc(doc(db, "tasks", tCont.id), tCont);
+        await saveDoc(doc(db, "tasks", tCont.id), tCont);
       }
     } catch (err) {
       console.warn("[Firestore Write Warning] tasks/update: saved in client sandbox", err);
@@ -1485,7 +1486,7 @@ export default function App() {
 
       try {
         try {
-          await setDoc(doc(db, "deletedItems", taskId), { type: "task", id: taskId, deletedAt: new Date().toISOString() });
+          await saveDoc(doc(db, "deletedItems", taskId), { type: "task", id: taskId, deletedAt: new Date().toISOString() });
         } catch (setErr) {
           console.warn("Could not save to deletedItems collection:", setErr);
         }
@@ -1527,7 +1528,7 @@ export default function App() {
     logEnterpriseAction(`Comentari afegit a la tasca: ${selectedTask.title}`);
 
     try {
-      await setDoc(doc(db, "comments", id), newComment);
+      await saveDoc(doc(db, "comments", id), newComment);
       
       // Notify other assignees of this comment mention
       const otherAssignees = (selectedTask.assigneeIds || []).filter(uid => uid !== currentUser.id);
@@ -1573,7 +1574,7 @@ export default function App() {
     logEnterpriseAction(`Golf registrat: ${course.name}`);
 
     try {
-      await setDoc(doc(db, "golfCourses", id), newCourse);
+      await saveDoc(doc(db, "golfCourses", id), newCourse);
     } catch (err) {
       console.warn("[Firestore Write Warning] golfCourses: saved in client sandbox", err);
     }
@@ -1629,7 +1630,7 @@ export default function App() {
     logEnterpriseAction(`Nou col·laborador registrat: ${name} (${role})`);
 
     try {
-      await setDoc(doc(db, "users", id), newU);
+      await saveDoc(doc(db, "users", id), newU);
     } catch (err) {
       console.warn("[Firestore Write Warning] users: saved in client sandbox", err);
     }
@@ -1650,7 +1651,7 @@ export default function App() {
 
       // 2. Also register as latest action on user presence in real-time
       const presenceRef = doc(db, "presence", currentUser.id);
-      setDoc(presenceRef, {
+      saveDoc(presenceRef, {
         lastAction: action,
         lastActionTime: Timestamp.now()
       }, { merge: true }).catch(err => console.warn(err));
@@ -3750,7 +3751,7 @@ export default function App() {
                                   localStorage.setItem("golfsana_tasks", JSON.stringify(updated));
                                   setSelectedTask(clonedTask);
                                   logEnterpriseAction(`Tasca duplicada (ID: ${cloneId})`);
-                                  setDoc(doc(db, "tasks", cloneId), clonedTask).catch(err => console.warn(err));
+                                  saveDoc(doc(db, "tasks", cloneId), clonedTask).catch(err => console.warn(err));
                                   alert(`S'ha duplicat la tasca amb èxit! Oberta la còpia de treball.`);
                                 }}
                                 className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-slate-700 border-b border-slate-50"
@@ -3785,7 +3786,7 @@ export default function App() {
                                   localStorage.setItem("golfsana_tasks", JSON.stringify(updated));
                                   setSelectedTask(followTask);
                                   logEnterpriseAction(`Tasca de seguiment asana creada (ID: ${cloneId})`);
-                                  setDoc(doc(db, "tasks", cloneId), followTask).catch(err => console.warn(err));
+                                  saveDoc(doc(db, "tasks", cloneId), followTask).catch(err => console.warn(err));
                                   alert(`S'ha creat una tasca de seguiment planificada per l'Asana.`);
                                 }}
                                 className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-slate-700 border-b border-slate-50"

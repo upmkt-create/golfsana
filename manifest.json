@@ -1,0 +1,21 @@
+{
+  "name": "GolfSana",
+  "short_name": "GolfSana",
+  "description": "Plataforma de gestió d'Asana per a Golf",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e293b",
+  "icons": [
+    {
+      "src": "/src/campo-de-golf.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/src/campo-de-golf.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

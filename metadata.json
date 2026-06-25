@@ -1,0 +1,6 @@
+{
+  "name": "GolfAsana Enterprise & Golf Comparador",
+  "description": "Plataforma de gestió de projectes estil Asana Enterprise amb gestió d'usuaris il·limitats i panell d'administració per a comparatives de preus de camps de golf.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

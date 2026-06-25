@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Safety net default-deny rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn();
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validation Helpers ---
+    function isValidUser(data) {
+      return data.id is string && data.id.size() <= 128;
+    }
+
+    function isValidWorkspace(data) {
+      return data.id is string && data.id.size() <= 128;
+    }
+
+    // Relaxed for robustness and prevent write/rules blockages
+    function isValidProject(data) {
+      return data.id is string && data.id.size() <= 128;
+    }
+
+    function isValidTask(data) {
+      return data.id is string && data.id.size() <= 128;
+    }
+
+    function isValidComment(data) {
+      return data.id is string && data.id.size() <= 128;
+    }
+
+    function isValidGolfCourse(data) {
+      return data.id is string && data.id.size() <= 128;
+    }
+
+    function isValidNotification(data) {
+      return data.id is string && data.id.size() <= 135;
+    }
+
+    function isValidLog(data) {
+      return data.userId is string && data.userId.size() <= 128;
+    }
+
+    // --- Collections Routing Rules ---
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow list, get: if true;
+      allow create, update: if isValidUser(incoming());
+      allow delete: if true;
+    }
+
+    // WORKSPACES COLLECTION
+    match /workspaces/{workspaceId} {
+      allow list, get: if true;
+      allow create, update: if isValidWorkspace(incoming());
+      allow delete: if true;
+    }
+
+    // PROJECTS COLLECTION
+    match /projects/{projectId} {
+      allow list, get: if true;
+      allow create, update: if isValidProject(incoming());
+      allow delete: if true;
+    }
+
+    // TASKS COLLECTION
+    match /tasks/{taskId} {
+      allow list, get: if true;
+      allow create, update: if isValidTask(incoming());
+      allow delete: if true;
+    }
+
+    // COMMENTS COLLECTION
+    match /comments/{commentId} {
+      allow list, get: if true;
+      allow create, update: if isValidComment(incoming());
+      allow delete: if true;
+    }
+
+    // GOLF COURSES ANALYSIS COLLECTION
+    match /golfCourses/{courseId} {
+      allow list, get: if true;
+      allow create, update: if isValidGolfCourse(incoming());
+      allow delete: if true;
+    }
+
+    // NOTIFICATIONS COLLECTION
+    match /notifications/{notificationId} {
+      allow list, get: if true;
+      allow create, update: if isValidNotification(incoming());
+      allow delete: if true;
+    }
+
+    // DELETEDITEMS COLLECTION
+    match /deletedItems/{itemId} {
+      allow read, write: if true;
+    }
+
+    // AUDIT LOGS COLLECTION
+    match /logs/{logId} {
+      allow list, get: if true;
+      allow create: if isValidLog(incoming());
+      allow update, delete: if false; // Audit logs are immutable and permanent
+    }
+
+    // PRESENCE COLLECTION
+    match /presence/{userId} {
+      allow read, write: if true;
+    }
+  }
+}

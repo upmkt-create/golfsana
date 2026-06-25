@@ -1,0 +1,158 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Enterprise user profile details",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique user credentials identifier" },
+        "name": { "type": "string", "description": "Display name of the user" },
+        "email": { "type": "string", "description": "Corporate or administrative email" },
+        "role": { "type": "string", "enum": ["admin", "owner", "member"], "description": "Access levels inside the platform" },
+        "avatar": { "type": "string", "description": "Profile photo URL or initials icon" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "Workspace": {
+      "title": "Workspace",
+      "description": "Collaborative enterprise container for projects",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A structured sequence of activities or tasks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "archived", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "workspaceId", "name"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "An actionable work item within a project",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assigneeId": { "type": "string" },
+        "status": { "type": "string", "enum": ["todo", "in_progress", "review", "done"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "dueDate": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "projectId", "workspaceId", "title", "status", "priority"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Collaborative discussion on a Task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "taskId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "taskId", "userId", "userName", "comment"]
+    },
+    "GolfCourse": {
+      "title": "GolfCourse",
+      "description": "Golf course fee comparison structure for administrative analytical reports",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "greenFeeHigh": { "type": "number" },
+        "greenFeeLow": { "type": "number" },
+        "buggyRental": { "type": "number" },
+        "clubRental": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["id", "name", "greenFeeHigh", "greenFeeLow"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User specific system alerts and task mentions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "taskTitle": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "taskId", "taskTitle", "message"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "User action and diagnostic audit logs recorded in real-time",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "email": { "type": "string" },
+        "action": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "email", "action"]
+    }
+  },
+  "firestore": {
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "System notices and action notifications to notify assigned members of changes"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User records containing name, role, and details"
+    },
+    "/workspaces/{workspaceId}": {
+      "schema": "Workspace",
+      "description": "Workspaces defining departments or groups"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Enterprise projects mapped within workspaces"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tasks within a project"
+    },
+    "/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments attached to progress items"
+    },
+    "/golfCourses/{courseId}": {
+      "schema": "GolfCourse",
+      "description": "Updated price rates of registered golf courses, queryable by administrators"
+    },
+    "/logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "User activity audit logs for enterprise monitoring"
+    }
+  }
+}

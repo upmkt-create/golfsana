@@ -5,7 +5,7 @@ export const STARTER_GOLF_CORES: Omit<GolfCourse, "id">[] = [
     name: "Club Golf d'Aro - Mas Nou",
     location: "Castell-Platja d'Aro, Girona",
     url: "https://www.golfdaro.com/",
-    bookingUrl: "https://eu.golfmanager.com/golfdaro/consumer/book?area=3&date=2026-06-23T00%3A00&resource=16",
+    bookingUrl: "https://eu.golfmanager.com/golfdaro/consumer/book?area=3&date=2026-06-13T00%3A00&resource=16",
     bookingSystem: "Golf Manager",
     syncStatus: "success",
     lastSyncTime: "Avui, 04:00 AM",
@@ -66,8 +66,8 @@ export const STARTER_GOLF_CORES: Omit<GolfCourse, "id">[] = [
       "12:00-13:00": "PALS - 18 HOYOS ADULTO",
       "13:00-14:00": "PALS - 18 HOYOS ADULTO",
       "14:00-15:00": "PALS - 18 HOYOS ADULTO",
-      "15:00-16:00": "18 HOYOS TWILIGHT",
-      "16:00-21:00": "18 HOYOS TWILIGHT"
+      "15:00-16:00": "PALS - 18 HOYOS ADULTO",
+      "16:00-21:00": "PALS - 18 HOYOS ADULTO"
     },
     updatedBy: "Scraper Automàtic",
     occupancyToday: 82,
@@ -93,18 +93,18 @@ export const STARTER_GOLF_CORES: Omit<GolfCourse, "id">[] = [
       "08:00-12:00": 110,
       "12:00-13:00": 100,
       "13:00-14:00": 95,
-      "14:00-15:00": 75,
-      "15:00-16:00": 75,
-      "16:00-21:00": 75
+      "14:00-15:00": 88,
+      "15:00-16:00": 82,
+      "16:00-21:00": 70
     },
     hourlyTariffs: {
       "07:00-08:00": "GF 18 HOLES FOREST",
       "08:00-12:00": "GF 18 HOLES FOREST",
       "12:00-13:00": "GF 18 HOLES FOREST",
       "13:00-14:00": "GF 18 HOLES FOREST",
-      "14:00-15:00": "GF ALL YOU CAN PLAY FOREST",
-      "15:00-16:00": "GF ALL YOU CAN PLAY FOREST",
-      "16:00-21:00": "GF ALL YOU CAN PLAY FOREST"
+      "14:00-15:00": "GF 18 HOLES FOREST",
+      "15:00-16:00": "GF 18 HOLES FOREST",
+      "16:00-21:00": "GF 18 HOLES FOREST"
     },
     updatedBy: "Scraper Automàtic",
     occupancyToday: 73,
@@ -204,18 +204,18 @@ export const STARTER_GOLF_CORES: Omit<GolfCourse, "id">[] = [
       "08:00-12:00": 107,
       "12:00-13:00": 81,
       "13:00-14:00": 81,
-      "14:00-15:00": 75,
-      "15:00-16:00": 75,
-      "16:00-21:00": 52
+      "14:00-15:00": 81,
+      "15:00-16:00": 81,
+      "16:00-21:00": 81
     },
     hourlyTariffs: {
-      "07:00-08:00": "GF 18 - Earlybird",
+      "07:00-08:00": "GF 18 Earlybird",
       "08:00-12:00": "GF 18 Forats",
-      "12:00-13:00": "GF 18 - Summer Fee",
-      "13:00-14:00": "GF 18 - Summer Fee",
-      "14:00-15:00": "GF 18 - Twilight",
-      "15:00-16:00": "GF 18 - Twilight",
-      "16:00-21:00": "GF 18 - All You Can Play"
+      "12:00-13:00": "GF 18 - 4 jugadors",
+      "13:00-14:00": "GF 18 - Summer fee",
+      "14:00-15:00": "GF 18- Twilight",
+      "15:00-16:00": "GF 18 - all You can Play",
+      "16:00-21:00": "GF 18- Twilight"
     },
     updatedBy: "Scraper Automàtic",
     occupancyToday: 30.5,
@@ -265,7 +265,6 @@ export const STARTER_GOLF_CORES: Omit<GolfCourse, "id">[] = [
 export const DEPARTMENTS = [
   { id: "dep-esportiu", name: "Esportiu", description: "Organització de tornejos, campionats de socis i activitats del Club.", color: "#3B82F6" },
   { id: "dep-comercial", name: "Comercial", description: "Vendes de green fees, abonaments de socis i esdeveniments corporatius.", color: "#EF4444" },
-  { id: "dep-pitch-putt", name: "Pitch & Putt", description: "Gestió, reserves, tornejos del recorregut i escola de Pitch&Putt.", color: "#0D9488" },
   { id: "dep-marqueting", name: "Màrqueting", description: "Disseny gràfic, campanyes digitals, gestió de web i xarxes socials.", color: "#F59E0B" }
 ];
 
@@ -346,8 +345,8 @@ export const STARTER_MEMBERS: UserProfile[] = [
     email: "saba@golfdaro.com",
     role: "member",
     avatar: "S",
-    departmentId: "dep-comercial",
-    departmentIds: ["dep-comercial"],
+    departmentId: "",
+    departmentIds: [],
     accessCode: "SABA-2026"
   }
 ];
@@ -366,12 +365,6 @@ export const STARTER_WORKSPACES: Workspace[] = [
     createdAt: new Date().toISOString()
   },
   {
-    id: "dep-pitch-putt",
-    name: "Pitch & Putt",
-    description: "Gestió, reserves, tornejos del recorregut i escola de Pitch&Putt.",
-    createdAt: new Date().toISOString()
-  },
-  {
     id: "dep-marqueting",
     name: "Màrqueting",
     description: "Disseny gràfic, campanyes digitals, gestió de web i xarxes socials.",
@@ -381,38 +374,11 @@ export const STARTER_WORKSPACES: Workspace[] = [
 
 export const STARTER_PROJECTS: Project[] = [
   {
-    id: "proj-torneig-primavera",
-    workspaceId: "dep-esportiu",
-    name: "Torneig de Primavera 2026",
-    color: "#3B82F6", // Blue
-    description: "Organització de la competició corporativa anual per a patrocinadors i socis nacionals.",
-    status: "active",
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "proj-manteniment-green",
-    workspaceId: "dep-comercial",
-    name: "Millora Tècnica de Greens",
-    color: "#10B981", // Emerald
-    description: "Re-sembrat i millora del sistema de drenatge d'aigua als forats 9 i 18 del camp principal.",
-    status: "active",
-    createdAt: new Date().toISOString()
-  },
-  {
     id: "proj-social-media",
     workspaceId: "dep-marqueting",
     name: "Campanya Estiu & Paquets de Golf",
     color: "#F59E0B", // Amber
     description: "Promoció digital dels nous abonaments de cap de setmana combinats amb allotjament.",
-    status: "active",
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: "proj-botiga-estoc",
-    workspaceId: "dep-comercial",
-    name: "Renovació Col·lecció Estiu Shop",
-    color: "#8B5CF6", // Purple
-    description: "Actualització de l'inventari tècnic de pals de lloguer i liquidació d'estocs anteriors.",
     status: "active",
     createdAt: new Date().toISOString()
   },
@@ -529,7 +495,7 @@ export const STARTER_PROJECTS: Project[] = [
 export const STARTER_TASKS: Task[] = [
   {
     id: "task-1",
-    projectId: "proj-torneig-primavera",
+    projectId: "",
     workspaceId: "dep-esportiu",
     title: "Tancar calendari de Tee Times amb Camiral",
     description: "Gestionar els dies exactes en cap de setmana amb tarifes de temporada alta, inclosos buggies de cortesia.",
@@ -557,7 +523,7 @@ export const STARTER_TASKS: Task[] = [
   },
   {
     id: "task-3",
-    projectId: "proj-manteniment-green",
+    projectId: "",
     workspaceId: "dep-comercial",
     title: "Contractar subministrament de fertilitzant orgànic",
     description: "Assegurar la correcta quantitat per als greens de practiques abans dels mesos d'estiu més càlids.",
@@ -571,7 +537,7 @@ export const STARTER_TASKS: Task[] = [
   },
   {
     id: "task-4",
-    projectId: "proj-botiga-estoc",
+    projectId: "",
     workspaceId: "dep-comercial",
     title: "Definir pressupost de campanyes a Meta i Google Ads",
     description: "Segmentar el público objectiu resident a Barcelona, Andorra i sud de França interessat en golf d'alta gama.",
@@ -613,7 +579,7 @@ export const STARTER_TASKS: Task[] = [
   },
   {
     id: "task-7",
-    projectId: "proj-botiga-estoc",
+    projectId: "",
     workspaceId: "dep-comercial",
     title: "Inventari de roba tècnica i calçat FootJoy",
     description: "Recomptar unitats restants del magatzem, aplicar descomptes outlet de fins al 45% i activar nova cartelleria.",
@@ -807,18 +773,18 @@ export function parseAndCleanPrice(priceInput: string | number): number {
  * Filtres estrictes de productes i tarifes per a cada camp de golf.
  */
 export const COURSE_TARIFF_FILTERS = {
-  pals: ["PALS - 18 HOYOS ADULTO", "18 HOYOS TWILIGHT"],
-  emporda: ["GF 18 HOLES FOREST", "GF ALL YOU CAN PLAY FOREST"],
+  pals: ["PALS - 18 HOYOS ADULTO"],
+  emporda: ["GF 18 HOLES FOREST"],
   costa_brava: ["18 holes", "18 holes Sun Hour"],
   camiral: ["Stadium Course"],
   perelada: ["GREEN FEE 18 Hoyos"],
   torremirona: [
-    "GF 18 - Earlybird",
-    "GF 18 Forats",
-    "GF 18 - 4 Jugadors",
-    "GF 18 - Summer Fee",
-    "GF 18 - Twilight",
-    "GF 18 - All You Can Play"
+    "GF 18 Earlybird", 
+    "GF 18 Forats", 
+    "GF 18 - 4 jugadors", 
+    "GF 18 - Summer fee", 
+    "GF 18- Twilight", 
+    "GF 18 - all You can Play"
   ]
 };
 
@@ -906,8 +872,8 @@ export function getRealWorldCompetitorPrices(courseName: string, isWeekend: bool
         "12:00-13:00": "PALS - 18 HOYOS ADULTO",
         "13:00-14:00": "PALS - 18 HOYOS ADULTO",
         "14:00-15:00": "PALS - 18 HOYOS ADULTO",
-        "15:00-16:00": "18 HOYOS TWILIGHT",
-        "16:00-21:00": "18 HOYOS TWILIGHT"
+        "15:00-16:00": "PALS - 18 HOYOS ADULTO",
+        "16:00-21:00": "PALS - 18 HOYOS ADULTO"
       }
     };
   }
@@ -932,9 +898,9 @@ export function getRealWorldCompetitorPrices(courseName: string, isWeekend: bool
         "08:00-12:00": "GF 18 HOLES FOREST",
         "12:00-13:00": "GF 18 HOLES FOREST",
         "13:00-14:00": "GF 18 HOLES FOREST",
-        "14:00-15:00": "GF ALL YOU CAN PLAY FOREST",
-        "15:00-16:00": "GF ALL YOU CAN PLAY FOREST",
-        "16:00-21:00": "GF ALL YOU CAN PLAY FOREST"
+        "14:00-15:00": "GF 18 HOLES FOREST",
+        "15:00-16:00": "GF 18 HOLES FOREST",
+        "16:00-21:00": "GF 18 HOLES FOREST"
       }
     };
   }
@@ -977,18 +943,18 @@ export function getRealWorldCompetitorPrices(courseName: string, isWeekend: bool
         "08:00-12:00": isWeekend ? 107 : 97,
         "12:00-13:00": isWeekend ? 81 : 75,
         "13:00-14:00": isWeekend ? 81 : 75,
-        "14:00-15:00": isWeekend ? 75 : 69,
-        "15:00-16:00": isWeekend ? 75 : 69,
-        "16:00-21:00": isWeekend ? 52 : 48
+        "14:00-15:00": isWeekend ? 81 : 75,
+        "15:00-16:00": isWeekend ? 81 : 75,
+        "16:00-21:00": isWeekend ? 81 : 75
       },
       hourlyTariffs: {
-        "07:00-08:00": "GF 18 - Earlybird",
+        "07:00-08:00": "GF 18 Earlybird",
         "08:00-12:00": "GF 18 Forats",
-        "12:00-13:00": "GF 18 - Summer Fee",
-        "13:00-14:00": "GF 18 - Summer Fee",
-        "14:00-15:00": "GF 18 - Twilight",
-        "15:00-16:00": "GF 18 - Twilight",
-        "16:00-21:00": "GF 18 - All You Can Play"
+        "12:00-13:00": "GF 18 - 4 jugadors",
+        "13:00-14:00": "GF 18 - Summer fee",
+        "14:00-15:00": "GF 18- Twilight",
+        "15:00-16:00": "GF 18 - all You can Play",
+        "16:00-21:00": "GF 18- Twilight"
       }
     };
   }

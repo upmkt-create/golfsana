@@ -161,9 +161,12 @@ export default function App() {
         const match = STARTER_MEMBERS.find((s) => s.id === targetId);
         return match ? { ...savedUser, ...match } : savedUser;
       }
-      return STARTER_MEMBERS[0];
+      // Sense sessió guardada → null perquè es mostri la pantalla de login.
+      // (Abans retornava STARTER_MEMBERS[0], que entrava com Isabel sempre i
+      // impedia que apareguessin el login i el logout funcionés.)
+      return null;
     } catch {
-      return STARTER_MEMBERS[0];
+      return null;
     }
   });
 

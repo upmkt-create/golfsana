@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Open Sans', system-ui, -apple-system, sans-serif;
+  --font-display: 'Open Sans', system-ui, sans-serif;
+  --font-mono: 'Open Sans', system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #f9fafb;
+}
+
+* {
+  font-family: 'Open Sans', system-ui, -apple-system, sans-serif !important;
+}
+
+/* Allow actual raw terminal console text to use mono for logs */
+.font-mono, pre, code {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Custom scrollbar adjustments for a clean, premium enterprise spreadsheet look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.35);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.55);
+}
+

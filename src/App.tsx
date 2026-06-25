@@ -418,18 +418,15 @@ export default function App() {
     localStorage.removeItem("golfsana_currentUser");
     setCurrentUser(null);
     setFirebaseUser(null);
-    window.location.reload();
+    setIsLogoutConfirmationOpen(false);
+    // No cal window.location.reload(): en posar currentUser a null, l'app mostra
+    // automàticament la pantalla de login. Evitem així l'avís del navegador
+    // "¿Quieres volver a cargar el sitio web?".
   };
 
-  // Prevent accidental navigation
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
+  // (S'ha eliminat el bloqueig de navegació "beforeunload": era massa agressiu
+  // i mostrava l'avís del navegador a cada recàrrega o logout. Les dades es desen
+  // automàticament a cada canvi, així que no cal advertir en sortir.)
 
   // User Presence Tracking (Online / Offline Sessions & Heartbeats)
   useEffect(() => {

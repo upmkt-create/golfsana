@@ -161,9 +161,7 @@ export default function App() {
         const match = STARTER_MEMBERS.find((s) => s.id === targetId);
         return match ? { ...savedUser, ...match } : savedUser;
       }
-      // Sense sessió guardada → null perquè es mostri la pantalla de login.
-      // (Abans retornava STARTER_MEMBERS[0], que entrava com Isabel sempre i
-      // impedia que apareguessin el login i el logout funcionés.)
+      // Sense sessió guardada → null perquè aparegui la pantalla de login.
       return null;
     } catch {
       return null;
@@ -351,7 +349,7 @@ export default function App() {
     }
   }, [offlineMode]);
 
-  const isAdmin = 
+  const isAdmin = !!currentUser && (
     currentUser.email === "info@up-mktdigital.com" || 
     currentUser.email === "rocio@golfdaro.com" ||
     currentUser.id === "member_isabel" || 
@@ -359,7 +357,8 @@ export default function App() {
     (currentUser.name && (
       currentUser.name.toLowerCase().includes("roci") || 
       currentUser.name.toLowerCase().includes("isabel")
-    ));
+    ))
+  );
 
   // Redirect non-admins from restricted tabs
   useEffect(() => {
@@ -387,16 +386,15 @@ export default function App() {
     if (userMatch) {
       setCurrentUser(userMatch);
       localStorage.setItem("golfsana_currentUser", JSON.stringify(userMatch));
-      // Estableix una sessió ANÒNIMA REAL de Firebase perquè Firestore accepti
-      // lectures/escriptures (request.auth != null). Sense això, request.auth
-      // seria null i Firestore rebutjaria amb "Missing or insufficient permissions".
+      // Sessió ANÒNIMA REAL de Firebase perquè Firestore accepti operacions
+      // (request.auth != null). Sense això → "Missing or insufficient permissions".
       try {
         if (!auth.currentUser) {
           await signInAnonymously(auth);
         }
         setFirebaseUser(auth.currentUser || { uid: userMatch.id, email: userMatch.email });
       } catch (err) {
-        console.warn("[Auth] No s'ha pogut iniciar sessió anònima a Firebase, activant mode local:", err);
+        console.warn("[Auth] Sessió anònima Firebase fallida, mode local:", err);
         setOfflineMode(true);
         localStorage.setItem("golfsana_offline", "true");
         setFirebaseUser({ uid: userMatch.id, email: userMatch.email });
@@ -418,10 +416,8 @@ export default function App() {
     }
     localStorage.removeItem("golfsana_currentUser");
     setCurrentUser(null);
-    setIsLogoutConfirmationOpen(false);
-    // No cal window.location.reload(): en posar currentUser a null, l'app
-    // mostra automàticament la pantalla de login. La sessió anònima de
-    // Firebase es manté (és només tècnica) per a la propera entrada.
+    setFirebaseUser(null);
+    window.location.reload();
   };
 
   // Prevent accidental navigation
@@ -1692,9 +1688,9 @@ export default function App() {
 
   if (authLoading) return <div className="p-10 text-center font-mono text-xs">Carregant sistema...</div>;
   
-  // La pantalla de login es mostra quan no hi ha usuari REAL seleccionat
-  // (currentUser). firebaseUser és només la sessió tècnica anònima de Firestore,
-  // que pot seguir activa després d'un logout — per això no serveix com a condició.
+  // El login es mostra quan no hi ha usuari REAL de l'app (currentUser).
+  // firebaseUser és només la sessió tècnica anònima de Firestore i pot existir
+  // sense que l'usuari hagi triat el seu perfil — per això no serveix com a condició.
   if (!currentUser) {
     return <LoginScreen onLogin={handleCustomLogin} />;
   }

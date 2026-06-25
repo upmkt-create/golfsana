@@ -48,7 +48,9 @@ import {
   GolfCourse,
   TaskStatus,
   TaskPriority,
-  UserRole
+  UserRole,
+  MeetingMinute,
+  MeetingAgreement
 } from "./types";
 import {
   Layers,
@@ -116,6 +118,7 @@ import ProductivityEvolutionChart from "./components/ProductivityEvolutionChart"
 import AdminMonitoringDashboard from "./components/AdminMonitoringDashboard";
 import UserManualDashboard from "./components/UserManualDashboard";
 import AllTasksGlobalView from "./components/AllTasksGlobalView";
+import MeetingMinutes from "./components/MeetingMinutes";
 // @ts-ignore
 import golfBallIcon from "./campo-de-golf.png";
 
@@ -244,7 +247,7 @@ export default function App() {
   }, [deletedItemIds]);
   
   // Interactive / detailed UI State
-  const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global">("inici");
+  const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes">("inici");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskComments, setTaskComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
@@ -272,6 +275,14 @@ export default function App() {
   const [toasts, setToasts] = useState<{ id: string; message: string; type: "success" | "info" | "warning" }[]>([]);
   const [linkCopied, setLinkCopied] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [meetingMinutes, setMeetingMinutes] = useState<MeetingMinute[]>(() => {
+    try {
+      const saved = localStorage.getItem("golfsana_minutes");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
 
   // Reusable React-driven confirmation state to bypass iframe popup constraints
@@ -967,6 +978,29 @@ export default function App() {
     return () => unsubNotifications();
   }, [currentUser]);
 
+  // Sincronització d'Actes de Reunió (meetingMinutes)
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsubMinutes = onSnapshot(collection(db, "meetingMinutes"), (snapshot) => {
+      const list: MeetingMinute[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ id: docSnap.id, ...docSnap.data() } as MeetingMinute);
+      });
+      list.sort((a, b) => b.date.localeCompare(a.date));
+      setMeetingMinutes(list);
+      localStorage.setItem("golfsana_minutes", JSON.stringify(list));
+    }, (error) => {
+      console.warn("[Firestore Minutes Sync Warning] loading offline fallbacks:", error);
+      try {
+        const saved = JSON.parse(localStorage.getItem("golfsana_minutes") || "[]");
+        setMeetingMinutes(saved);
+      } catch {
+        setMeetingMinutes([]);
+      }
+    });
+    return () => unsubMinutes();
+  }, [currentUser]);
+
   // Sync selectedTask with any background or status updates in the global tasks array
   useEffect(() => {
     if (selectedTask) {
@@ -998,6 +1032,77 @@ export default function App() {
     }
     // Speculative update for speed or offline use
     setNotifications((prev) => [newNotif, ...prev.filter(n => n.id !== newNotif.id)]);
+  };
+
+  // ---- ACTES DE REUNIÓ ----
+  const handleSaveMinute = async (minute: MeetingMinute, isNew: boolean) => {
+    // Actualització local immediata
+    setMeetingMinutes((prev) => {
+      const next = isNew ? [minute, ...prev] : prev.map((m) => (m.id === minute.id ? minute : m));
+      localStorage.setItem("golfsana_minutes", JSON.stringify(next));
+      return next;
+    });
+    // Escriure a Firestore
+    try {
+      await saveDoc(doc(db, "meetingMinutes", minute.id), minute);
+    } catch (err) {
+      console.warn("[Minutes Write Warning] desat localment:", err);
+      setOfflineMode(true);
+      localStorage.setItem("golfsana_offline", "true");
+    }
+    // Notificar el membre (personalitzada, només a ell)
+    if (isNew && minute.memberId !== currentUser.id) {
+      const nAgr = minute.agreements.length;
+      await createNotification(
+        minute.memberId,
+        minute.id,
+        `Acta de reunió ${minute.date}`,
+        `${currentUser.name} ha registrat l'acta de la vostra reunió del ${minute.date} amb ${nAgr} acord${nAgr === 1 ? "" : "s"} a fer.`
+      );
+    }
+    addToast(isNew ? "Acta publicada i membre avisat" : "Acta actualitzada", "success");
+    logEnterpriseAction(`Acta de reunió ${isNew ? "creada" : "editada"} per a ${minute.memberName} (${minute.date})`);
+  };
+
+  const handleDeleteMinute = async (id: string) => {
+    const minute = meetingMinutes.find((m) => m.id === id);
+    if (!minute) return;
+    if (!window.confirm(`Segur que vols eliminar l'acta de ${minute.memberName} del ${minute.date}?`)) return;
+    setMeetingMinutes((prev) => {
+      const next = prev.filter((m) => m.id !== id);
+      localStorage.setItem("golfsana_minutes", JSON.stringify(next));
+      return next;
+    });
+    try {
+      await deleteDoc(doc(db, "meetingMinutes", id));
+    } catch (err) {
+      console.warn("[Minutes Delete Warning] eliminat localment:", err);
+    }
+    addToast("Acta eliminada", "info");
+  };
+
+  const handleCreateTaskFromAgreement = async (minute: MeetingMinute, agreement: MeetingAgreement) => {
+    // Projecte per defecte: el primer de l'espai actiu, o el primer disponible
+    const targetProject = projects.find((p) => p.workspaceId === activeWorkspaceId) || projects[0];
+    if (!targetProject) {
+      addToast("Cal almenys un projecte per crear la tasca", "warning");
+      return;
+    }
+    await handleAddTask(
+      agreement.text,
+      targetProject.id,
+      [minute.memberId],
+      "medium",
+      undefined,
+      agreement.dueDate || undefined
+    );
+    // Marcar l'acord com a convertit
+    const updatedMinute: MeetingMinute = {
+      ...minute,
+      agreements: minute.agreements.map((a) => (a.id === agreement.id ? { ...a, taskCreated: true } : a)),
+    };
+    await handleSaveMinute(updatedMinute, false);
+    addToast("Tasca creada des de l'acta", "success");
   };
 
   // --- Seed initial data helper loaders in Firestore ---
@@ -2386,6 +2491,18 @@ export default function App() {
               <span>Calendari</span>
             </button>
 
+            <button
+              onClick={() => setActiveTab("minutes")}
+              className={`py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border ${
+                activeTab === "minutes"
+                  ? "bg-slate-100 border-slate-355 text-slate-900"
+                  : "text-slate-505 border-transparent hover:bg-slate-50 hover:text-slate-850"
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <span>Acta de Reunió</span>
+            </button>
+
             {/* Golf pricing matrix (Super Admin workspace) */}
             <button
               onClick={() => setActiveTab("golf")}
@@ -2512,9 +2629,16 @@ export default function App() {
                                         <div 
                                           key={n.id} 
                                           onClick={() => {
-                                            const taskObj = tasks.find(t => t.id === n.taskId);
-                                            if (taskObj) {
-                                              setSelectedTask(taskObj);
+                                            // Si la notificació és d'una acta de reunió,
+                                            // portar el membre a la pestanya d'actes.
+                                            const minuteObj = meetingMinutes.find(m => m.id === n.taskId);
+                                            if (minuteObj) {
+                                              setActiveTab("minutes");
+                                            } else {
+                                              const taskObj = tasks.find(t => t.id === n.taskId);
+                                              if (taskObj) {
+                                                setSelectedTask(taskObj);
+                                              }
                                             }
                                             setShowNotificationsDropdown(false);
                                           }}
@@ -3530,6 +3654,18 @@ export default function App() {
                     onSelectTask={(task) => setSelectedTask(task)}
                   />
                 </div>
+              )}
+
+              {activeTab === "minutes" && (
+                <MeetingMinutes
+                  minutes={meetingMinutes}
+                  users={users}
+                  currentUser={currentUser}
+                  isAdmin={isAdmin}
+                  onSaveMinute={handleSaveMinute}
+                  onDeleteMinute={handleDeleteMinute}
+                  onCreateTaskFromAgreement={handleCreateTaskFromAgreement}
+                />
               )}
 
               {activeTab === "security" && (

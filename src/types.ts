@@ -34,6 +34,7 @@ export interface Workspace {
   name: string;
   description: string;
   createdAt?: any;
+  adminOnly?: boolean; // Si true, només els administradors hi poden entrar
 }
 
 export interface ProjectRole {

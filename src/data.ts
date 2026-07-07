@@ -369,6 +369,13 @@ export const STARTER_WORKSPACES: Workspace[] = [
     name: "Màrqueting",
     description: "Disseny gràfic, campanyes digitals, gestió de web i xarxes socials.",
     createdAt: new Date().toISOString()
+  },
+  {
+    id: "dep-direccio",
+    name: "Direcció",
+    description: "Espai privat de direcció. Accés restringit als administradors.",
+    adminOnly: true,
+    createdAt: new Date().toISOString()
   }
 ];
 

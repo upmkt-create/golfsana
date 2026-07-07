@@ -145,40 +145,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(404).json({ error: `Camp no trobat: ${courseParam}` });
   }
 
-  const results = await Promise.all(
-    targets.map(async (ep) => {
-      // Camp tancat?
-      const closed = isCourseClosedOn(ep.name, dateStr);
-      if (closed.closed) {
-        return { course: ep.name, slug: ep.slug, source: "closed", closedReason: closed.reason, teeTimes: [], summary: getDaySummary(ep.name, dateStr) };
-      }
-
-      // 1r) Intent en directe
-      let liveData: any[] | null = null;
-      if (ep.system === "golfmanager") liveData = await scrapeGolfManager(ep, dateStr);
-      else if (ep.system === "teeone") liveData = await scrapeTeeOne(ep, dateStr);
-
-      // 2n) Fallback al model verificat
-      if (!liveData) {
+  try {
+    // De moment servim el MODEL VERIFICAT (dades correctes de les captures).
+    // L'scraping en directe s'activarà quan es confirmi el format JSON real de
+    // GolfManager/TeeOne. Servir el model és instantani i no pot petar.
+    const results = targets.map((ep) => {
+      try {
+        const closed = isCourseClosedOn(ep.name, dateStr);
+        if (closed.closed) {
+          return {
+            course: ep.name, slug: ep.slug, source: "closed",
+            closedReason: closed.reason, teeTimes: [],
+            summary: getDaySummary(ep.name, dateStr),
+          };
+        }
         return {
-          course: ep.name, slug: ep.slug,
-          source: "model", // dades del model verificat (no en directe)
+          course: ep.name, slug: ep.slug, source: "model",
           teeTimes: getCompetitorTeeTimes(ep.name, dateStr),
           summary: getDaySummary(ep.name, dateStr),
         };
+      } catch (courseErr: any) {
+        // Si un camp concret falla, no tombem tota la resposta
+        return {
+          course: ep.name, slug: ep.slug, source: "error",
+          error: String(courseErr?.message || courseErr),
+          teeTimes: [], summary: null,
+        };
       }
+    });
 
-      // Si tenim dades en directe, aquí es mapejarien al format TeeTime.
-      // (Pendent de confirmar el format JSON real via DevTools.)
-      return {
-        course: ep.name, slug: ep.slug,
-        source: "live",
-        teeTimes: getCompetitorTeeTimes(ep.name, dateStr), // de moment model fins confirmar parser
-        summary: getDaySummary(ep.name, dateStr),
-        _rawLiveSample: liveData.slice(0, 2), // mostra per depurar el format
-      };
-    })
-  );
-
-  return res.status(200).json({ date: dateStr, courses: results });
+    return res.status(200).json({ date: dateStr, courses: results });
+  } catch (err: any) {
+    // Xarxa de seguretat global: mai retornem 500
+    return res.status(200).json({
+      date: dateStr,
+      courses: [],
+      error: String(err?.message || err),
+    });
+  }
 }

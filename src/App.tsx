@@ -377,7 +377,13 @@ export default function App() {
     if (!isAdmin && activeTab === "incentives") {
       setActiveTab("summary");
     }
-  }, [isAdmin, activeTab]);
+    // Seguretat: si un no-admin té actiu l'espai privat de direcció, el treiem
+    const activeWs = workspaces.find(w => w.id === activeWorkspaceId);
+    if (!isAdmin && activeWs?.adminOnly) {
+      const firstAllowed = workspaces.find(w => !w.adminOnly);
+      setActiveWorkspaceId(firstAllowed?.id || "");
+    }
+  }, [isAdmin, activeTab, activeWorkspaceId, workspaces]);
 
   // 1. Authenticate silently or manage google login
   useEffect(() => {
@@ -640,6 +646,21 @@ export default function App() {
         // Set first active workspace if none selected
         if (!activeWorkspaceId || !items.some(w => w.id === activeWorkspaceId)) {
           setActiveWorkspaceId(items[0]?.id || "");
+        }
+        // Auto-seed de l'espai "Direcció" (admin-only) si falta i no s'ha eliminat.
+        // Es fa una sola vegada, comprovant que no existeixi ja, per evitar duplicats.
+        const hasDireccio = items.some(w => w.id === "dep-direccio");
+        if (!hasDireccio && !deletedSet.has("dep-direccio")) {
+          const direccio: Workspace = {
+            id: "dep-direccio",
+            name: "Direcció",
+            description: "Espai privat de direcció. Accés restringit als administradors.",
+            adminOnly: true,
+            createdAt: new Date().toISOString()
+          };
+          saveDoc(doc(db, "workspaces", "dep-direccio"), direccio).catch((e) =>
+            console.warn("No s'ha pogut crear l'espai Direcció:", e)
+          );
         }
       }
     }, (error) => {
@@ -1964,46 +1985,57 @@ export default function App() {
               <div className="space-y-1 pl-1.5">
                 {workspaces.map((ws) => {
                   const isActive = ws.id === activeWorkspaceId;
+                  const isLocked = ws.adminOnly && !isAdmin; // Espai restringit i usuari no admin
                   return (
                     <div
                       key={ws.id}
                       className={`group/ws w-full text-xs transition-all flex items-center justify-between border ${
                         isActive
                           ? "bg-[#033b7a] text-white border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
+                          : isLocked
+                          ? "text-blue-300/50 border-transparent"
                           : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
                       }`}
                     >
                       <button
                         onClick={() => {
+                          if (isLocked) {
+                            addToast("Aquest és un espai privat de direcció. No tens accés.", "warning");
+                            return;
+                          }
                           setActiveWorkspaceId(ws.id);
                           setActiveProjectId(null); // Reset active project
                           setFilterAssigneeId(null); // Clear assignee filter
                           setActiveTab("summary"); // Navigate to Workspace Summary
                           setIsMobileSidebarOpen(false);
                         }}
-                        className={`flex-1 text-left py-2 px-3 truncate ${isActive ? "font-bold" : ""}`}
-                        title={`Obre l'espai de treball: ${ws.name}`}
+                        className={`flex-1 text-left py-2 px-3 truncate flex items-center gap-1.5 ${isActive ? "font-bold" : ""} ${isLocked ? "cursor-not-allowed" : ""}`}
+                        title={isLocked ? "Espai privat de direcció (sense accés)" : `Obre l'espai de treball: ${ws.name}`}
                       >
-                        {ws.name}
+                        {isLocked && <Lock className="w-3 h-3 shrink-0" />}
+                        {ws.adminOnly && !isLocked && <Lock className="w-3 h-3 shrink-0 text-amber-400" />}
+                        <span className="truncate">{ws.name}</span>
                       </button>
                       
                       <div className="flex items-center gap-1.5 pr-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteWorkspace(ws.id);
-                          }}
-                          className="opacity-0 group-hover/ws:opacity-100 p-1 hover:bg-red-700 hover:text-white text-red-300 transition-all cursor-pointer border border-transparent hover:border-red-600 shadow-sm"
-                          title={`Eliminar espai de treball: ${ws.name}`}
-                        >
-                          <Trash className="w-3 h-3" />
-                        </button>
+                        {!isLocked && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteWorkspace(ws.id);
+                            }}
+                            className="opacity-0 group-hover/ws:opacity-100 p-1 hover:bg-red-700 hover:text-white text-red-300 transition-all cursor-pointer border border-transparent hover:border-red-600 shadow-sm"
+                            title={`Eliminar espai de treball: ${ws.name}`}
+                          >
+                            <Trash className="w-3 h-3" />
+                          </button>
+                        )}
                         <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-none border shrink-0 ${
                           isActive
                             ? "bg-[#022e5f] text-blue-200 border-[#033b7a]"
                             : "bg-[#012042] text-blue-200 border-[#022e5f]"
                         }`}>
-                          {tasks.filter(t => (t.workspaceId || projects.find(p => p.id === t.projectId)?.workspaceId) === ws.id).length}
+                          {isLocked ? "—" : tasks.filter(t => (t.workspaceId || projects.find(p => p.id === t.projectId)?.workspaceId) === ws.id).length}
                         </span>
                       </div>
                     </div>

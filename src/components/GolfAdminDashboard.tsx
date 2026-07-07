@@ -27,7 +27,10 @@ import {
   Calendar,
   Layers,
   ArrowRight,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw
 } from "lucide-react";
 
 interface GolfAdminDashboardProps {
@@ -77,6 +80,27 @@ export function getConsecutiveDays(startDateStr: string, count: number) {
   }
   return days;
 }
+
+// Genera tots els dies d'un mes natural (per a la vista mensual del comparador)
+export function getMonthDays(year: number, month: number) {
+  const days = [];
+  const weekdays = ["Diumenge", "Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte"];
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (let day = 1; day <= daysInMonth; day++) {
+    const d = new Date(year, month, day);
+    const dayName = weekdays[d.getDay()];
+    const dd = String(day).padStart(2, "0");
+    const mm = String(month + 1).padStart(2, "0");
+    days.push({
+      dateStr: `${year}-${mm}-${dd}`,
+      label: `${dayName}, ${dd}/${mm}`,
+      isWeekend: [0, 6].includes(d.getDay()),
+    });
+  }
+  return days;
+}
+
+const MONTH_NAMES = ["Gener", "Febrer", "Març", "Abril", "Maig", "Juny", "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre"];
 
 export function getOurClubDetailedTeeTimes(t: number) {
   // t is minutes from 00:00 (e.g. 07:00 is 420, 20:48 is 1248)
@@ -170,7 +194,14 @@ export default function GolfAdminDashboard({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string>("all");
-  const [selectedMatrixDate, setSelectedMatrixDate] = useState<string>("2026-06-20");
+  const [selectedMatrixDate, setSelectedMatrixDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  // Vista del calendari comparador: "today" (30 dies des d'avui) o "month" (mes natural)
+  const [calendarView, setCalendarView] = useState<"today" | "month">("today");
+  // Mes de referència quan calendarView === "month" (primer dia del mes)
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), 1);
+  });
   const [selectedDetailCourseId, setSelectedDetailCourseId] = useState<string>("");
   const [detailFilterSearch, setDetailFilterSearch] = useState<string>("");
   const [chartMetric, setChartMetric] = useState<"avg" | "prime" | "twilight">("avg");
@@ -1288,15 +1319,80 @@ export default function GolfAdminDashboard({
             </div>
           </div>
 
-          {/* Consecutive days date-picker selector (CRITICAL USER REQUEST) */}
+          {/* Calendari comparador: 30 dies des d'avui o mes natural navegable */}
           <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
-            <label className="text-[10.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono block mb-2 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-blue-600" />
-              <span>📅 CALENDAR COMPARATOR MULTIDIA:</span>
-              <span className="text-[9px] bg-blue-100 dark:bg-blue-900/40 text-blue-805 dark:text-blue-300 px-1.5 py-0.5 rounded-none font-bold">14 DIES CONSECUTIUS ACTIUS</span>
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <label className="text-[10.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                <span>📅 CALENDARI COMPARADOR</span>
+              </label>
+
+              {/* Controls de vista */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Botó Avui (30 dies) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCalendarView("today");
+                    setSelectedMatrixDate(new Date().toISOString().slice(0, 10));
+                  }}
+                  className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-none border transition-all ${
+                    calendarView === "today"
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <RotateCcw className="w-3 h-3" /> Pròxims 30 dies
+                </button>
+
+                {/* Navegació per mes */}
+                <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-none">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCalendarView("month");
+                      setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1));
+                    }}
+                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    title="Mes anterior"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarView("month")}
+                    className={`text-[10px] font-bold px-2 py-1.5 min-w-[95px] text-center ${
+                      calendarView === "month"
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {MONTH_NAMES[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCalendarView("month");
+                      setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1));
+                    }}
+                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    title="Mes següent"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <span className="text-[9px] bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded-none font-bold">
+                  {calendarView === "today" ? "30 DIES CONSECUTIUS" : `${new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate()} DIES`}
+                </span>
+              </div>
+            </div>
+
             <div className="flex gap-2 items-center overflow-x-auto pb-2 scrollbar-none">
-              {getConsecutiveDays("2026-06-20", 14).map((day) => {
+              {(calendarView === "today"
+                ? getConsecutiveDays(new Date().toISOString().slice(0, 10), 30)
+                : getMonthDays(calendarMonth.getFullYear(), calendarMonth.getMonth())
+              ).map((day) => {
                 const isActive = selectedMatrixDate === day.dateStr;
                 return (
                   <button

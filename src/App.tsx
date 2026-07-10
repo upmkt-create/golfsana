@@ -7,6 +7,7 @@ import {
   handleFirestoreError
 } from "./firebase";
 import { logActivity } from "./lib/logger";
+import { stripHtmlToText } from "./lib/textUtils";
 
 import {
   signInAnonymously,
@@ -118,6 +119,7 @@ import ProductivityEvolutionChart from "./components/ProductivityEvolutionChart"
 import AdminMonitoringDashboard from "./components/AdminMonitoringDashboard";
 import UserManualDashboard from "./components/UserManualDashboard";
 import AllTasksGlobalView from "./components/AllTasksGlobalView";
+import RichTextEditor from "./components/RichTextEditor";
 import MeetingMinutes from "./components/MeetingMinutes";
 // @ts-ignore
 import golfBallIcon from "./campo-de-golf.png";
@@ -2391,7 +2393,7 @@ export default function App() {
                   ? "Resum general, comparativa sectorial i activitats consolidades dels departaments" 
                   : activeTab === "all_workspaces" 
                     ? "Vista corporativa general de tots els departaments"
-                    : (activeProjectObj ? activeProjectObj.description : activeWorkspaceObj?.description)}
+                    : (activeProjectObj ? stripHtmlToText(activeProjectObj.description) : stripHtmlToText(activeWorkspaceObj?.description))}
               </p>
             </div>
           </div>
@@ -2937,7 +2939,7 @@ export default function App() {
                                         </h4>
                                       </div>
                                       <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-3 line-clamp-2 min-h-[30px] leading-relaxed">
-                                        {ws.description || "Sense descripció definida per a aquest departament."}
+                                        {stripHtmlToText(ws.description) || "Sense descripció definida per a aquest departament."}
                                       </p>
                                     </div>
 
@@ -3285,7 +3287,7 @@ export default function App() {
                                         <div className="flex items-center gap-2">
                                           <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors">{proj.name}</span>
                                         </div>
-                                        <p className="text-[11px] text-slate-500 line-clamp-1">{proj.description}</p>
+                                        <p className="text-[11px] text-slate-500 line-clamp-1">{stripHtmlToText(proj.description)}</p>
                                         
                                         <div className="flex items-center gap-3 pt-1">
                                           <div className="flex-1 bg-slate-100 h-1.5 overflow-hidden">
@@ -4400,11 +4402,11 @@ export default function App() {
                 {/* Description details */}
                 <div className="space-y-1.5">
                   <span className="text-[11px] text-slate-450 font-bold uppercase tracking-wider block font-mono">Descripció o Notes del projecte:</span>
-                  <textarea
+                  <RichTextEditor
                     value={selectedTask.description || ""}
-                    onChange={(e) => handleUpdateTask(selectedTask.id, { description: e.target.value })}
+                    onChange={(html) => handleUpdateTask(selectedTask.id, { description: html })}
                     placeholder="Escriu les instruccions detallades o apunts del procediment d'Asana..."
-                    className="w-full h-24 p-3 text-xs border border-slate-200 bg-slate-50 rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-600 text-slate-800"
+                    minHeightClass="min-h-[6rem]"
                   />
                 </div>
 

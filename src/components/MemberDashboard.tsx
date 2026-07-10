@@ -37,7 +37,7 @@ interface MemberDashboardProps {
   workspaces: Workspace[];
   onClose: () => void;
   onUpdateTaskStatus?: (taskId: string, newStatus: TaskStatus) => Promise<void>;
-  onAddTask?: (title: string, projectId: string, assigneeIds: string[], priority: TaskPriority, departmentIds?: string[], dueDate?: string) => Promise<void>;
+  onAddTask?: (title: string, projectId: string, assigneeIds: string[], priority: TaskPriority, departmentIds?: string[], dueDate?: string) => Promise<string | void>;
   onSelectTask?: (task: Task) => void;
 }
 

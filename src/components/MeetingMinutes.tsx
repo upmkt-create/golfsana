@@ -13,11 +13,12 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import { MeetingMinute, MeetingAgreement, UserProfile } from "../types";
+import { MeetingMinute, MeetingAgreement, UserProfile, Task } from "../types";
 
 interface MeetingMinutesProps {
   minutes: MeetingMinute[];
   users: UserProfile[];
+  tasks: Task[];
   currentUser: UserProfile;
   isAdmin: boolean;
   onSaveMinute: (minute: MeetingMinute, isNew: boolean) => Promise<void> | void;
@@ -49,6 +50,7 @@ interface MinuteFormValues {
 export default function MeetingMinutes({
   minutes,
   users,
+  tasks,
   currentUser,
   isAdmin,
   onSaveMinute,
@@ -449,11 +451,13 @@ export default function MeetingMinutes({
                     <ul className="space-y-2">
                       {m.agreements.map((agr, idx) => {
                         const canCreateTask = !isAdmin && m.memberId === currentUser.id;
+                        const linkedTask = agr.taskId ? tasks.find((t) => t.id === agr.taskId) : undefined;
+                        const isTaskDone = linkedTask?.status === "done";
                         return (
                           <li key={agr.id} className="flex items-start gap-2.5 text-xs">
                             <span className="font-mono font-bold text-slate-300 mt-0.5">{idx + 1}.</span>
                             <div className="flex-grow">
-                              <span className="text-slate-800 font-medium">{agr.text}</span>
+                              <span className={`text-slate-800 font-medium ${isTaskDone ? "line-through text-slate-400" : ""}`}>{agr.text}</span>
                               <div className="flex items-center gap-3 mt-1 flex-wrap">
                                 {agr.dueDate && (
                                   <span className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
@@ -465,9 +469,14 @@ export default function MeetingMinutes({
                                     <Repeat className="w-3 h-3" /> Setmanal
                                   </span>
                                 )}
-                                {agr.taskCreated && (
+                                {agr.taskCreated && !isTaskDone && (
                                   <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold">
                                     <CheckCircle className="w-3 h-3" /> Tasca creada
+                                  </span>
+                                )}
+                                {isTaskDone && (
+                                  <span className="flex items-center gap-1 text-[10px] text-white font-bold bg-rose-600 px-1.5 py-0.5 rounded-none">
+                                    <CheckCircle className="w-3 h-3" /> Tasca completada
                                   </span>
                                 )}
                               </div>

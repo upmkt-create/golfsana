@@ -165,6 +165,7 @@ export interface MeetingAgreement {
   text: string;            // L'acord / tasca acordada
   dueDate?: string;        // Data límit opcional
   taskCreated?: boolean;   // Si el membre ja ha convertit aquest acord en tasca
+  taskId?: string;         // ID de la tasca creada (per saber si s'ha completat)
   recurring?: boolean;     // Si és de seguiment setmanal
 }
 

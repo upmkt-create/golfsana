@@ -1111,7 +1111,7 @@ export default function App() {
       addToast("Cal almenys un projecte per crear la tasca", "warning");
       return;
     }
-    await handleAddTask(
+    const newTaskId = await handleAddTask(
       agreement.text,
       targetProject.id,
       [minute.memberId],
@@ -1119,10 +1119,11 @@ export default function App() {
       undefined,
       agreement.dueDate || undefined
     );
-    // Marcar l'acord com a convertit
+    // Marcar l'acord com a convertit i enllaçar-lo amb la tasca creada,
+    // perquè l'acta pugui saber més endavant si aquesta tasca s'ha completat.
     const updatedMinute: MeetingMinute = {
       ...minute,
-      agreements: minute.agreements.map((a) => (a.id === agreement.id ? { ...a, taskCreated: true } : a)),
+      agreements: minute.agreements.map((a) => (a.id === agreement.id ? { ...a, taskCreated: true, taskId: newTaskId } : a)),
     };
     await handleSaveMinute(updatedMinute, false);
     addToast("Tasca creada des de l'acta", "success");
@@ -1463,6 +1464,8 @@ export default function App() {
     } catch (err) {
       console.warn("[Firestore Write Warning] tasks: saved in client sandbox", err);
     }
+
+    return id;
   };
 
   // Helper to calculate the next recurrence of a task
@@ -3699,6 +3702,7 @@ export default function App() {
                 <MeetingMinutes
                   minutes={meetingMinutes}
                   users={users}
+                  tasks={tasks}
                   currentUser={currentUser}
                   isAdmin={isAdmin}
                   onSaveMinute={handleSaveMinute}

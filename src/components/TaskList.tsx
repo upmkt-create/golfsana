@@ -745,12 +745,23 @@ export default function TaskList({
                                   </div>
                                 )}
 
-                                {/* Prioritat */}
-                                {sub.priority && (
-                                  <span className={`text-[9.5px] font-semibold px-1.5 py-0.5 rounded-none shrink-0 ${getPriorityBadgeColor(sub.priority)}`}>
-                                    {sub.priority === "urgent" ? "Urgent" : sub.priority === "high" ? "Alta" : sub.priority === "medium" ? "Mitjana" : "Baixa"}
-                                  </span>
-                                )}
+                                {/* Prioritat (sempre editable, "medium" per defecte) */}
+                                <select
+                                  value={sub.priority || "medium"}
+                                  onChange={(e) => {
+                                    const updatedSubtasks = (task.subtasks || []).map((s) =>
+                                      s.id === sub.id ? { ...s, priority: e.target.value as TaskPriority } : s
+                                    );
+                                    onUpdateTask(task.id, { subtasks: updatedSubtasks });
+                                  }}
+                                  className={`text-[9.5px] font-semibold px-1.5 py-0.5 rounded-none shrink-0 border-none focus:outline-none cursor-pointer ${getPriorityBadgeColor(sub.priority || "medium")}`}
+                                  title="Prioritat de la subtasca"
+                                >
+                                  <option value="low">Baixa</option>
+                                  <option value="medium">Mitjana</option>
+                                  <option value="high">Alta</option>
+                                  <option value="urgent">Urgent</option>
+                                </select>
 
                                 {/* Cronòmetre */}
                                 <div className="flex items-center gap-1 shrink-0">

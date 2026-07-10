@@ -60,6 +60,32 @@ export default function TaskList({
     });
   };
 
+  // Inicia un cronòmetre (de tasca o subtasca). Si ja n'hi havia un altre
+  // actiu en un altre lloc, l'atura i en desa el temps abans, per no perdre'l.
+  const startTimer = (targetTaskId: string, targetSubtaskId?: string) => {
+    if (activeTimer) {
+      const isSameTarget = activeTimer.taskId === targetTaskId && activeTimer.subtaskId === targetSubtaskId;
+      if (!isSameTarget) {
+        const prevTask = tasks.find((t) => t.id === activeTimer.taskId);
+        if (prevTask) {
+          const startTime = activeTimer.startTime;
+          const endTime = new Date();
+          const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+          const newEntry = { id: Date.now().toString(), startTime, endTime, duration };
+          if (activeTimer.subtaskId) {
+            const updatedSubtasks = (prevTask.subtasks || []).map((s) =>
+              s.id === activeTimer.subtaskId ? { ...s, timeEntries: [...(s.timeEntries || []), newEntry] } : s
+            );
+            onUpdateTask(prevTask.id, { subtasks: updatedSubtasks });
+          } else {
+            onUpdateTask(prevTask.id, { timeEntries: [...(prevTask.timeEntries || []), newEntry] });
+          }
+        }
+      }
+    }
+    setActiveTimer({ taskId: targetTaskId, subtaskId: targetSubtaskId, startTime: new Date() });
+  };
+
   // Get current project options
   const workspaceProjects = projects.filter(p => p.workspaceId === activeWorkspaceId);
   const defaultProj = activeProjectId || (workspaceProjects[0]?.id || "");
@@ -572,7 +598,7 @@ export default function TaskList({
                         </span>
                         <button
                           onClick={() => {
-                            if (activeTimer?.taskId === task.id) {
+                            if (activeTimer?.taskId === task.id && !activeTimer?.subtaskId) {
                               // Stop timer
                               const startTime = activeTimer.startTime;
                               const endTime = new Date();
@@ -582,13 +608,13 @@ export default function TaskList({
                               });
                               setActiveTimer(null);
                             } else {
-                              // Start timer
-                              setActiveTimer({ taskId: task.id, startTime: new Date() });
+                              // Start timer (de la tasca, no d'una subtasca)
+                              startTimer(task.id);
                             }
                           }}
-                          className={`p-1 rounded-full ${activeTimer?.taskId === task.id ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600"}`}
+                          className={`p-1 rounded-full ${activeTimer?.taskId === task.id && !activeTimer?.subtaskId ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600"}`}
                         >
-                          {activeTimer?.taskId === task.id ? <Square className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
+                          {activeTimer?.taskId === task.id && !activeTimer?.subtaskId ? <Square className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
                         </button>
                       </div>
                     </td>
@@ -670,7 +696,15 @@ export default function TaskList({
                               if (!b.endDate) return -1;
                               return a.endDate.localeCompare(b.endDate);
                             })
-                            .map((sub) => (
+                            .map((sub) => {
+                              const subAssignees = (sub.assigneeIds || []).map((aId) => users.find((u) => u.id === aId)).filter(Boolean);
+                              const isSubTimerActive = activeTimer?.taskId === task.id && activeTimer?.subtaskId === sub.id;
+                              const subTotalMs = (sub.timeEntries || []).reduce((acc, entry) => acc + (entry.duration || 0), 0) * 1000;
+                              const subHours = Math.floor(subTotalMs / 3600000);
+                              const subMinutes = Math.floor((subTotalMs % 3600000) / 60000);
+                              const subSeconds = Math.floor((subTotalMs % 60000) / 1000);
+
+                              return (
                               <div
                                 key={sub.id}
                                 className="flex items-center gap-2.5 text-xs py-1"
@@ -695,6 +729,59 @@ export default function TaskList({
                                 <span className={`flex-1 truncate ${sub.completed ? "line-through text-slate-400" : "text-slate-700 dark:text-slate-300"}`}>
                                   {sub.title}
                                 </span>
+
+                                {/* Responsable(s) assignat(s) */}
+                                {subAssignees.length > 0 && (
+                                  <div className="flex items-center -space-x-1 shrink-0">
+                                    {subAssignees.map((u) => (
+                                      <div
+                                        key={u!.id}
+                                        className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-slate-800 flex items-center justify-center font-bold text-[9px] text-blue-600 border border-white dark:border-slate-900 ring-1 ring-blue-200/50"
+                                        title={u!.name}
+                                      >
+                                        {u!.avatar}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Prioritat */}
+                                {sub.priority && (
+                                  <span className={`text-[9.5px] font-semibold px-1.5 py-0.5 rounded-none shrink-0 ${getPriorityBadgeColor(sub.priority)}`}>
+                                    {sub.priority === "urgent" ? "Urgent" : sub.priority === "high" ? "Alta" : sub.priority === "medium" ? "Mitjana" : "Baixa"}
+                                  </span>
+                                )}
+
+                                {/* Cronòmetre */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400">
+                                    {`${subHours.toString().padStart(2, '0')}:${subMinutes.toString().padStart(2, '0')}:${subSeconds.toString().padStart(2, '0')}`}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (isSubTimerActive) {
+                                        const startTime = activeTimer!.startTime;
+                                        const endTime = new Date();
+                                        const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+                                        const updatedSubtasks = (task.subtasks || []).map((s) =>
+                                          s.id === sub.id
+                                            ? { ...s, timeEntries: [...(s.timeEntries || []), { id: Date.now().toString(), startTime, endTime, duration }] }
+                                            : s
+                                        );
+                                        onUpdateTask(task.id, { subtasks: updatedSubtasks });
+                                        setActiveTimer(null);
+                                      } else {
+                                        startTimer(task.id, sub.id);
+                                      }
+                                    }}
+                                    className={`p-1 rounded-full ${isSubTimerActive ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600"}`}
+                                    title={isSubTimerActive ? "Aturar cronòmetre" : "Iniciar cronòmetre"}
+                                  >
+                                    {isSubTimerActive ? <Square className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
+                                  </button>
+                                </div>
+
                                 {sub.endDate && (
                                   <span className="flex items-center gap-1 text-[10px] font-mono text-slate-450 shrink-0">
                                     <Calendar className="w-3 h-3" />
@@ -702,7 +789,8 @@ export default function TaskList({
                                   </span>
                                 )}
                               </div>
-                            ))}
+                              );
+                            })}
                         </div>
                       </td>
                     </tr>

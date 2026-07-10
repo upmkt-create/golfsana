@@ -232,9 +232,10 @@ export default function TaskBoard({
 
                         {/* Description (Highlighted Container for Supreme Legibility) */}
                         {task.description ? (
-                          <div className="mt-2.5 bg-slate-50 text-[11px] text-slate-700 p-2.5 rounded-lg border-0 leading-relaxed font-sans max-h-20 overflow-y-auto whitespace-pre-line border-l-2 border-slate-250">
-                            {task.description}
-                          </div>
+                          <div
+                            className="mt-2.5 bg-slate-50 text-[11px] text-slate-700 p-2.5 rounded-lg border-0 leading-relaxed font-sans max-h-20 overflow-y-auto border-l-2 border-slate-250 rte-content"
+                            dangerouslySetInnerHTML={{ __html: task.description }}
+                          />
                         ) : (
                           <p className="text-[10px] text-slate-450 italic mt-1.5">— Sense descripció</p>
                         )}

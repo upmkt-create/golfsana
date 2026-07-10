@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Project, UserProfile, ProjectRole, KeyResource } from "../types";
 import { Plus, Users, BookOpen, Link, Calendar, Check, Trash2, FileText, AlertTriangle, CheckCircle2, X, Edit3, MessageSquare, Clock } from "lucide-react";
 import { DEPARTMENTS } from "../data";
+import RichTextEditor from "./RichTextEditor";
 
 interface ProjectSummaryProps {
   project: Project;
@@ -246,11 +247,11 @@ export default function ProjectSummary({
 
           {isEditingDesc ? (
             <div className="space-y-3">
-              <textarea
+              <RichTextEditor
                 value={descText}
-                onChange={(e) => setDescText(e.target.value)}
+                onChange={setDescText}
                 placeholder="De què es tracta el projecte? Afegeix objectius clau, fites o resum per a l'equip..."
-                className="w-full h-32 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-850 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-200 rounded-none font-medium"
+                minHeightClass="min-h-[8rem]"
               />
               <div className="flex justify-end gap-2">
                 <button
@@ -272,9 +273,14 @@ export default function ProjectSummary({
                 </button>
               </div>
             </div>
+          ) : project.description ? (
+            <div
+              className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-medium rte-content"
+              dangerouslySetInnerHTML={{ __html: project.description }}
+            />
           ) : (
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap font-medium">
-              {project.description ? project.description : "De què es tracta el projecte? Feu clic a \"Editar\" per definir el propòsit, la descripció o els objectius d'aquest pla de treball d'Asana."}
+              De què es tracta el projecte? Feu clic a "Editar" per definir el propòsit, la descripció o els objectius d'aquest pla de treball d'Asana.
             </p>
           )}
         </div>

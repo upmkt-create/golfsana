@@ -9,6 +9,7 @@ import {
 } from "../types";
 import { DEPARTMENTS } from "../data";
 import MemberCalendar from "./MemberCalendar";
+import { stripHtmlToText } from "../lib/textUtils";
 import { 
   CalendarDays, 
   Briefcase, 
@@ -724,7 +725,7 @@ export default function MemberDashboard({
                     </div>
 
                     <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                      {project.description || "Sense descripció corporativa formal disponible pel projecte."}
+                      {stripHtmlToText(project.description) || "Sense descripció corporativa formal disponible pel projecte."}
                     </p>
 
                     <div className="space-y-2 border-t border-slate-100 pt-3">

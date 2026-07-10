@@ -1,5 +1,6 @@
 import React from "react";
 import { FolderGit2, CalendarCheck, Activity, BellRing, Check } from "lucide-react";
+import { stripHtmlToText } from "../lib/textUtils";
 
 export default function WorkspaceKPICards({
   workspaceTasks,
@@ -90,7 +91,7 @@ export default function WorkspaceKPICards({
                         <span className="text-[8px] bg-blue-600 text-white px-1 font-mono tracking-widest leading-none font-bold">ACTIU</span>
                       )}
                     </div>
-                    <div className="text-[9.5px] text-slate-500 line-clamp-1 mt-0.5" title={proj.description}>{proj.description}</div>
+                    <div className="text-[9.5px] text-slate-500 line-clamp-1 mt-0.5" title={stripHtmlToText(proj.description)}>{stripHtmlToText(proj.description)}</div>
                   </div>
                 );
               })

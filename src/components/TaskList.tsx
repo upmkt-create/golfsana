@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus, TaskPriority, Department } from "../types";
-import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square } from "lucide-react";
+import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle } from "lucide-react";
 import { DEPARTMENTS } from "../data";
 
 interface TaskListProps {
@@ -49,6 +49,16 @@ export default function TaskList({
   const [filterDepartment, setFilterDepartment] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
+  // Controla quines tasques tenen les subtasques desplegades al llistat
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (taskId: string) => {
+    setExpandedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
 
   // Get current project options
   const workspaceProjects = projects.filter(p => p.workspaceId === activeWorkspaceId);
@@ -425,8 +435,8 @@ export default function TaskList({
                 const cellCls = isCompactView ? "py-1 px-2.5" : "py-3 px-4";
 
                 return (
+                  <React.Fragment key={task.id}>
                   <tr
-                    key={task.id}
                     className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-all group"
                   >
                     <td className={`${cellCls} text-center`}>
@@ -450,6 +460,22 @@ export default function TaskList({
 
                     <td className={`${cellCls} font-semibold text-slate-800 dark:text-slate-100`}>
                       <div className="flex items-center gap-2">
+                        {task.subtasks && task.subtasks.length > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(task.id)}
+                            className="p-0.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-none text-slate-400 hover:text-slate-700 shrink-0 transition-colors"
+                            title={expandedTaskIds.has(task.id) ? "Amagar subtasques" : `Veure ${task.subtasks.length} subtasca(es)`}
+                          >
+                            {expandedTaskIds.has(task.id) ? (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="w-3.5 h-3.5 shrink-0" />
+                        )}
                         <button
                           onClick={() => onSelectTaskForDetails(task)}
                           className="hover:text-blue-600 transition-colors text-left truncate max-w-[280px]"
@@ -458,6 +484,14 @@ export default function TaskList({
                         </button>
                         {task.description && (
                           <span className="w-1.5 h-1.5 rounded-none bg-slate-300" title="Té descripció"></span>
+                        )}
+                        {task.subtasks && task.subtasks.length > 0 && (
+                          <span
+                            className="text-[9px] font-mono font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-none shrink-0"
+                            title={`${task.subtasks.filter(s => s.completed).length} de ${task.subtasks.length} completades`}
+                          >
+                            {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                          </span>
                         )}
                       </div>
                     </td>
@@ -620,6 +654,60 @@ export default function TaskList({
                       </div>
                     </td>
                   </tr>
+                  {expandedTaskIds.has(task.id) && task.subtasks && task.subtasks.length > 0 && (
+                    <tr key={`${task.id}-subtasks`} className="bg-slate-50/60 dark:bg-slate-900/40">
+                      <td></td>
+                      <td colSpan={8} className="py-2 px-4">
+                        <div className="pl-5 border-l-2 border-slate-200 dark:border-slate-700 space-y-1.5">
+                          <div className="text-[9.5px] font-mono font-bold text-slate-400 uppercase tracking-wider mb-1">
+                            Subtasques (ordenades per data de venciment)
+                          </div>
+                          {[...task.subtasks]
+                            .sort((a, b) => {
+                              // Sense data de venciment van al final
+                              if (!a.endDate && !b.endDate) return 0;
+                              if (!a.endDate) return 1;
+                              if (!b.endDate) return -1;
+                              return a.endDate.localeCompare(b.endDate);
+                            })
+                            .map((sub) => (
+                              <div
+                                key={sub.id}
+                                className="flex items-center gap-2.5 text-xs py-1"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedSubtasks = (task.subtasks || []).map((s) =>
+                                      s.id === sub.id ? { ...s, completed: !s.completed } : s
+                                    );
+                                    onUpdateTask(task.id, { subtasks: updatedSubtasks });
+                                  }}
+                                  className="shrink-0"
+                                  title={sub.completed ? "Marcar com a pendent" : "Marcar com a feta"}
+                                >
+                                  {sub.completed ? (
+                                    <CheckSquare className="w-3.5 h-3.5 text-emerald-500" />
+                                  ) : (
+                                    <Circle className="w-3.5 h-3.5 text-slate-300 hover:text-slate-500" />
+                                  )}
+                                </button>
+                                <span className={`flex-1 truncate ${sub.completed ? "line-through text-slate-400" : "text-slate-700 dark:text-slate-300"}`}>
+                                  {sub.title}
+                                </span>
+                                {sub.endDate && (
+                                  <span className="flex items-center gap-1 text-[10px] font-mono text-slate-450 shrink-0">
+                                    <Calendar className="w-3 h-3" />
+                                    {sub.endDate}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })
             )}

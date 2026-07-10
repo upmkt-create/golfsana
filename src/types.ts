@@ -84,6 +84,7 @@ export interface SubTask {
   assigneeIds?: string[];
   workspaceId?: string;
   timeEntries?: TimeEntry[];
+  priority?: "low" | "medium" | "high" | "urgent";
 }
 
 export interface Attachment {

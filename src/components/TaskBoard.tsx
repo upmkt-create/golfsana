@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus } from "../types";
-import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Kanban, LayoutGrid } from "lucide-react";
+import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Kanban, LayoutGrid, Star } from "lucide-react";
 import { motion } from "motion/react";
 import { DEPARTMENTS } from "../data";
 
@@ -219,12 +219,15 @@ export default function TaskBoard({
                         onClick={() => onSelectTaskForDetails(task)}
                         className={`block bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_1.5px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:translate-y-[-1px] transition-all cursor-pointer relative group-card border-l-4 ${
                           isCompactView ? "p-2.5 rounded-lg" : "p-4 rounded-xl"
-                        }`}
+                        } ${task.isBaseTask ? "ring-2 ring-amber-300" : ""}`}
                         style={{ borderLeftColor: proj ? proj.color : "#cbd5e1" }}
                       >
                         {/* Title & Priority */}
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="text-xs font-bold text-slate-800 hover:text-blue-600 leading-snug tracking-tight">
+                          <h4 className="text-xs font-bold text-slate-800 hover:text-blue-600 leading-snug tracking-tight flex items-center gap-1.5">
+                            {task.isBaseTask && (
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-500 shrink-0" />
+                            )}
                             {task.title}
                           </h4>
                           <div className="shrink-0">{getPriorityBadge(task.priority)}</div>

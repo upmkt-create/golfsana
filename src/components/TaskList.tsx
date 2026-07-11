@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus, TaskPriority, Department } from "../types";
-import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle } from "lucide-react";
+import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle, Star } from "lucide-react";
 import { DEPARTMENTS } from "../data";
 
 interface TaskListProps {
@@ -486,6 +486,14 @@ export default function TaskList({
 
                     <td className={`${cellCls} font-semibold text-slate-800 dark:text-slate-100`}>
                       <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onUpdateTask(task.id, { isBaseTask: !task.isBaseTask })}
+                          className="shrink-0 transition-colors"
+                          title={task.isBaseTask ? "Tasca Base del Projecte (clica per treure-la)" : "Marcar com a Tasca Base del Projecte"}
+                        >
+                          <Star className={`w-3.5 h-3.5 ${task.isBaseTask ? "fill-amber-400 text-amber-500" : "text-slate-250 hover:text-amber-400"}`} />
+                        </button>
                         {task.subtasks && task.subtasks.length > 0 ? (
                           <button
                             type="button"

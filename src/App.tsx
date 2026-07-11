@@ -2473,7 +2473,7 @@ export default function App() {
         </header>
 
         {/* WORKSPACE NAVIGATION BAR (Asana tabs list) */}
-        {!filterAssigneeId && ["summary", "list", "board", "timeline", "calendar", "golf"].includes(activeTab) && (
+        {!filterAssigneeId && ["summary", "list", "base_tasks", "board", "timeline", "calendar", "golf"].includes(activeTab) && (
           <nav className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center gap-2 shrink-0 overflow-x-auto select-none">
             <button
               onClick={() => setActiveTab("summary")}
@@ -3616,7 +3616,7 @@ export default function App() {
 
               {activeTab === "list" && (
                 <TaskList
-                  tasks={displayedTasks}
+                  tasks={displayedTasks.filter((t) => !t.isBaseTask)}
                   users={users}
                   projects={projects}
                   activeProjectId={activeProjectId}

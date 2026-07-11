@@ -111,6 +111,7 @@ export interface Task {
   dueDate: string; // YYYY-MM-DD
   startDate?: string; // YYYY-MM-DD (Data d'inici)
   recurrence?: "none" | "weekly" | "fortnightly" | "monthly" | "bimonthly" | "quarterly" | "semiannually" | "yearly"; // Periodicitat
+  isBaseTask?: boolean; // Tasca estructural del projecte (Base del Projecte), a diferència de les puntuals/ad-hoc
   completedAt?: string; // YYYY-MM-DD
   completedOnTime?: boolean; // Ha acabat a temps?
   createdAt?: any;

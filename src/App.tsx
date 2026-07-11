@@ -97,7 +97,8 @@ import {
   Upload,
   ExternalLink,
   Play,
-  Square
+  Square,
+  Star
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import UserSessionSelector from "./components/UserSessionSelector";
@@ -249,7 +250,7 @@ export default function App() {
   }, [deletedItemIds]);
   
   // Interactive / detailed UI State
-  const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes">("inici");
+  const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "base_tasks" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes">("inici");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskComments, setTaskComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
@@ -511,6 +512,7 @@ export default function App() {
         case "all_workspaces": return "Tots els Espais de Treball";
         case "summary": return "Resum d'Espai de Treball";
         case "list": return "Llistat de Tasques";
+        case "base_tasks": return "Base del Projecte";
         case "board": return "Taulell Kanban";
         case "timeline": return "Cronograma Gantt";
         case "calendar": return "Calendari";
@@ -2498,6 +2500,18 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => setActiveTab("base_tasks")}
+              className={`py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border ${
+                activeTab === "base_tasks"
+                  ? "bg-amber-50 border-amber-350 text-amber-800"
+                  : "text-slate-500 border-transparent hover:bg-slate-50 hover:text-amber-700"
+              }`}
+            >
+              <Star className="w-3.5 h-3.5 text-amber-500" />
+              <span>Base del Projecte</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("board")}
               className={`py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border ${
                 activeTab === "board"
@@ -3617,6 +3631,23 @@ export default function App() {
                 />
               )}
 
+              {activeTab === "base_tasks" && (
+                <TaskList
+                  tasks={displayedTasks.filter((t) => t.isBaseTask)}
+                  users={users}
+                  projects={projects}
+                  activeProjectId={activeProjectId}
+                  activeWorkspaceId={activeWorkspaceId}
+                  onAddTask={handleAddTask}
+                  onUpdateTask={handleUpdateTask}
+                  onDeleteTask={handleDeleteTask}
+                  onSelectTaskForDetails={(task) => setSelectedTask(task)}
+                  isCompactView={isCompactView}
+                  activeTimer={activeTimer}
+                  setActiveTimer={setActiveTimer}
+                />
+              )}
+
               {activeTab === "board" && (
                 <TaskBoard
                   tasks={displayedTasks}
@@ -4279,6 +4310,24 @@ export default function App() {
                       <option value="high" className="text-rose-600 font-bold">Alta</option>
                       <option value="urgent" className="text-red-600 font-bold">Urgent</option>
                     </select>
+                  </div>
+
+                  {/* Tasca Base del Projecte */}
+                  <div className="grid grid-cols-[130px_1fr] items-center gap-2 py-1.5 border-b border-slate-100 font-sans text-xs">
+                    <span className="text-slate-400 font-medium select-none">Tipus</span>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateTask(selectedTask.id, { isBaseTask: !selectedTask.isBaseTask })}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-sm w-fit font-bold transition-colors ${
+                        selectedTask.isBaseTask
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                          : "bg-slate-50 text-slate-500 border border-slate-200 hover:border-amber-300 hover:text-amber-600"
+                      }`}
+                      title="Marca aquesta tasca com a estructural del projecte (apareixerà a la pestanya 'Base del Projecte')"
+                    >
+                      <Star className={`w-3.5 h-3.5 ${selectedTask.isBaseTask ? "fill-amber-400" : ""}`} />
+                      {selectedTask.isBaseTask ? "Tasca Base del Projecte" : "Marcar com a Base del Projecte"}
+                    </button>
                   </div>
 
                   {/* Multi-Department Section */}

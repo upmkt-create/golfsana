@@ -2383,7 +2383,21 @@ export default function App() {
                   </span>
                 ) : (
                   <div className="flex items-center gap-1.5 truncate text-slate-850">
-                    <span className="truncate">{activeWorkspaceObj ? activeWorkspaceObj.name : "Sense Workspace"}</span>
+                    {activeProjectObj ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveProjectId(null);
+                          setActiveTab("summary");
+                        }}
+                        className="truncate hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                        title={`Tornar als projectes de ${activeWorkspaceObj?.name || "l'espai"}`}
+                      >
+                        {activeWorkspaceObj ? activeWorkspaceObj.name : "Sense Workspace"}
+                      </button>
+                    ) : (
+                      <span className="truncate">{activeWorkspaceObj ? activeWorkspaceObj.name : "Sense Workspace"}</span>
+                    )}
                     {activeProjectObj && (
                       <>
                         <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />

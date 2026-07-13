@@ -58,24 +58,43 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
 • Vistes del Projecte:
   - Resum (Tab Summary): Una visió executiva d'alt nivell de les tasques i avenços del projecte actiu.
   - Llista (Tab List): Format taula excel on és molt ràpid editar prioritzacions, estats o dates límit de venciment de forma lamel·lar.
+  - Base del Projecte (Tab nou): Mostra només les tasques marcades amb l'estrella ⭐ com a "estructurals" del projecte (a diferència de les puntuals o recurrents). Per marcar una tasca com a Base, clica l'estrella al costat del títol, tant al llistat com al detall de la tasca. Al Kanban, aquestes targetes es distingeixen amb un anell daurat i la mateixa estrella.
   - Kanban (Tab Board): Flux visual organitzat per l'estat actual del procés ("Pendent", "En Curs", "Sota Revisió", "Completat"). Perfecte per fer reunions setmanals de coordinació.
-  - Calendari (Tab Timeline): Planificació temporal dinàmica i interactiva. Ara és compatible amb rangs multidia (mostrant la duració sencera per a tasques des de la seva data d'inici fins a la data límit en lloc d'un bloc curt d'una sola hora), la qual cosa evita el solapament d'esdeveniments comercials crítics, auditories o tasques mecàniques del camp.`
+  - Calendari (Tab Timeline): Planificació temporal dinàmica i interactiva. Ara és compatible amb rangs multidia (mostrant la duració sencera per a tasques des de la seva data d'inici fins a la data límit en lloc d'un bloc curt d'una sola hora), la qual cosa evita el solapament d'esdeveniments comercials crítics, auditories o tasques mecàniques del camp.
+• Subtasques: Si una tasca té subtasques, apareix una fletxa (▶) al costat del títol al Llistat. Clicant-hi es desplega la llista de subtasques, ordenades automàticament per data de venciment. Des d'allà mateix podeu veure i editar el responsable assignat, la prioritat, i portar un cronòmetre propi de temps treballat per cada subtasca (independent del cronòmetre de la tasca principal).
+• Descripcions amb format: El quadre de descripció de tasques i projectes admet ara text amb estil — negreta, cursiva, mides de lletra, llistes amb vinyetes o numerades, i checklists amb caselles clicables. La barra d'eines apareix a sobre del quadre de text en editar.
+• Navegació ràpida: A la capçalera superior, el nom de l'espai de treball (per exemple "Esportiu" a "Esportiu > E-Acords Camps") és clicable — hi torna directament sense haver de passar pel menú lateral.`
+    },
+    {
+      id: "meeting-minutes",
+      title: "3. Actes de Reunió",
+      category: "asana",
+      icon: FileText,
+      content: `Les Actes de Reunió permeten registrar el que s'acorda a cada reunió individual entre Rocío/Direcció i cada membre de l'equip.
+
+• Creació: Els administradors creen una acta nova indicant el membre, la data de la reunió, notes de context, i una llista d'acords/tasques concretes, cadascun amb data límit opcional i marca de "seguiment setmanal" si és recurrent.
+• Edició: Per editar una acta ja creada, cliqueu "Editar" — el formulari apareix allà mateix, a sobre de l'acta, sense necessitat de desplaçar-vos a dalt de la pàgina.
+• Filtres: Es poden filtrar les actes per persona (només administradors) i per rang de data de creació, amb el botó "Filtres" de la capçalera.
+• Conversió a tasca: Cada membre pot convertir un dels seus propis acords en una tasca real amb el botó "Crear tasca". Un cop creada, l'acord mostra l'etiqueta verda "Tasca creada".
+• Seguiment de compliment: Quan aquesta tasca es marca com a completada (des de qualsevol vista de GolfSana), l'acta ho reflecteix automàticament amb una etiqueta vermella "Tasca completada", i el text de l'acord apareix ratllat. No cal fer res manualment — l'estat es llegeix en directe de la tasca vinculada.
+• Notificacions: Cada membre només veu les seves pròpies actes, i rep una notificació (campaneta "Mencions") quan se li crea o modifica una acta.`
     },
     {
       id: "golf-monitor",
-      title: "3. Monitor de Tarifes i Comparador",
+      title: "4. Monitor de Tarifes i Comparador",
       category: "golf",
       icon: TrendingUp,
       content: `El cor competitiu de GolfSana és el Comparador de Tarifes de Golf:
 
 • Lectura en Temps Real: Mostra de forma constant el preu per hora del Green Fee (alta i baixa temporada), el lloguer de Buggies i de llicències de pals de Golf d'Aro davant rivals d'alta ocupació.
-• Simulador de Tarifes per Hores: Proporciona un visor interactiu per hores del dia actual amb un gràfic comparatiu.
+• Font de dades: El comparador intenta llegir dades en directe (preus i disponibilitat real) directament del sistema de reserves GolfManager de cada camp. Cada resultat indica la seva font: "live" quan són dades reals d'aquell moment, o "model" quan s'utilitza la base de tarifes verificada com a alternativa fiable (per exemple, si un camp bloqueja temporalment l'accés extern).
+• Simulador de Tarifes per Hores: Proporciona un visor interactiu per hores del dia actual amb un gràfic comparatiu, incloent el percentatge d'ocupació/disponibilitat de cada franja horària.
 • Enllaços Directes: Disposa de botons de redirecció directa als widgets oficials de Golf Manager per fer reserves de sortida de forma directa davant clients.
 • Estat de Sincronització: Indica quan s'ha fet l'última sincronització de dades. Els administradors tenen la capacitat de llançar un "Scraping de Forçat" per recalcular l'estat del mercat immediatament.`
     },
     {
       id: "users-roles",
-      title: "4. Gestió de Membres i Drets d'Alta",
+      title: "5. Gestió de Membres i Drets d'Alta",
       category: "security",
       icon: Users,
       content: `La plataforma disposa d'un sistema d'usuaris per un màxim rendiment amb llicència il·limitada "Enterprise":
@@ -86,7 +105,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
     },
     {
       id: "incentives-metrics",
-      title: "5. Rendiment, Mètriques i Incentius",
+      title: "6. Rendiment, Mètriques i Incentius",
       category: "metrics",
       icon: Clock,
       content: `La finalització de tasques col·labora en el creixement del club i la compensació de l'equip:
@@ -97,7 +116,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
     },
     {
       id: "offline-redundancy",
-      title: "6. Mode de Seguretat i Sincronització Redundada",
+      title: "7. Mode de Seguretat i Sincronització Redundada",
       category: "security",
       icon: Shield,
       content: `Per garantir l'operació diària fins i tot a les zones més allunyades del camp de golf, GolfSana incorpora un Mode de Redundància i Sincro Segura:
@@ -140,8 +159,9 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
   const roleGuides = useMemo(() => ({
     admin: {
       title: "Pla de Treball per a Administradors (Isabel, Rocío, Direcció)",
-      brief: "Com a管理者, disposes d'un control transversal sobre l'operació del golf i els preus comercials d'Asana d'alt nivell.",
+      brief: "Com a administrador/a, disposes d'un control transversal sobre l'operació del golf i els preus comercials d'Asana d'alt nivell.",
       steps: [
+        "Fer seguiment individual: Crea una Acta de Reunió després de cada trobada amb un membre de l'equip, amb els acords concrets. Cada membre rep notificació i només veu les seves pròpies actes.",
         "Llançar actualitzacions de tarifes: Ves a la secció d'Anàlisi i utilitza l'Scrape manual forçat de preus competidors.",
         "Gestionar personal: Utilitza el selector d'usuaris per afegir membres indefinit de l'equip i controlar auditories.",
         "Aprovar incentius: Revisa el tauler de rendiment per verificar els indicadors mensuals de cada àrea (Màrqueting, Comercial, etc.).",
@@ -152,6 +172,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
       title: "Guia d'Operacions per a l'Equip de Gestió (Marc, Erika, Ester, Mònica, Saba, etc.)",
       brief: "El vostre focus és mantenir activa l'excel·lència operativa de la marca i el servei al client directament.",
       steps: [
+        "Revisar les vostres Actes de Reunió: Consulteu la pestanya d'Actes per veure els acords de la darrera reunió amb Rocío/Direcció, i convertiu els que calgui en tasques reals amb el botó 'Crear tasca'.",
         "Mantenir el tauler actualitzat: Moveu les tasques diàries al Kanban de 'En curs' o 'Sota Revisió' perquè la direcció conegui l'estat d'ocupació.",
         "Marcar les hores i venciments: Intenteu obrir i tancar tasques dins de les dates certificades per acumular el bonus d'incentius setmanals.",
         "Adjuntar fitxers i comentaris: Feu servir el cercador de la dreta a la fitxa de cada tasca per registrar incidències, contractes o correus lamel·lars amb un sol clic.",

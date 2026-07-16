@@ -1145,11 +1145,10 @@ export default function App() {
     addToast("Acta eliminada", "info");
   };
 
-  const handleCreateTaskFromAgreement = async (minute: MeetingMinute, agreement: MeetingAgreement) => {
-    // Projecte per defecte: el primer de l'espai actiu, o el primer disponible
-    const targetProject = projects.find((p) => p.workspaceId === activeWorkspaceId) || projects[0];
+  const handleCreateTaskFromAgreement = async (minute: MeetingMinute, agreement: MeetingAgreement, projectId: string) => {
+    const targetProject = projects.find((p) => p.id === projectId);
     if (!targetProject) {
-      addToast("Cal almenys un projecte per crear la tasca", "warning");
+      addToast("Selecciona un projecte vàlid per crear la tasca", "warning");
       return;
     }
     const newTaskId = await handleAddTask(
@@ -3880,6 +3879,10 @@ export default function App() {
                   minutes={meetingMinutes}
                   users={users}
                   tasks={visibleTasks}
+                  projects={projects.filter((p) => {
+                    const ws = workspaces.find((w) => w.id === p.workspaceId);
+                    return isAdmin || !ws?.adminOnly;
+                  })}
                   currentUser={currentUser}
                   isAdmin={isAdmin}
                   onSaveMinute={handleSaveMinute}

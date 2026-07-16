@@ -7,7 +7,7 @@ interface UserSessionSelectorProps {
   users: UserProfile[];
   currentUser: UserProfile;
   onSelectUser: (user: UserProfile) => void;
-  onAddUser: (name: string, email: string, role: UserRole) => Promise<void>;
+  onAddUser: (name: string, email: string, role: UserRole, accessCode: string) => Promise<void>;
   onLogout: () => void;
 }
 
@@ -23,18 +23,20 @@ export default function UserSessionSelector({
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<UserRole>("member");
+  const [newAccessCode, setNewAccessCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newEmail.trim()) return;
+    if (!newName.trim() || !newEmail.trim() || !newAccessCode.trim()) return;
 
     setIsSubmitting(true);
     try {
-      await onAddUser(newName, newEmail, newRole);
+      await onAddUser(newName, newEmail, newRole, newAccessCode.trim());
       setNewName("");
       setNewEmail("");
       setNewRole("member");
+      setNewAccessCode("");
       setShowAddForm(false);
     } catch (err) {
       console.error(err);
@@ -187,6 +189,18 @@ export default function UserSessionSelector({
                         onChange={(e) => setNewEmail(e.target.value)}
                         className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                       />
+
+                      <input
+                        type="text"
+                        placeholder="Codi d'accés (per iniciar sessió)"
+                        required
+                        value={newAccessCode}
+                        onChange={(e) => setNewAccessCode(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono"
+                      />
+                      <p className="text-[9.5px] text-slate-400 -mt-1">
+                        Comunica aquest codi al nou usuari — el necessitarà per entrar amb el seu email.
+                      </p>
 
                       <div className="grid grid-cols-2 gap-1.5">
                         <button

@@ -4177,9 +4177,17 @@ export default function App() {
                 {/* Inline editable task description */}
                 <div className="pt-2">
                   <input
+                    key={selectedTask.id}
                     type="text"
-                    value={selectedTask.title}
-                    onChange={(e) => handleUpdateTask(selectedTask.id, { title: e.target.value })}
+                    defaultValue={selectedTask.title}
+                    onBlur={(e) => {
+                      if (e.target.value !== selectedTask.title) {
+                        handleUpdateTask(selectedTask.id, { title: e.target.value });
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    }}
                     className="w-full text-base font-bold text-slate-800 dark:text-white bg-transparent border border-transparent hover:border-slate-200 focus:border-slate-300 focus:bg-slate-50 outline-none p-1.5 rounded-sm transition-all focus:ring-1 focus:ring-indigo-500"
                     placeholder="Títol de la tasca..."
                   />

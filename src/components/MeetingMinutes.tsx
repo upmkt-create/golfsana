@@ -6,6 +6,7 @@ import {
   User as UserIcon,
   Trash,
   CheckCircle,
+  Check,
   Clock,
   ListPlus,
   Send,
@@ -13,17 +14,18 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import { MeetingMinute, MeetingAgreement, UserProfile, Task } from "../types";
+import { MeetingMinute, MeetingAgreement, UserProfile, Task, Project } from "../types";
 
 interface MeetingMinutesProps {
   minutes: MeetingMinute[];
   users: UserProfile[];
   tasks: Task[];
+  projects: Project[];
   currentUser: UserProfile;
   isAdmin: boolean;
   onSaveMinute: (minute: MeetingMinute, isNew: boolean) => Promise<void> | void;
   onDeleteMinute: (id: string) => Promise<void> | void;
-  onCreateTaskFromAgreement: (minute: MeetingMinute, agreement: MeetingAgreement) => Promise<void> | void;
+  onCreateTaskFromAgreement: (minute: MeetingMinute, agreement: MeetingAgreement, projectId: string) => Promise<void> | void;
 }
 
 const NAVY = "#033b7a";
@@ -51,6 +53,7 @@ export default function MeetingMinutes({
   minutes,
   users,
   tasks,
+  projects,
   currentUser,
   isAdmin,
   onSaveMinute,
@@ -59,6 +62,12 @@ export default function MeetingMinutes({
 }: MeetingMinutesProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // Acord per al qual s'està triant el projecte de destinació abans de
+  // crear-ne la tasca — evita crear-la "a cegues" al projecte que
+  // casualment estigués obert (això feia que la tasca quedés en un espai
+  // aliè al membre, i podia arribar a quedar-li invisible a ell mateix).
+  const [selectingProjectForAgreement, setSelectingProjectForAgreement] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
   // Formulari (compartit entre crear nova acta i editar-ne una existent)
   const emptyForm: MinuteFormValues = { memberId: "", date: todayStr(), title: "", notes: "", agreements: [] };
@@ -482,14 +491,57 @@ export default function MeetingMinutes({
                               </div>
                             </div>
                             {canCreateTask && !agr.taskCreated && (
-                              <button
-                                onClick={() => onCreateTaskFromAgreement(m, agr)}
-                                className="flex items-center gap-1 text-[10px] font-semibold text-white px-2 py-1 rounded-sm hover:opacity-90 shrink-0"
-                                style={{ backgroundColor: NAVY }}
-                                title="Crear una tasca a partir d'aquest acord"
-                              >
-                                <ListPlus className="w-3 h-3" /> Crear tasca
-                              </button>
+                              selectingProjectForAgreement === agr.id ? (
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <select
+                                    autoFocus
+                                    value={selectedProjectId}
+                                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                                    className="text-[10px] border border-slate-200 rounded-sm px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px]"
+                                  >
+                                    <option value="">Tria el projecte...</option>
+                                    {projects.map((p) => (
+                                      <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    onClick={() => {
+                                      if (!selectedProjectId) return;
+                                      onCreateTaskFromAgreement(m, agr, selectedProjectId);
+                                      setSelectingProjectForAgreement(null);
+                                      setSelectedProjectId("");
+                                    }}
+                                    disabled={!selectedProjectId}
+                                    className="text-[10px] font-semibold text-white px-2 py-1 rounded-sm hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                                    style={{ backgroundColor: NAVY }}
+                                    title="Confirmar"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectingProjectForAgreement(null);
+                                      setSelectedProjectId("");
+                                    }}
+                                    className="text-slate-400 hover:text-rose-600 p-1 shrink-0"
+                                    title="Cancel·lar"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setSelectingProjectForAgreement(agr.id);
+                                    setSelectedProjectId("");
+                                  }}
+                                  className="flex items-center gap-1 text-[10px] font-semibold text-white px-2 py-1 rounded-sm hover:opacity-90 shrink-0"
+                                  style={{ backgroundColor: NAVY }}
+                                  title="Crear una tasca a partir d'aquest acord"
+                                >
+                                  <ListPlus className="w-3 h-3" /> Crear tasca
+                                </button>
+                              )
                             )}
                           </li>
                         );

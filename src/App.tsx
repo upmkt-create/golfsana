@@ -1849,6 +1849,24 @@ export default function App() {
 
   // Check if current playing user holds Admin permissions (already declared above)
 
+  // Tasques "visibles" segons el rol: per a un administrador, totes; per a
+  // un membre normal, excloent qualsevol tasca que pertanyi a un espai de
+  // treball marcat com a privat (adminOnly, p.ex. "Direcció"). Aquest és el
+  // punt únic de veritat per a totes les vistes TRANSVERSALS (que no depenen
+  // de l'espai de treball actiu i per tant no queden protegides per la
+  // redirecció de navegació de l'espai privat): Taulell Global de Tasques,
+  // dashboards d'incentius/informes/càrrega de treball, comptadors de KPIs
+  // generals i el dashboard personal d'un membre.
+  const visibleTasks = React.useMemo(() => {
+    if (isAdmin) return tasks;
+    const restrictedWsIds = new Set(workspaces.filter((w) => w.adminOnly).map((w) => w.id));
+    if (restrictedWsIds.size === 0) return tasks;
+    return tasks.filter((t) => {
+      const wsId = t.workspaceId || projects.find((p) => p.id === t.projectId)?.workspaceId;
+      return !wsId || !restrictedWsIds.has(wsId);
+    });
+  }, [tasks, workspaces, projects, isAdmin]);
+
   // Filter tasks dynamically if a team member is clicked in sidebar and by global search query (Improvement 3)
   const displayedTasks = tasks.filter((t) => {
     // Member filter
@@ -2300,7 +2318,7 @@ export default function App() {
               <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-blue-800 pl-1.5">
                 {users.map((u) => {
                   const isActiveFilter = filterAssigneeId === u.id;
-                  const pendingCount = tasks.filter(t => (t.assigneeIds?.includes(u.id) || t.assigneeId === u.id) && t.status !== "done").length;
+                  const pendingCount = visibleTasks.filter(t => (t.assigneeIds?.includes(u.id) || t.assigneeId === u.id) && t.status !== "done").length;
 
                   return (
                     <button
@@ -2643,7 +2661,7 @@ export default function App() {
                 <MemberDashboard
                   memberId={filterAssigneeId}
                   users={users}
-                  tasks={tasks}
+                  tasks={visibleTasks}
                   projects={projects}
                   workspaces={workspaces}
                   onClose={() => setFilterAssigneeId(null)}
@@ -2789,15 +2807,15 @@ export default function App() {
                       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
                     })();
                     
-                    // Task calculations across ALL workspaces/departments
-                    const totalAllTasks = tasks.length;
-                    const doneAllTasks = tasks.filter(t => t.status === "done").length;
-                    const inProgressAllTasks = tasks.filter(t => t.status === "in_progress").length;
-                    const reviewAllTasks = tasks.filter(t => t.status === "review").length;
-                    const todoAllTasks = tasks.filter(t => t.status === "todo").length;
+                    // Task calculations across ALL workspaces/departments (visibles segons rol)
+                    const totalAllTasks = visibleTasks.length;
+                    const doneAllTasks = visibleTasks.filter(t => t.status === "done").length;
+                    const inProgressAllTasks = visibleTasks.filter(t => t.status === "in_progress").length;
+                    const reviewAllTasks = visibleTasks.filter(t => t.status === "review").length;
+                    const todoAllTasks = visibleTasks.filter(t => t.status === "todo").length;
                     
                     // Delayed tasks (dueDate is in the past and status is not done)
-                    const overdueAllTasks = tasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== "done").length;
+                    const overdueAllTasks = visibleTasks.filter(t => t.dueDate && t.dueDate < todayStr && t.status !== "done").length;
                     
                     // Average completed percentage
                     const globalCompletionPct = totalAllTasks > 0 ? Math.round((doneAllTasks / totalAllTasks) * 100) : 0;
@@ -2957,7 +2975,7 @@ export default function App() {
                         </div>
 
                         {/* Line Chart: Evolution of productivity over 3 months */}
-                        <ProductivityEvolutionChart tasks={tasks} workspaces={workspaces} />
+                        <ProductivityEvolutionChart tasks={visibleTasks} workspaces={workspaces} />
 
                         {/* Middle grid section: Departaments & Golf Comparisons side-by-side */}
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2973,8 +2991,8 @@ export default function App() {
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                              {workspaces.map(ws => {
-                                const wsTasks = tasks.filter(t => (t.workspaceId || projects.find(p => p.id === t.projectId)?.workspaceId) === ws.id);
+                              {workspaces.filter(ws => isAdmin || !ws.adminOnly).map(ws => {
+                                const wsTasks = visibleTasks.filter(t => (t.workspaceId || projects.find(p => p.id === t.projectId)?.workspaceId) === ws.id);
                                 const wsTotal = wsTasks.length;
                                 const wsDone = wsTasks.filter(t => t.status === "done").length;
                                 const wsInProg = wsTasks.filter(t => t.status === "in_progress").length;
@@ -3210,9 +3228,9 @@ export default function App() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {workspaces.map((ws) => {
+                    {workspaces.filter((ws) => isAdmin || !ws.adminOnly).map((ws) => {
                       const wsProjects = projects.filter(p => p.workspaceId === ws.id);
-                      const wsTasks = tasks.filter(t => (t.workspaceId || projects.find(p => p.id === t.projectId)?.workspaceId) === ws.id);
+                      const wsTasks = visibleTasks.filter(t => (t.workspaceId || projects.find(p => p.id === t.projectId)?.workspaceId) === ws.id);
                       const wsTaskCount = wsTasks.length;
                       const doneTasks = wsTasks.filter(t => t.status === "done").length;
                       const progress = wsTaskCount === 0 ? 0 : Math.round((doneTasks / wsTaskCount) * 100);
@@ -3724,7 +3742,7 @@ export default function App() {
 
               {activeTab === "all_tasks_global" && (
                 <AllTasksGlobalView
-                  tasks={tasks}
+                  tasks={visibleTasks}
                   projects={projects}
                   users={users}
                   workspaces={DEPARTMENTS}
@@ -3745,7 +3763,7 @@ export default function App() {
 
               {activeTab === "incentives" && (
                 <IncentivesDashboard
-                  tasks={tasks}
+                  tasks={visibleTasks}
                   users={users}
                   projects={projects}
                 />
@@ -3753,7 +3771,7 @@ export default function App() {
 
               {activeTab === "reports" && (
                 <ReportsDashboard
-                  tasks={tasks}
+                  tasks={visibleTasks}
                   users={users}
                   projects={projects}
                   defaultDepartmentId="all"
@@ -3784,7 +3802,7 @@ export default function App() {
                 <MeetingMinutes
                   minutes={meetingMinutes}
                   users={users}
-                  tasks={tasks}
+                  tasks={visibleTasks}
                   currentUser={currentUser}
                   isAdmin={isAdmin}
                   onSaveMinute={handleSaveMinute}
@@ -3824,7 +3842,7 @@ export default function App() {
 
                   {/* Executive Workload & Department Productivity Dashboard via Recharts */}
                   <WorkloadDashboard 
-                    tasks={tasks}
+                    tasks={visibleTasks}
                     users={users}
                     projects={projects}
                   />

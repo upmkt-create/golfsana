@@ -20,10 +20,22 @@ export default function RichTextEditor({
 }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const isInternalChange = useRef(false);
+  // Retarda la propagació del canvi (Firestore + registre d'activitat) fins
+  // que l'usuari para d'escriure uns instants — abans cada tecla premuda
+  // generava una escriptura completa a la base de dades i una entrada nova
+  // al log "Tasca actualitzada", inundant la monitorització de duplicats.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Sincronitza el contingut extern (p.ex. quan canvia de tasca) sense
   // sobreescriure mentre l'usuari està escrivint.
   useEffect(() => {
+    // Si hi havia un canvi pendent d'aplicar-se (encara no propagat) i el
+    // contingut extern canvia (p.ex. l'usuari ha saltat a una altra tasca),
+    // el cancel·lem — no ha d'aplicar-se a la tasca equivocada.
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
     if (!editorRef.current) return;
     if (isInternalChange.current) {
       isInternalChange.current = false;
@@ -34,10 +46,23 @@ export default function RichTextEditor({
     }
   }, [value]);
 
+  // Neteja el timeout pendent si el component es desmunta (p.ex. es tanca
+  // el detall de la tasca) per no cridar onChange sobre un component mort.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const emitChange = useCallback(() => {
     if (!editorRef.current) return;
-    isInternalChange.current = true;
-    onChange(editorRef.current.innerHTML);
+    const html = editorRef.current.innerHTML;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      isInternalChange.current = true;
+      onChange(html);
+      debounceRef.current = null;
+    }, 600);
   }, [onChange]);
 
   const exec = (command: string, arg?: string) => {

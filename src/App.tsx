@@ -138,9 +138,11 @@ export default function App() {
     try {
       const saved = localStorage.getItem("golfsana_users");
       const loaded: UserProfile[] = saved ? JSON.parse(saved) : [...STARTER_MEMBERS];
-      const starterIds = new Set(STARTER_MEMBERS.map(m => m.id));
-      const filtered = loaded.filter(u => starterIds.has(u.id));
-      const updated = [...filtered];
+      // Ja NO filtrem fora els usuaris que no siguin STARTER_MEMBERS —
+      // aquest filtre eliminava els usuaris afegits des del formulari
+      // "Afegir Usuari" ja des de la càrrega inicial, abans fins i tot
+      // que la sincronització amb Firestore es completés.
+      const updated = [...loaded];
       STARTER_MEMBERS.forEach((starter) => {
         const idx = updated.findIndex((u) => u.id === starter.id);
         if (idx !== -1) {
@@ -403,7 +405,37 @@ export default function App() {
   }, []);
 
   const handleCustomLogin = async (email: string, code: string) => {
-    const userMatch = STARTER_MEMBERS.find(m => m.email === email && m.accessCode === code);
+    // 1r: comprovar contra els membres de fàbrica (ràpid, sense xarxa)
+    let userMatch = STARTER_MEMBERS.find(m => m.email === email && m.accessCode === code);
+
+    // 2n: comprovar contra els usuaris ja carregats en aquest dispositiu
+    // (per exemple si ja s'hi ha entrat abans, o s'han creat en aquesta sessió)
+    if (!userMatch) {
+      userMatch = users.find(u => u.email === email && u.accessCode === code);
+    }
+
+    // 3r: si l'usuari s'ha creat des d'un ALTRE dispositiu (p.ex. Isabel crea
+    // l'Aurora, i l'Aurora entra per primer cop des del seu propi mòbil), el
+    // seu localStorage encara no té res. Consultem Firestore directament
+    // abans de rendir-nos — cal autenticar-se anònimament primer per tenir
+    // permisos de lectura.
+    if (!userMatch) {
+      try {
+        if (!auth.currentUser) {
+          await signInAnonymously(auth);
+        }
+        const usersSnap = await getDocs(collection(db, "users"));
+        usersSnap.forEach((docSnap) => {
+          const u = docSnap.data() as UserProfile;
+          if (u.email === email && u.accessCode === code) {
+            userMatch = u;
+          }
+        });
+      } catch (err) {
+        console.warn("[Auth] No s'ha pogut consultar Firestore per a l'inici de sessió remot:", err);
+      }
+    }
+
     if (userMatch) {
       setCurrentUser(userMatch);
       localStorage.setItem("golfsana_currentUser", JSON.stringify(userMatch));
@@ -584,14 +616,18 @@ export default function App() {
         });
 
         const starterIds = new Set(STARTER_MEMBERS.map(m => m.id));
+        // Ja NO filtrem fora els usuaris que no siguin STARTER_MEMBERS —
+        // abans aquest filtre eliminava qualsevol usuari afegit des del
+        // formulari "Afegir Usuari" a la propera sincronització, fent la
+        // funcionalitat inservible. Mantenim tots els usuaris reals de
+        // Firestore, i només forcem el rol admin per Isabel/Rocío.
         let filteredMerged = merged
-          .filter(u => starterIds.has(u.id) || u.email === "info@up-mktdigital.com" || u.email === "rocio@golfdaro.com")
           .map(u => {
             const isIsabel = u.email === "info@up-mktdigital.com" || u.id === "member_isabel";
             const isRocio = u.email === "rocio@golfdaro.com" || u.id === "member_rocio";
             return {
               ...u,
-              role: (isIsabel || isRocio) ? ("admin" as UserRole) : ("member" as UserRole)
+              role: (isIsabel || isRocio) ? ("admin" as UserRole) : u.role
             };
           });
 
@@ -1759,7 +1795,7 @@ export default function App() {
   };
 
   // Add Custom User Profile
-  const handleAddUserProfile = async (name: string, email: string, role: UserRole) => {
+  const handleAddUserProfile = async (name: string, email: string, role: UserRole, accessCode: string) => {
     const id = "user-" + Math.random().toString(36).substring(2, 9);
     const avatar = name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase() || "PM";
     const newU: UserProfile = {
@@ -1768,6 +1804,7 @@ export default function App() {
       email,
       role,
       avatar,
+      accessCode,
       createdAt: new Date().toISOString()
     };
 

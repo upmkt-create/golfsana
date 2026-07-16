@@ -98,7 +98,8 @@ import {
   ExternalLink,
   Play,
   Square,
-  Star
+  Star,
+  Pencil
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import UserSessionSelector from "./components/UserSessionSelector";
@@ -323,6 +324,8 @@ export default function App() {
 
   const [showNewWorkspaceModal, setShowNewWorkspaceModal] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
+  const [editingWorkspaceName, setEditingWorkspaceName] = useState("");
   const [newWorkspaceDesc, setNewWorkspaceDesc] = useState("");
 
   const [auditLogs, setAuditLogs] = useState<{ id: string; action: string; time: string; user: string }[]>([
@@ -1294,6 +1297,21 @@ export default function App() {
       await saveDoc(doc(db, "workspaces", id), newWS);
     } catch (err) {
       console.warn("[Firestore Write Warning] workspaces: saved in client sandbox", err);
+    }
+  };
+
+  // Update workspace (e.g. rename)
+  const handleUpdateWorkspace = async (workspaceId: string, updates: Partial<Workspace>) => {
+    const updated = workspaces.map((w) => (w.id === workspaceId ? { ...w, ...updates } : w));
+    setWorkspaces(updated);
+    localStorage.setItem("golfsana_workspaces", JSON.stringify(updated));
+    logEnterpriseAction(`Espai de treball actualitzat: ${updates.name || workspaceId}`);
+    addToast("Espai de treball actualitzat", "success");
+
+    try {
+      await saveDoc(doc(db, "workspaces", workspaceId), updates as Record<string, unknown>, { merge: true });
+    } catch (err) {
+      console.warn("[Firestore Write Warning] workspaces update: saved in client sandbox", err);
     }
   };
 
@@ -3251,9 +3269,68 @@ export default function App() {
                               <div className="w-10 h-10 bg-slate-100 flex items-center justify-center shrink-0">
                                 <Layers className="w-5 h-5 text-blue-600" />
                               </div>
-                              <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors">
-                                {ws.name}
-                              </h3>
+                              {editingWorkspaceId === ws.id ? (
+                                <div
+                                  className="flex items-center gap-1 flex-1"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <input
+                                    type="text"
+                                    autoFocus
+                                    value={editingWorkspaceName}
+                                    onChange={(e) => setEditingWorkspaceName(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        if (editingWorkspaceName.trim()) {
+                                          handleUpdateWorkspace(ws.id, { name: editingWorkspaceName.trim() });
+                                        }
+                                        setEditingWorkspaceId(null);
+                                      }
+                                      if (e.key === "Escape") setEditingWorkspaceId(null);
+                                    }}
+                                    className="text-sm font-bold text-slate-800 uppercase tracking-tight border border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-400 px-1.5 py-1 rounded-sm flex-1 min-w-0"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (editingWorkspaceName.trim()) {
+                                        handleUpdateWorkspace(ws.id, { name: editingWorkspaceName.trim() });
+                                      }
+                                      setEditingWorkspaceId(null);
+                                    }}
+                                    className="text-emerald-600 hover:text-emerald-700 p-1 shrink-0"
+                                    title="Desar"
+                                  >
+                                    <Check className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingWorkspaceId(null)}
+                                    className="text-slate-400 hover:text-rose-600 p-1 shrink-0"
+                                    title="Cancel·lar"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors truncate">
+                                    {ws.name}
+                                  </h3>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingWorkspaceId(ws.id);
+                                      setEditingWorkspaceName(ws.name);
+                                    }}
+                                    className="text-slate-300 hover:text-blue-600 p-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    title="Editar nom de l'espai"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                             
                             <div className="space-y-4 mb-4">

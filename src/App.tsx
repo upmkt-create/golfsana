@@ -2551,17 +2551,25 @@ export default function App() {
 
             {/* Session switcher */}
             {isAdmin && (
-              <UserSessionSelector
-                users={users}
-                currentUser={currentUser}
-                onSelectUser={(u) => {
-                  setCurrentUser(u);
-                  logEnterpriseAction(`Canvi de sessió: ara actua com ${u.name}`);
-                  addToast(`Sessió iniciada com a ${u.name}`, "success");
-                }}
-                onAddUser={handleAddUserProfile}
-                onLogout={handleLogout}
-              />
+              <>
+                {/* Alertes de canvis de preus de la competència — al costat
+                    del selector de sessió, visible només per a Direcció */}
+                <PriceNotificationBubble
+                  golfCourses={golfCourses}
+                  onUpdateCourse={handleUpdateGolfCourse}
+                />
+                <UserSessionSelector
+                  users={users}
+                  currentUser={currentUser}
+                  onSelectUser={(u) => {
+                    setCurrentUser(u);
+                    logEnterpriseAction(`Canvi de sessió: ara actua com ${u.name}`);
+                    addToast(`Sessió iniciada com a ${u.name}`, "success");
+                  }}
+                  onAddUser={handleAddUserProfile}
+                  onLogout={handleLogout}
+                />
+              </>
             )}
           </div>
         </header>
@@ -5184,12 +5192,6 @@ export default function App() {
           </motion.form>
         </div>
       )}
-
-      {/* FLOATING COMPETITOR WEB SCRAPING ALERTS & COGNITIVE BUBBLE */}
-      <PriceNotificationBubble 
-        golfCourses={golfCourses} 
-        onUpdateCourse={handleUpdateGolfCourse} 
-      />
 
       {/* Dynamic Toast Notifications (Improvement 5) */}
       <div className="fixed bottom-5 right-5 z-55 flex flex-col gap-2 max-w-sm w-full pointer-events-none">

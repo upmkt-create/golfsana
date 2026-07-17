@@ -132,7 +132,7 @@ export default function MeetingMinutes({
       ...prev,
       agreements: [
         ...prev.agreements,
-        { id: `agr-${Date.now()}-${Math.floor(Math.random() * 1000)}`, text: "", dueDate: "", recurring: false },
+        { id: `agr-${Date.now()}-${Math.floor(Math.random() * 1000)}`, text: "", dueDate: "", recurring: true, isTask: true, priority: "medium" },
       ],
     }));
   };
@@ -242,7 +242,9 @@ export default function MeetingMinutes({
           <p className="text-[11px] text-slate-400 italic py-1">Encara no hi ha acords. Clica "Afegir acord".</p>
         ) : (
           <div className="space-y-2">
-            {form.agreements.map((agr, idx) => (
+            {form.agreements.map((agr, idx) => {
+              const isTask = agr.isTask !== false; // per defecte true
+              return (
               <div key={agr.id} className="flex items-start gap-2 bg-zinc-50 border border-slate-200 p-2 rounded-sm">
                 <span className="text-[10px] font-mono font-bold text-slate-400 mt-2 w-4 shrink-0">{idx + 1}.</span>
                 <div className="flex-grow space-y-2">
@@ -250,28 +252,60 @@ export default function MeetingMinutes({
                     type="text"
                     value={agr.text}
                     onChange={(e) => updateAgreement(agr.id, { text: e.target.value })}
-                    placeholder="Què s'ha de fer..."
+                    placeholder="Què s'ha de fer o de què s'ha parlat..."
                     className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
                   <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-3 h-3 text-slate-400" />
-                      <input
-                        type="date"
-                        value={agr.dueDate || ""}
-                        onChange={(e) => updateAgreement(agr.id, { dueDate: e.target.value })}
-                        className="text-[10px] border border-slate-200 rounded-sm px-1.5 py-1 focus:outline-none"
-                      />
+                    {/* Toggle Tasca / Informatiu */}
+                    <div className="flex items-center border border-slate-200 rounded-sm overflow-hidden text-[10px] font-semibold shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => updateAgreement(agr.id, { isTask: true })}
+                        className={`px-2 py-1 transition-colors ${isTask ? "bg-indigo-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                      >
+                        Tasca
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateAgreement(agr.id, { isTask: false })}
+                        className={`px-2 py-1 transition-colors ${!isTask ? "bg-slate-500 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                      >
+                        Informatiu
+                      </button>
                     </div>
-                    <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={!!agr.recurring}
-                        onChange={(e) => updateAgreement(agr.id, { recurring: e.target.checked })}
-                        className="w-3.5 h-3.5"
-                      />
-                      <Repeat className="w-3 h-3" /> Seguiment setmanal
-                    </label>
+
+                    {isTask && (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-3 h-3 text-slate-400" />
+                          <input
+                            type="date"
+                            value={agr.dueDate || ""}
+                            onChange={(e) => updateAgreement(agr.id, { dueDate: e.target.value })}
+                            className="text-[10px] border border-slate-200 rounded-sm px-1.5 py-1 focus:outline-none"
+                          />
+                        </div>
+                        <select
+                          value={agr.priority || "medium"}
+                          onChange={(e) => updateAgreement(agr.id, { priority: e.target.value as MeetingAgreement["priority"] })}
+                          className="text-[10px] border border-slate-200 rounded-sm px-1.5 py-1 focus:outline-none"
+                        >
+                          <option value="low">Baixa</option>
+                          <option value="medium">Mitjana</option>
+                          <option value="high">Alta</option>
+                          <option value="urgent">Urgent</option>
+                        </select>
+                        <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={!!agr.recurring}
+                            onChange={(e) => updateAgreement(agr.id, { recurring: e.target.checked })}
+                            className="w-3.5 h-3.5"
+                          />
+                          <Repeat className="w-3 h-3" /> Seguiment setmanal
+                        </label>
+                      </>
+                    )}
                   </div>
                 </div>
                 <button
@@ -282,7 +316,8 @@ export default function MeetingMinutes({
                   <Trash className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -462,12 +497,16 @@ export default function MeetingMinutes({
                         const canCreateTask = !isAdmin && m.memberId === currentUser.id;
                         const linkedTask = agr.taskId ? tasks.find((t) => t.id === agr.taskId) : undefined;
                         const isTaskDone = linkedTask?.status === "done";
+                        const isAgreementTask = agr.isTask !== false;
                         return (
                           <li key={agr.id} className="flex items-start gap-2.5 text-xs">
                             <span className="font-mono font-bold text-slate-300 mt-0.5">{idx + 1}.</span>
                             <div className="flex-grow">
                               <span className={`text-slate-800 font-medium ${isTaskDone ? "line-through text-slate-400" : ""}`}>{agr.text}</span>
                               <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-none ${isAgreementTask ? "bg-indigo-50 text-indigo-700" : "bg-slate-100 text-slate-500"}`}>
+                                  {isAgreementTask ? "Tasca" : "Informatiu"}
+                                </span>
                                 {agr.dueDate && (
                                   <span className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
                                     <Clock className="w-3 h-3" /> {agr.dueDate}
@@ -490,7 +529,7 @@ export default function MeetingMinutes({
                                 )}
                               </div>
                             </div>
-                            {canCreateTask && !agr.taskCreated && (
+                            {isAgreementTask && canCreateTask && !agr.taskCreated && (
                               selectingProjectForAgreement === agr.id ? (
                                 <div className="flex items-center gap-1.5 shrink-0">
                                   <select

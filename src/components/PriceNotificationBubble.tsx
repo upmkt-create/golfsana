@@ -342,32 +342,30 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
         </div>
       )}
 
-      {/* Floating Circle Button */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2">
+      {/* Bell Button — ara inline a la capçalera, al costat del selector de sessió */}
+      <div className="relative flex items-center">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`relative p-3.5 rounded-full transition-all flex items-center justify-center border shadow-lg ${
-            isOpen 
-              ? "bg-[#022e5f] border-[#022e5f] text-white hover:bg-blue-900" 
-              : "bg-white border-slate-200 text-[#022e5f] hover:bg-slate-50"
+          className={`relative p-1 px-2 border transition-all flex items-center gap-1.5 rounded-sm text-xs font-semibold ${
+            isOpen
+              ? "bg-blue-900/85 border-blue-800 text-white"
+              : "border-blue-800 bg-blue-900/60 hover:bg-blue-800/85 text-blue-200 hover:text-white"
           }`}
           title="Canvis de Preus de la Competència (Web Scraping)"
           id="comparator-notification-bubble"
         >
+          <Bell className={`w-3.5 h-3.5 ${unreadCount > 0 ? "text-amber-400 animate-bounce" : ""}`} />
+          <span>Preus</span>
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white ring-2 ring-white animate-bounce">
+            <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 rounded-full">
               {unreadCount}
             </span>
           )}
-          {unreadCount > 0 && !isOpen && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-400 animate-ping opacity-60"></span>
-          )}
-          <Bell className="w-5 h-5 flex-shrink-0" />
         </button>
 
-        {/* Panel Container (Pop-up slideout) */}
+        {/* Panel Container (Pop-up, s'obre cap avall des de la capçalera) */}
         {isOpen && (
-          <div className="absolute bottom-16 right-0 w-[420px] max-h-[580px] bg-white border border-slate-200 shadow-2xl rounded-none flex flex-col overflow-hidden z-50 animate-fade-in animate-slide-up">
+          <div className="absolute top-full left-0 mt-2 w-[420px] max-h-[580px] bg-white border border-slate-200 shadow-2xl rounded-none flex flex-col overflow-hidden z-50 animate-fade-in">
             {/* Header */}
             <div className="p-4 bg-[#022e5f] text-white flex items-center justify-between">
               <div className="flex items-center gap-2">

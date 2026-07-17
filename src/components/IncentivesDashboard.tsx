@@ -118,14 +118,23 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
   const periodDiff = currentPeriodCount - previousPeriodCount;
   const periodDiffPct = previousPeriodCount > 0 ? Math.round((periodDiff / previousPeriodCount) * 100) : (currentPeriodCount > 0 ? 100 : 0);
 
-  const previousPeriodLabel = (() => {
+  // Etiqueta curta amb el rang de dates concret per a qualsevol offset —
+  // es fa servir tant per al període anterior com per l'actual, perquè
+  // els dos costats de la comparativa mostrin sempre una data explícita
+  // i no hi hagi dubte de quina setmana/mes concret s'està mirant.
+  const getShortRangeLabel = (offset: number): string => {
     if (periodFilter === "all") return "";
-    const { start } = getPeriodRange(periodFilter, periodOffset - 1);
-    if (periodFilter === "week") return `${start.toLocaleDateString("ca-ES", { day: "numeric", month: "short" })}`;
+    const { start, end } = getPeriodRange(periodFilter, offset);
+    if (periodFilter === "week") {
+      return `${start.toLocaleDateString("ca-ES", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("ca-ES", { day: "numeric", month: "short" })}`;
+    }
     if (periodFilter === "month") return start.toLocaleDateString("ca-ES", { month: "short", year: "numeric" });
     const qn = Math.floor(start.getMonth() / 3) + 1;
     return `${qn}r trim. ${start.getFullYear()}`;
-  })();
+  };
+
+  const previousPeriodLabel = getShortRangeLabel(periodOffset - 1);
+  const currentPeriodLabelShort = getShortRangeLabel(periodOffset);
 
   // Grouped stats
   const totalTasks = tasks.length;
@@ -340,7 +349,7 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
                 </div>
                 <div className="text-center border-l border-slate-150 pl-3">
                   <div className="text-[9.5px] font-bold uppercase tracking-wider text-blue-700 mb-1">
-                    {periodOffset === 0 ? "Ara" : "Període triat"}
+                    {periodOffset === 0 ? `Ara (${currentPeriodLabelShort})` : currentPeriodLabelShort}
                   </div>
                   <div className="text-3xl font-extrabold font-mono text-blue-900">{currentPeriodCount}</div>
                   <div className={`text-[10px] font-bold mt-0.5 flex items-center justify-center gap-1 ${periodDiff > 0 ? "text-emerald-600" : periodDiff < 0 ? "text-rose-600" : "text-slate-400"}`}>

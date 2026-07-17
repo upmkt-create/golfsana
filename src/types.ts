@@ -85,6 +85,7 @@ export interface SubTask {
   workspaceId?: string;
   timeEntries?: TimeEntry[];
   priority?: "low" | "medium" | "high" | "urgent";
+  description?: string; // Notes/descripció amb el mateix editor de text ric que les tasques
 }
 
 export interface Attachment {

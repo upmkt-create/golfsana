@@ -12,7 +12,8 @@ import {
   ChevronRight,
   TrendingDown,
   Sparkles,
-  HelpCircle
+  HelpCircle,
+  Calendar
 } from "lucide-react";
 import { Task, UserProfile, Project } from "../types";
 import { DEPARTMENTS } from "../data";
@@ -30,10 +31,43 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
   const [multiplier, setMultiplier] = useState<number>(35); // € per on-time task
   const [highPriorityBonus, setHighPriorityBonus] = useState<number>(15); // € extra for high priority on-time tasks
   const [showExplanation, setShowExplanation] = useState<boolean>(true);
+  // Filtre de període per a les tasques ACABADES (basat en completedAt, la
+  // data real de finalització, no la data límit). Les tasques pendents no
+  // es veuen afectades — són sempre "l'estat actual", independentment del
+  // període triat per revisar el que ja s'ha completat.
+  const [periodFilter, setPeriodFilter] = useState<"week" | "month" | "quarter" | "all">("all");
+
+  const getPeriodStart = (period: "week" | "month" | "quarter"): Date => {
+    const now = new Date();
+    if (period === "week") {
+      const day = now.getDay(); // 0=diumenge, 1=dilluns...
+      const diffToMonday = day === 0 ? 6 : day - 1;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - diffToMonday);
+      monday.setHours(0, 0, 0, 0);
+      return monday;
+    }
+    if (period === "month") {
+      return new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+    // quarter
+    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+    return new Date(now.getFullYear(), quarterStartMonth, 1);
+  };
+
+  const isCompletedInPeriod = (completedAt: string | undefined): boolean => {
+    if (periodFilter === "all") return true;
+    if (!completedAt) return false;
+    const periodStart = getPeriodStart(periodFilter);
+    const completedDate = new Date(completedAt);
+    return completedDate >= periodStart;
+  };
+
+  const periodLabel = periodFilter === "week" ? "aquesta setmana" : periodFilter === "month" ? "aquest mes" : periodFilter === "quarter" ? "aquest trimestre" : "sempre";
 
   // Grouped stats
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === "done");
+  const completedTasks = tasks.filter(t => t.status === "done" && isCompletedInPeriod(t.completedAt));
   const onTimeTasks = completedTasks.filter(t => t.completedOnTime === true);
   const overdueTasksCount = completedTasks.filter(t => t.completedOnTime === false).length;
   const pendingTasks = tasks.filter(t => t.status !== "done");
@@ -65,7 +99,7 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
     })
     .map(user => {
     const userTasks = tasks.filter(t => (t.assigneeIds?.includes(user.id) || t.assigneeId === user.id));
-    const uCompleted = userTasks.filter(t => t.status === "done");
+    const uCompleted = userTasks.filter(t => t.status === "done" && isCompletedInPeriod(t.completedAt));
     const uOnTime = uCompleted.filter(t => t.completedOnTime === true);
     const uLate = uCompleted.filter(t => t.completedOnTime === false);
     const uPending = userTasks.filter(t => t.status !== "done");
@@ -169,6 +203,56 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
           </ul>
         </div>
       )}
+
+      {/* Period Filter for Completed Tasks */}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <Calendar className="w-3.5 h-3.5" />
+          <span>Tasques acabades — {periodLabel}</span>
+        </div>
+        <div className="bg-slate-100 p-1 flex border border-slate-205 max-w-xl font-sans text-xs">
+          <button
+            onClick={() => setPeriodFilter("week")}
+            className={`flex-1 text-center py-2 font-bold transition-all ${
+              periodFilter === "week"
+                ? "bg-white text-blue-900 shadow-sm border border-slate-300"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Aquesta setmana
+          </button>
+          <button
+            onClick={() => setPeriodFilter("month")}
+            className={`flex-1 text-center py-2 font-bold transition-all ${
+              periodFilter === "month"
+                ? "bg-white text-blue-900 shadow-sm border border-slate-300"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Aquest mes
+          </button>
+          <button
+            onClick={() => setPeriodFilter("quarter")}
+            className={`flex-1 text-center py-2 font-bold transition-all ${
+              periodFilter === "quarter"
+                ? "bg-white text-blue-900 shadow-sm border border-slate-300"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Aquest trimestre
+          </button>
+          <button
+            onClick={() => setPeriodFilter("all")}
+            className={`flex-1 text-center py-2 font-bold transition-all ${
+              periodFilter === "all"
+                ? "bg-white text-blue-900 shadow-sm border border-slate-300"
+                : "text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Tot l'històric
+          </button>
+        </div>
+      </div>
 
       {/* Model Selection Switcher */}
       <div className="bg-slate-100 p-1 flex border border-slate-205 max-w-xl font-sans text-xs">
@@ -303,14 +387,14 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
 
         {/* Completades */}
         <div className="bg-white border border-slate-205 p-4 font-sans rounded-none flex flex-col justify-between">
-          <span className="text-[10px] font-mono font-bold text-slate-405 uppercase tracking-wider block">S'han acabat en total</span>
+          <span className="text-[10px] font-mono font-bold text-slate-405 uppercase tracking-wider block">S'han acabat</span>
           <div className="mt-2.5 flex items-center justify-between">
             <span className="text-2xl font-extrabold text-emerald-655 font-mono text-emerald-600">{completedTasks.length}</span>
             <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 font-mono">
               {totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0}%
             </span>
           </div>
-          <span className="text-[10px] text-slate-450 block mt-2">Tancades històricament</span>
+          <span className="text-[10px] text-slate-450 block mt-2 capitalize">{periodLabel}</span>
         </div>
 
         {/* A temps */}

@@ -3891,6 +3891,7 @@ export default function App() {
                     const ws = workspaces.find((w) => w.id === p.workspaceId);
                     return isAdmin || !ws?.adminOnly;
                   })}
+                  workspaces={workspaces.filter((ws) => isAdmin || !ws.adminOnly)}
                   currentUser={currentUser}
                   isAdmin={isAdmin}
                   onSaveMinute={handleSaveMinute}

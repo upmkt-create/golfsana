@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { 
   Bell, 
   Info, 
@@ -90,6 +91,10 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
   const [isOpen, setIsOpen] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [toast, setToast] = useState<PriceNotification | null>(null);
+  // El panell es renderitza via Portal (fora del <main overflow-hidden> que
+  // el tallava); calculem la seva posició en píxels a partir del botó.
+  const bellButtonRef = useRef<HTMLButtonElement>(null);
+  const [panelPos, setPanelPos] = useState<{ top: number; right: number } | null>(null);
   
   // Load initial alerts from LocalStorage or seed with default ones
   const [notifications, setNotifications] = useState<PriceNotification[]>(() => {
@@ -345,7 +350,14 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
       {/* Bell Button — ara inline a la capçalera, al costat del selector de sessió */}
       <div className="relative flex items-center">
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          ref={bellButtonRef}
+          onClick={() => {
+            if (!isOpen && bellButtonRef.current) {
+              const rect = bellButtonRef.current.getBoundingClientRect();
+              setPanelPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+            }
+            setIsOpen(!isOpen);
+          }}
           className={`relative p-1 px-2 border transition-all flex items-center gap-1.5 rounded-sm text-xs font-semibold ${
             isOpen
               ? "bg-blue-900/85 border-blue-800 text-white"
@@ -363,9 +375,13 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
           )}
         </button>
 
-        {/* Panel Container (Pop-up, s'obre cap avall des de la capçalera) */}
-        {isOpen && (
-          <div className="absolute top-full left-0 mt-2 w-[420px] max-h-[580px] bg-white border border-slate-200 shadow-2xl rounded-none flex flex-col overflow-hidden z-50 animate-fade-in">
+        {/* Panel Container — via Portal (escapa del <main overflow-hidden>
+            que el tallava), amb posició fixed calculada des del botó */}
+        {isOpen && panelPos && createPortal(
+          <div
+            className="fixed w-[420px] max-w-[calc(100vw-2rem)] max-h-[580px] bg-white border border-slate-200 shadow-2xl rounded-none flex flex-col overflow-hidden z-[9999] animate-fade-in"
+            style={{ top: panelPos.top, right: panelPos.right }}
+          >
             {/* Header */}
             <div className="p-4 bg-[#022e5f] text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -520,7 +536,8 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
             <div className="p-3 bg-slate-50 border-t border-slate-150 text-[10px] text-slate-500 font-mono text-center shrink-0">
               Sincronització de preus activa de forma encriptada v1.2
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </>

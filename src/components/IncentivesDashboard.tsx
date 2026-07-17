@@ -36,34 +36,68 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
   // es veuen afectades — són sempre "l'estat actual", independentment del
   // període triat per revisar el que ja s'ha completat.
   const [periodFilter, setPeriodFilter] = useState<"week" | "month" | "quarter" | "all">("all");
+  // 0 = període actual, -1 = l'anterior, -2 = dos enrere... Es reinicia a 0
+  // cada cop que es canvia de tipus de període (setmana/mes/trimestre).
+  const [periodOffset, setPeriodOffset] = useState<number>(0);
 
-  const getPeriodStart = (period: "week" | "month" | "quarter"): Date => {
+  const changePeriodFilter = (period: "week" | "month" | "quarter" | "all") => {
+    setPeriodFilter(period);
+    setPeriodOffset(0);
+  };
+
+  const getPeriodRange = (period: "week" | "month" | "quarter", offset: number): { start: Date; end: Date } => {
     const now = new Date();
     if (period === "week") {
       const day = now.getDay(); // 0=diumenge, 1=dilluns...
       const diffToMonday = day === 0 ? 6 : day - 1;
       const monday = new Date(now);
-      monday.setDate(now.getDate() - diffToMonday);
+      monday.setDate(now.getDate() - diffToMonday + offset * 7);
       monday.setHours(0, 0, 0, 0);
-      return monday;
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+      return { start: monday, end: sunday };
     }
     if (period === "month") {
-      return new Date(now.getFullYear(), now.getMonth(), 1);
+      const start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0, 23, 59, 59, 999);
+      return { start, end };
     }
     // quarter
-    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
-    return new Date(now.getFullYear(), quarterStartMonth, 1);
+    const currentQuarterMonth = Math.floor(now.getMonth() / 3) * 3;
+    const start = new Date(now.getFullYear(), currentQuarterMonth + offset * 3, 1);
+    const end = new Date(now.getFullYear(), currentQuarterMonth + offset * 3 + 3, 0, 23, 59, 59, 999);
+    return { start, end };
   };
 
   const isCompletedInPeriod = (completedAt: string | undefined): boolean => {
     if (periodFilter === "all") return true;
     if (!completedAt) return false;
-    const periodStart = getPeriodStart(periodFilter);
+    const { start, end } = getPeriodRange(periodFilter, periodOffset);
     const completedDate = new Date(completedAt);
-    return completedDate >= periodStart;
+    return completedDate >= start && completedDate <= end;
   };
 
-  const periodLabel = periodFilter === "week" ? "aquesta setmana" : periodFilter === "month" ? "aquest mes" : periodFilter === "quarter" ? "aquest trimestre" : "sempre";
+  // Etiqueta llegible del període actiu, amb el rang de dates concret quan
+  // no és "Tot l'històric" — perquè quedi clar quin període s'està mirant
+  // en navegar cap enrere.
+  const periodLabel = (() => {
+    if (periodFilter === "all") return "sempre";
+    const { start, end } = getPeriodRange(periodFilter, periodOffset);
+    const isCurrent = periodOffset === 0;
+    if (periodFilter === "week") {
+      const rangeStr = `${start.toLocaleDateString("ca-ES", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("ca-ES", { day: "numeric", month: "short", year: "numeric" })}`;
+      return isCurrent ? `aquesta setmana (${rangeStr})` : rangeStr;
+    }
+    if (periodFilter === "month") {
+      const monthStr = start.toLocaleDateString("ca-ES", { month: "long", year: "numeric" });
+      return isCurrent ? `aquest mes (${monthStr})` : monthStr;
+    }
+    // quarter
+    const quarterNum = Math.floor(start.getMonth() / 3) + 1;
+    const quarterStr = `${quarterNum}r trimestre ${start.getFullYear()}`;
+    return isCurrent ? `aquest trimestre (${quarterStr})` : quarterStr;
+  })();
 
   // Grouped stats
   const totalTasks = tasks.length;
@@ -206,43 +240,72 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
 
       {/* Period Filter for Completed Tasks */}
       <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-          <Calendar className="w-3.5 h-3.5" />
-          <span>Tasques acabades — {periodLabel}</span>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Tasques acabades — {periodLabel}</span>
+          </div>
+          {periodFilter !== "all" && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPeriodOffset((o) => o - 1)}
+                className="p-1 border border-slate-250 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
+                title="Període anterior"
+              >
+                <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+              </button>
+              <button
+                onClick={() => setPeriodOffset(0)}
+                disabled={periodOffset === 0}
+                className="text-[10px] font-bold px-2 py-1 border border-slate-250 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                title="Tornar al període actual"
+              >
+                Avui
+              </button>
+              <button
+                onClick={() => setPeriodOffset((o) => Math.min(0, o + 1))}
+                disabled={periodOffset === 0}
+                className="p-1 border border-slate-250 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Període següent"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
         <div className="bg-slate-100 p-1 flex border border-slate-205 max-w-xl font-sans text-xs">
           <button
-            onClick={() => setPeriodFilter("week")}
+            onClick={() => changePeriodFilter("week")}
             className={`flex-1 text-center py-2 font-bold transition-all ${
               periodFilter === "week"
                 ? "bg-white text-blue-900 shadow-sm border border-slate-300"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            Aquesta setmana
+            Setmana
           </button>
           <button
-            onClick={() => setPeriodFilter("month")}
+            onClick={() => changePeriodFilter("month")}
             className={`flex-1 text-center py-2 font-bold transition-all ${
               periodFilter === "month"
                 ? "bg-white text-blue-900 shadow-sm border border-slate-300"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            Aquest mes
+            Mes
           </button>
           <button
-            onClick={() => setPeriodFilter("quarter")}
+            onClick={() => changePeriodFilter("quarter")}
             className={`flex-1 text-center py-2 font-bold transition-all ${
               periodFilter === "quarter"
                 ? "bg-white text-blue-900 shadow-sm border border-slate-300"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
-            Aquest trimestre
+            Trimestre
           </button>
           <button
-            onClick={() => setPeriodFilter("all")}
+            onClick={() => changePeriodFilter("all")}
             className={`flex-1 text-center py-2 font-bold transition-all ${
               periodFilter === "all"
                 ? "bg-white text-blue-900 shadow-sm border border-slate-300"

@@ -21,7 +21,21 @@
 //      GET /api/rates?date=2026-06-26           (tots els camps)
 // ============================================================================
 
-import type { VercelRequest, VercelResponse } from "@vercel/node";
+// Tipus mínims propis per a la petició/resposta de la funció — evitem
+// dependre de "@vercel/node" en runtime. És una devDependency: si el
+// bundler de Vercel no elimina del tot l'import (encara que sigui
+// "import type"), la funció peta en producció en no trobar el paquet,
+// tot i funcionar perfecte en local. Definint els tipus aquí mateix,
+// no cal cap import extern per a res.
+interface VercelRequest {
+  query: { [key: string]: string | string[] | undefined };
+}
+interface VercelResponse {
+  setHeader(name: string, value: string): void;
+  status(code: number): VercelResponse;
+  json(body: unknown): void;
+}
+
 import {
   getCompetitorTeeTimes,
   getDaySummary,

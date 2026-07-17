@@ -14,13 +14,14 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import { MeetingMinute, MeetingAgreement, UserProfile, Task, Project } from "../types";
+import { MeetingMinute, MeetingAgreement, UserProfile, Task, Project, Workspace } from "../types";
 
 interface MeetingMinutesProps {
   minutes: MeetingMinute[];
   users: UserProfile[];
   tasks: Task[];
   projects: Project[];
+  workspaces: Workspace[];
   currentUser: UserProfile;
   isAdmin: boolean;
   onSaveMinute: (minute: MeetingMinute, isNew: boolean) => Promise<void> | void;
@@ -54,6 +55,7 @@ export default function MeetingMinutes({
   users,
   tasks,
   projects,
+  workspaces,
   currentUser,
   isAdmin,
   onSaveMinute,
@@ -62,11 +64,12 @@ export default function MeetingMinutes({
 }: MeetingMinutesProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  // Acord per al qual s'està triant el projecte de destinació abans de
-  // crear-ne la tasca — evita crear-la "a cegues" al projecte que
+  // Acord per al qual s'està triant l'espai i el projecte de destinació
+  // abans de crear-ne la tasca — evita crear-la "a cegues" al projecte que
   // casualment estigués obert (això feia que la tasca quedés en un espai
   // aliè al membre, i podia arribar a quedar-li invisible a ell mateix).
   const [selectingProjectForAgreement, setSelectingProjectForAgreement] = useState<string | null>(null);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 
   // Formulari (compartit entre crear nova acta i editar-ne una existent)
@@ -531,15 +534,29 @@ export default function MeetingMinutes({
                             </div>
                             {isAgreementTask && canCreateTask && !agr.taskCreated && (
                               selectingProjectForAgreement === agr.id ? (
-                                <div className="flex items-center gap-1.5 shrink-0">
+                                <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
                                   <select
                                     autoFocus
+                                    value={selectedWorkspaceId}
+                                    onChange={(e) => {
+                                      setSelectedWorkspaceId(e.target.value);
+                                      setSelectedProjectId(""); // reset: el projecte triat abans ja no és vàlid per al nou espai
+                                    }}
+                                    className="text-[10px] border border-slate-200 rounded-sm px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[120px]"
+                                  >
+                                    <option value="">Tria l'espai...</option>
+                                    {workspaces.map((ws) => (
+                                      <option key={ws.id} value={ws.id}>{ws.name}</option>
+                                    ))}
+                                  </select>
+                                  <select
                                     value={selectedProjectId}
                                     onChange={(e) => setSelectedProjectId(e.target.value)}
-                                    className="text-[10px] border border-slate-200 rounded-sm px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px]"
+                                    disabled={!selectedWorkspaceId}
+                                    className="text-[10px] border border-slate-200 rounded-sm px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 max-w-[140px] disabled:opacity-40 disabled:cursor-not-allowed"
                                   >
                                     <option value="">Tria el projecte...</option>
-                                    {projects.map((p) => (
+                                    {projects.filter((p) => p.workspaceId === selectedWorkspaceId).map((p) => (
                                       <option key={p.id} value={p.id}>{p.name}</option>
                                     ))}
                                   </select>
@@ -548,6 +565,7 @@ export default function MeetingMinutes({
                                       if (!selectedProjectId) return;
                                       onCreateTaskFromAgreement(m, agr, selectedProjectId);
                                       setSelectingProjectForAgreement(null);
+                                      setSelectedWorkspaceId("");
                                       setSelectedProjectId("");
                                     }}
                                     disabled={!selectedProjectId}
@@ -560,6 +578,7 @@ export default function MeetingMinutes({
                                   <button
                                     onClick={() => {
                                       setSelectingProjectForAgreement(null);
+                                      setSelectedWorkspaceId("");
                                       setSelectedProjectId("");
                                     }}
                                     className="text-slate-400 hover:text-rose-600 p-1 shrink-0"
@@ -572,6 +591,7 @@ export default function MeetingMinutes({
                                 <button
                                   onClick={() => {
                                     setSelectingProjectForAgreement(agr.id);
+                                    setSelectedWorkspaceId("");
                                     setSelectedProjectId("");
                                   }}
                                   className="flex items-center gap-1 text-[10px] font-semibold text-white px-2 py-1 rounded-sm hover:opacity-90 shrink-0"

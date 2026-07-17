@@ -255,20 +255,21 @@ async function scrapeTeeOne(ep: CourseEndpoint, dateStr: string): Promise<TeeTim
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=1800");
-
-  const dateStr = (req.query.date as string) || new Date().toISOString().slice(0, 10);
-  const courseParam = req.query.course as string | undefined;
-
-  const targets = courseParam
-    ? [findEndpoint(courseParam)].filter(Boolean) as CourseEndpoint[]
-    : COURSE_ENDPOINTS;
-
-  if (targets.length === 0) {
-    return res.status(404).json({ error: `Camp no trobat: ${courseParam}` });
-  }
-
+  let dateStr = new Date().toISOString().slice(0, 10);
   try {
+    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=1800");
+
+    dateStr = (req.query.date as string) || dateStr;
+    const courseParam = req.query.course as string | undefined;
+
+    const targets = courseParam
+      ? [findEndpoint(courseParam)].filter(Boolean) as CourseEndpoint[]
+      : COURSE_ENDPOINTS;
+
+    if (targets.length === 0) {
+      return res.status(404).json({ error: `Camp no trobat: ${courseParam}` });
+    }
+
     const results = await Promise.all(
       targets.map(async (ep) => {
         try {
@@ -322,10 +323,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ date: dateStr, courses: results });
   } catch (err: any) {
-    return res.status(200).json({
-      date: dateStr,
-      courses: [],
-      error: String(err?.message || err),
-    });
+    // Xarxa de seguretat absoluta: si res.status/.json existeixen, els fem
+    // servir; si l'entorn fos tan diferent que ni això funcionés, com a
+    // mínim aquest catch evita que l'excepció es propagui sense control.
+    try {
+      return res.status(200).json({
+        date: dateStr,
+        courses: [],
+        error: String(err?.message || err),
+      });
+    } catch {
+      return;
+    }
   }
 }

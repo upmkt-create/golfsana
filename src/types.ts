@@ -168,6 +168,8 @@ export interface MeetingAgreement {
   taskCreated?: boolean;   // Si el membre ja ha convertit aquest acord en tasca
   taskId?: string;         // ID de la tasca creada (per saber si s'ha completat)
   recurring?: boolean;     // Si és de seguiment setmanal
+  isTask?: boolean;        // true = és una tasca (per defecte); false = només punt informatiu tractat, sense seguiment
+  priority?: "low" | "medium" | "high" | "urgent"; // Mateixos atributs que una tasca normal
 }
 
 export interface MeetingMinute {

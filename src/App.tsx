@@ -1155,9 +1155,10 @@ export default function App() {
       agreement.text,
       targetProject.id,
       [minute.memberId],
-      "medium",
+      agreement.priority || "medium",
       undefined,
-      agreement.dueDate || undefined
+      agreement.dueDate || undefined,
+      agreement.recurring ? "weekly" : "none"
     );
     // Marcar l'acord com a convertit i enllaçar-lo amb la tasca creada,
     // perquè l'acta pugui saber més endavant si aquesta tasca s'ha completat.
@@ -1487,13 +1488,19 @@ export default function App() {
   };
 
   // Add Task
-  const handleAddTask = async (title: string, projectId: string, assigneeIds: string[], priority: TaskPriority, departmentIds?: string[], dueDate?: string) => {
+  const handleAddTask = async (title: string, projectId: string, assigneeIds: string[], priority: TaskPriority, departmentIds?: string[], dueDate?: string, recurrence?: Task["recurrence"]) => {
     const id = "task-" + Math.random().toString(36).substring(2, 9);
     const resolvedDeptIds = departmentIds && departmentIds.length > 0 ? departmentIds : ["dep-reserves"];
+    // El workspace de la tasca ha de derivar-se del PROJECTE on es crea, no
+    // de l'espai que casualment tinguis obert en aquell moment — si no,
+    // una tasca creada en un projecte concret podria acabar etiquetada amb
+    // un workspaceId diferent del seu propi projecte (i tornar a quedar
+    // amagada pel filtre de privacitat, encara triant bé el projecte).
+    const resolvedWorkspaceId = projects.find((p) => p.id === projectId)?.workspaceId || activeWorkspaceId;
     const newTask: Task = {
       id,
       projectId,
-      workspaceId: activeWorkspaceId,
+      workspaceId: resolvedWorkspaceId,
       title,
       description: "",
       assigneeIds,
@@ -1502,6 +1509,7 @@ export default function App() {
       status: "todo",
       priority,
       dueDate: dueDate || new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], // default 10 days out
+      recurrence: recurrence || "none",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdBy: currentUser?.id

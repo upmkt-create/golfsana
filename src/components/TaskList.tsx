@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus, TaskPriority, Department } from "../types";
-import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle, Star } from "lucide-react";
+import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle, Star, FileText } from "lucide-react";
 import { DEPARTMENTS } from "../data";
+import RichTextEditor from "./RichTextEditor";
 
 interface TaskListProps {
   tasks: Task[];
@@ -59,6 +60,9 @@ export default function TaskList({
       return next;
     });
   };
+  // Quina subtasca té l'editor de descripció desplegat (una alhora, per no
+  // carregar la llista quan hi ha moltes subtasques)
+  const [expandedSubtaskDescId, setExpandedSubtaskDescId] = useState<string | null>(null);
 
   // Inicia un cronòmetre (de tasca o subtasca). Si ja n'hi havia un altre
   // actiu en un altre lloc, l'atura i en desa el temps abans, per no perdre'l.
@@ -713,8 +717,8 @@ export default function TaskList({
                               const subSeconds = Math.floor((subTotalMs % 60000) / 1000);
 
                               return (
+                              <div key={sub.id}>
                               <div
-                                key={sub.id}
                                 className="flex items-center gap-2.5 text-xs py-1"
                               >
                                 <button
@@ -807,6 +811,38 @@ export default function TaskList({
                                     {sub.endDate}
                                   </span>
                                 )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedSubtaskDescId(expandedSubtaskDescId === sub.id ? null : sub.id)}
+                                  className={`flex items-center gap-1 shrink-0 p-1 rounded-none transition-colors ${
+                                    expandedSubtaskDescId === sub.id
+                                      ? "text-indigo-600 bg-indigo-50"
+                                      : sub.description
+                                      ? "text-indigo-400 hover:text-indigo-600"
+                                      : "text-slate-300 hover:text-slate-500"
+                                  }`}
+                                  title={sub.description ? "Veure/editar descripció" : "Afegir descripció"}
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+
+                              {expandedSubtaskDescId === sub.id && (
+                                <div className="pl-6 pr-2 pb-2">
+                                  <RichTextEditor
+                                    value={sub.description || ""}
+                                    onChange={(html) => {
+                                      const updatedSubtasks = (task.subtasks || []).map((s) =>
+                                        s.id === sub.id ? { ...s, description: html } : s
+                                      );
+                                      onUpdateTask(task.id, { subtasks: updatedSubtasks });
+                                    }}
+                                    placeholder="Notes o detalls d'aquesta subtasca..."
+                                    minHeightClass="min-h-[4rem]"
+                                  />
+                                </div>
+                              )}
                               </div>
                               );
                             })}

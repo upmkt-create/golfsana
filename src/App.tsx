@@ -66,6 +66,7 @@ import {
   Users,
   LogOut,
   ChevronRight,
+  ChevronDown,
   Send,
   Trash,
   HelpCircle,
@@ -255,6 +256,9 @@ export default function App() {
   // Interactive / detailed UI State
   const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "base_tasks" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes">("inici");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // Quina subtasca té l'editor de descripció desplegat, dins del drawer de
+  // detall de tasca (una alhora, per no allargar excessivament la llista)
+  const [expandedSubtaskDescId, setExpandedSubtaskDescId] = useState<string | null>(null);
   const [taskComments, setTaskComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -4857,6 +4861,32 @@ export default function App() {
                                       );
                                     })}
                                   </div>
+                                </div>
+
+                                {/* Subtask Description / Notes */}
+                                <div className="md:col-span-2 space-y-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedSubtaskDescId(expandedSubtaskDescId === sub.id ? null : sub.id)}
+                                    className="flex items-center gap-1.5 font-mono text-[9px] font-bold text-slate-400 uppercase tracking-tight hover:text-indigo-600 transition-colors"
+                                  >
+                                    <FileText className={`w-3 h-3 ${sub.description ? "text-indigo-400" : ""}`} />
+                                    <span>Descripció / Notes de la Subtasca</span>
+                                    {expandedSubtaskDescId === sub.id ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                  </button>
+                                  {expandedSubtaskDescId === sub.id && (
+                                    <RichTextEditor
+                                      value={sub.description || ""}
+                                      onChange={(html) => {
+                                        const current = selectedTask.subtasks || [];
+                                        const next = current.map(s => s.id === sub.id ? { ...s, description: html } : s);
+                                        handleUpdateTask(selectedTask.id, { subtasks: next });
+                                        setSelectedTask({ ...selectedTask, subtasks: next });
+                                      }}
+                                      placeholder="Notes o detalls d'aquesta subtasca..."
+                                      minHeightClass="min-h-[4rem]"
+                                    />
+                                  )}
                                 </div>
 
                               </div>

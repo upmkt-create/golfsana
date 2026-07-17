@@ -99,6 +99,34 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
     return isCurrent ? `aquest trimestre (${quarterStr})` : quarterStr;
   })();
 
+  // Comparativa directa: nombre de tasques acabades en el període que
+  // s'està mirant vs. el període immediatament anterior — es mostra
+  // costat a costat perquè la comparació sigui instantània, sense haver
+  // de navegar endavant i enrere per recordar el número anterior.
+  const countCompletedInOffset = (offset: number): number => {
+    if (periodFilter === "all") return 0;
+    const { start, end } = getPeriodRange(periodFilter, offset);
+    return tasks.filter((t) => {
+      if (t.status !== "done" || !t.completedAt) return false;
+      const d = new Date(t.completedAt);
+      return d >= start && d <= end;
+    }).length;
+  };
+
+  const currentPeriodCount = countCompletedInOffset(periodOffset);
+  const previousPeriodCount = countCompletedInOffset(periodOffset - 1);
+  const periodDiff = currentPeriodCount - previousPeriodCount;
+  const periodDiffPct = previousPeriodCount > 0 ? Math.round((periodDiff / previousPeriodCount) * 100) : (currentPeriodCount > 0 ? 100 : 0);
+
+  const previousPeriodLabel = (() => {
+    if (periodFilter === "all") return "";
+    const { start } = getPeriodRange(periodFilter, periodOffset - 1);
+    if (periodFilter === "week") return `${start.toLocaleDateString("ca-ES", { day: "numeric", month: "short" })}`;
+    if (periodFilter === "month") return start.toLocaleDateString("ca-ES", { month: "short", year: "numeric" });
+    const qn = Math.floor(start.getMonth() / 3) + 1;
+    return `${qn}r trim. ${start.getFullYear()}`;
+  })();
+
   // Grouped stats
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === "done" && isCompletedInPeriod(t.completedAt));
@@ -239,40 +267,13 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
       )}
 
       {/* Period Filter for Completed Tasks */}
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Tasques acabades — {periodLabel}</span>
-          </div>
-          {periodFilter !== "all" && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setPeriodOffset((o) => o - 1)}
-                className="p-1 border border-slate-250 bg-white hover:bg-slate-50 text-slate-600 transition-colors"
-                title="Període anterior"
-              >
-                <ChevronRight className="w-3.5 h-3.5 rotate-180" />
-              </button>
-              <button
-                onClick={() => setPeriodOffset(0)}
-                disabled={periodOffset === 0}
-                className="text-[10px] font-bold px-2 py-1 border border-slate-250 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                title="Tornar al període actual"
-              >
-                Avui
-              </button>
-              <button
-                onClick={() => setPeriodOffset((o) => Math.min(0, o + 1))}
-                disabled={periodOffset === 0}
-                className="p-1 border border-slate-250 bg-white hover:bg-slate-50 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                title="Període següent"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          <Calendar className="w-3.5 h-3.5" />
+          <span>Comparativa de tasques acabades</span>
         </div>
+
+        {/* Tabs: tipus de període */}
         <div className="bg-slate-100 p-1 flex border border-slate-205 max-w-xl font-sans text-xs">
           <button
             onClick={() => changePeriodFilter("week")}
@@ -315,6 +316,60 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
             Tot l'històric
           </button>
         </div>
+
+        {/* Comparativa visual: període anterior vs període actual, costat a
+            costat, amb navegació — pensada per no haver de recordar el
+            número de l'altre període mentre naveguem. */}
+        {periodFilter !== "all" && (
+          <div className="bg-white border-2 border-blue-200 rounded-none p-4 max-w-xl">
+            <div className="flex items-center justify-between gap-3">
+              <button
+                onClick={() => setPeriodOffset((o) => o - 1)}
+                className="flex flex-col items-center gap-1 px-3 py-2 border border-slate-250 bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
+                title="Veure el període anterior"
+              >
+                <ChevronRight className="w-4 h-4 rotate-180" />
+                <span className="text-[9px] font-bold uppercase">Anterior</span>
+              </button>
+
+              <div className="flex-1 grid grid-cols-2 gap-3 items-center">
+                <div className="text-center">
+                  <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 mb-1">{previousPeriodLabel}</div>
+                  <div className="text-3xl font-extrabold font-mono text-slate-400">{previousPeriodCount}</div>
+                  <div className="text-[9px] text-slate-400 mt-0.5">tasques acabades</div>
+                </div>
+                <div className="text-center border-l border-slate-150 pl-3">
+                  <div className="text-[9.5px] font-bold uppercase tracking-wider text-blue-700 mb-1">
+                    {periodOffset === 0 ? "Ara" : "Període triat"}
+                  </div>
+                  <div className="text-3xl font-extrabold font-mono text-blue-900">{currentPeriodCount}</div>
+                  <div className={`text-[10px] font-bold mt-0.5 flex items-center justify-center gap-1 ${periodDiff > 0 ? "text-emerald-600" : periodDiff < 0 ? "text-rose-600" : "text-slate-400"}`}>
+                    {periodDiff !== 0 && (periodDiff > 0 ? "▲" : "▼")}
+                    {periodDiff === 0 ? "Igual" : `${periodDiff > 0 ? "+" : ""}${periodDiffPct}% vs. anterior`}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setPeriodOffset((o) => Math.min(0, o + 1))}
+                disabled={periodOffset === 0}
+                className="flex flex-col items-center gap-1 px-3 py-2 border border-slate-250 bg-slate-50 hover:bg-slate-100 text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+                title={periodOffset === 0 ? "Ja ets al període actual" : "Avançar un període"}
+              >
+                <ChevronRight className="w-4 h-4" />
+                <span className="text-[9px] font-bold uppercase">Següent</span>
+              </button>
+            </div>
+            {periodOffset !== 0 && (
+              <button
+                onClick={() => setPeriodOffset(0)}
+                className="w-full mt-3 text-[10px] font-bold text-blue-700 hover:text-blue-900 underline text-center"
+              >
+                Tornar al període actual
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Model Selection Switcher */}

@@ -497,7 +497,7 @@ export default function MeetingMinutes({
                   ) : (
                     <ul className="space-y-2">
                       {m.agreements.map((agr, idx) => {
-                        const canCreateTask = !isAdmin && m.memberId === currentUser.id;
+                        const canCreateTask = isAdmin || m.memberId === currentUser.id;
                         const linkedTask = agr.taskId ? tasks.find((t) => t.id === agr.taskId) : undefined;
                         const isTaskDone = linkedTask?.status === "done";
                         const isAgreementTask = agr.isTask !== false;

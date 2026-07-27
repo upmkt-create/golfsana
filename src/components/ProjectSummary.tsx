@@ -525,11 +525,11 @@ export default function ProjectSummary({
                 </div>
                 {isEditingBrief ? (
                   <div className="space-y-2">
-                    <textarea
+                    <RichTextEditor
                       value={briefText}
-                      onChange={(e) => setBriefText(e.target.value)}
+                      onChange={setBriefText}
                       placeholder="Redacta el brief, indicacions, metes i visió compartida de la tasca comercial o directiva..."
-                      className="w-full h-24 px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-200 focus:outline-none text-slate-800 dark:text-slate-200"
+                      minHeightClass="min-h-[6rem]"
                     />
                     <div className="flex justify-end gap-1.5">
                       <button
@@ -548,9 +548,14 @@ export default function ProjectSummary({
                       </button>
                     </div>
                   </div>
+                ) : briefText ? (
+                  <div
+                    className="text-[11.5px] text-slate-600 dark:text-slate-400 font-medium leading-relaxed mb-4 rte-content"
+                    dangerouslySetInnerHTML={{ __html: briefText }}
+                  />
                 ) : (
                   <p className="text-[11.5px] text-slate-600 dark:text-slate-400 font-medium leading-relaxed italic mb-4">
-                    {briefText ? briefText : "Usa el brief del projecte per redactar i unificar directrius de treball, documents generals o acords dels Comitès d'empresa."}
+                    Usa el brief del projecte per redactar i unificar directrius de treball, documents generals o acords dels Comitès d'empresa.
                   </p>
                 )}
               </div>

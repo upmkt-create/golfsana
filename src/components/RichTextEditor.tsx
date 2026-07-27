@@ -104,6 +104,33 @@ export default function RichTextEditor({
     }
   };
 
+  // Tab dins d'un element de llista (li) crea un sub-nivell (indent);
+  // Shift+Tab el treu (outdent) — el comportament habitual d'aquest tipus
+  // d'editors. Fora d'una llista, deixem el Tab amb el seu comportament
+  // normal (moure el focus), per no atrapar-lo sense necessitat.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Tab") return;
+
+    const selection = window.getSelection();
+    if (!selection || !selection.anchorNode) return;
+
+    let node: Node | null = selection.anchorNode;
+    let insideListItem = false;
+    while (node && node !== editorRef.current) {
+      if (node.nodeType === 1 && (node as HTMLElement).tagName === "LI") {
+        insideListItem = true;
+        break;
+      }
+      node = node.parentNode;
+    }
+
+    if (!insideListItem) return; // deixa el comportament per defecte del Tab
+
+    e.preventDefault();
+    document.execCommand(e.shiftKey ? "outdent" : "indent");
+    emitChange();
+  };
+
   const btnCls =
     "p-1.5 rounded-none border border-transparent hover:border-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-800 transition-colors";
 
@@ -156,6 +183,7 @@ export default function RichTextEditor({
         suppressContentEditableWarning
         onInput={emitChange}
         onClick={handleClick}
+        onKeyDown={handleKeyDown}
         data-placeholder={placeholder}
         className={`w-full ${minHeightClass} p-3 text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none rte-content`}
       />

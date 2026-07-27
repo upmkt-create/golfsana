@@ -59,6 +59,20 @@ body {
   padding-left: 1.25rem;
   margin: 4px 0;
 }
+/* Sub-nivells de llista (creats amb Tab dins d'un bullet) — mateix patró
+   visual que fan servir la majoria d'editors: disc, cercle, quadrat. */
+.rte-content ul ul {
+  list-style: circle;
+}
+.rte-content ul ul ul {
+  list-style: square;
+}
+.rte-content ol ol {
+  list-style: lower-alpha;
+}
+.rte-content ol ol ol {
+  list-style: lower-roman;
+}
 .rte-checklist-item input.rte-checkbox {
   accent-color: #4f46e5;
 }

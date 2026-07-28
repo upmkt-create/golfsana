@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Project, UserProfile, ProjectRole, KeyResource } from "../types";
-import { Plus, Users, BookOpen, Link, Calendar, Check, Trash2, FileText, AlertTriangle, CheckCircle2, X, Edit3, MessageSquare, Clock } from "lucide-react";
+import { Plus, Users, BookOpen, Link, Calendar, Check, Trash2, FileText, AlertTriangle, CheckCircle2, X, Edit3, MessageSquare, Clock, GripVertical } from "lucide-react";
 import { DEPARTMENTS } from "../data";
 import RichTextEditor from "./RichTextEditor";
 
@@ -50,6 +50,12 @@ export default function ProjectSummary({
   const [showAddResource, setShowAddResource] = useState(false);
   const [resourceTitle, setResourceTitle] = useState("");
   const [resourceUrl, setResourceUrl] = useState("");
+  // Reordenació dels enllaços (drag-and-drop natiu)
+  const [draggedLinkId, setDraggedLinkId] = useState<string | null>(null);
+  const [dragOverLinkId, setDragOverLinkId] = useState<string | null>(null);
+  // Edició inline del nom d'un enllaç
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
+  const [editingLinkTitle, setEditingLinkTitle] = useState("");
 
   // Sync local editing states with props when active project or its content changes
   React.useEffect(() => {
@@ -185,6 +191,38 @@ export default function ProjectSummary({
     if (logAction) {
       logAction(`Ha eliminat el recurs "${name}"`);
     }
+  };
+
+  // Reordena els enllaços (només els de type "link") deixant intactes els
+  // altres tipus de recurs (brief, file) a la resta de l'array.
+  const handleReorderLinks = (draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    const links = keyResources.filter(r => r.type === "link");
+    const others = keyResources.filter(r => r.type !== "link");
+    const draggedIdx = links.findIndex(l => l.id === draggedId);
+    const targetIdx = links.findIndex(l => l.id === targetId);
+    if (draggedIdx === -1 || targetIdx === -1) return;
+
+    const reordered = [...links];
+    const [moved] = reordered.splice(draggedIdx, 1);
+    reordered.splice(targetIdx, 0, moved);
+
+    onUpdateProject(project.id, { keyResources: [...others, ...reordered] });
+  };
+
+  const handleSaveLinkTitle = (id: string) => {
+    if (!editingLinkTitle.trim()) {
+      setEditingLinkId(null);
+      return;
+    }
+    const updatedResources = keyResources.map(r =>
+      r.id === id ? { ...r, title: editingLinkTitle.trim() } : r
+    );
+    onUpdateProject(project.id, { keyResources: updatedResources });
+    if (logAction) {
+      logAction(`Ha renombrat un enllaç a "${editingLinkTitle.trim()}"`);
+    }
+    setEditingLinkId(null);
   };
 
   // Status mapping
@@ -583,23 +621,85 @@ export default function ProjectSummary({
                 ) : (
                   <div className="space-y-2 mb-4">
                     {keyResources.filter(r => r.type === "link").map(res => (
-                      <div key={res.id} className="flex items-center justify-between bg-white dark:bg-slate-800 px-2 py-1.5 border border-slate-100 group relative">
-                        <a
-                          href={res.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs text-blue-600 hover:underline font-semibold truncate flex items-center gap-1.5 max-w-[140px]"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{res.title}</span>
-                        </a>
-                        <button
-                          onClick={() => handleRemoveResource(res.id, res.title)}
-                          className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 p-0.5 justify-self-end text-xs"
-                          title="Eliminar enllaç"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                      <div
+                        key={res.id}
+                        draggable={editingLinkId !== res.id}
+                        onDragStart={() => setDraggedLinkId(res.id)}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          if (draggedLinkId && draggedLinkId !== res.id) setDragOverLinkId(res.id);
+                        }}
+                        onDragLeave={() => setDragOverLinkId((cur) => (cur === res.id ? null : cur))}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (draggedLinkId) handleReorderLinks(draggedLinkId, res.id);
+                          setDraggedLinkId(null);
+                          setDragOverLinkId(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedLinkId(null);
+                          setDragOverLinkId(null);
+                        }}
+                        className={`flex items-center justify-between gap-1 bg-white dark:bg-slate-800 px-2 py-1.5 border group relative transition-colors ${
+                          dragOverLinkId === res.id ? "border-blue-400 bg-blue-50/60" : "border-slate-100"
+                        } ${draggedLinkId === res.id ? "opacity-40" : ""}`}
+                      >
+                        <span className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 shrink-0" title="Arrossega per reordenar">
+                          <GripVertical className="w-3.5 h-3.5" />
+                        </span>
+
+                        {editingLinkId === res.id ? (
+                          <div className="flex items-center gap-1 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              autoFocus
+                              value={editingLinkTitle}
+                              onChange={(e) => setEditingLinkTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") handleSaveLinkTitle(res.id);
+                                if (e.key === "Escape") setEditingLinkId(null);
+                              }}
+                              className="text-xs font-semibold border border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-400 px-1.5 py-0.5 rounded-sm flex-1 min-w-0"
+                            />
+                            <button onClick={() => handleSaveLinkTitle(res.id)} className="text-emerald-600 hover:text-emerald-700 p-0.5 shrink-0" title="Desar">
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => setEditingLinkId(null)} className="text-slate-400 hover:text-rose-600 p-0.5 shrink-0" title="Cancel·lar">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <a
+                              href={res.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-blue-600 hover:underline font-semibold truncate flex items-center gap-1.5 flex-1 min-w-0"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                              <span className="truncate">{res.title}</span>
+                            </a>
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 shrink-0">
+                              <button
+                                onClick={() => {
+                                  setEditingLinkId(res.id);
+                                  setEditingLinkTitle(res.title);
+                                }}
+                                className="text-slate-400 hover:text-blue-600 p-0.5"
+                                title="Editar nom de l'enllaç"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleRemoveResource(res.id, res.title)}
+                                className="text-slate-400 hover:text-rose-600 p-0.5"
+                                title="Eliminar enllaç"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>

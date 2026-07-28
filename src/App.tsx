@@ -4016,6 +4016,7 @@ export default function App() {
                     activeWorkspaceId={activeWorkspaceId}
                     activeProjectId={activeProjectId}
                     onAddTask={handleAddTask}
+                    onUpdateTask={handleUpdateTask}
                     onSelectTask={(task) => setSelectedTask(task)}
                     searchTerm={taskSearchTerm}
                     setSearchTerm={setTaskSearchTerm}
@@ -4023,12 +4024,8 @@ export default function App() {
                     setFilterPriority={setTaskFilterPriority}
                     filterStatus={taskFilterStatus}
                     setFilterStatus={setTaskFilterStatus}
-                    filterDepartment={taskFilterDepartment}
-                    setFilterDepartment={setTaskFilterDepartment}
                     filterAssignee={taskFilterAssignee}
                     setFilterAssignee={setTaskFilterAssignee}
-                    filterProject={taskFilterProject}
-                    setFilterProject={setTaskFilterProject}
                     dateFilterField={taskDateFilterField}
                     setDateFilterField={setTaskDateFilterField}
                     dateFilterFrom={taskDateFilterFrom}

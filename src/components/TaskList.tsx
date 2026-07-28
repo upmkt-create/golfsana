@@ -51,6 +51,7 @@ export default function TaskList({
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterDepartment, setFilterDepartment] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
+  const [filterProject, setFilterProject] = useState<string>("all");
   const [sortField, setSortField] = useState<"dueDate" | "startDate">("dueDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
   const handleSortClick = (field: "dueDate" | "startDate") => {
@@ -74,8 +75,11 @@ export default function TaskList({
     filterAssignee !== "all" ||
     filterStatus !== "all" ||
     filterPriority !== "all" ||
+    filterProject !== "all" ||
     sortDirection !== null ||
     hasActiveDateFilter;
+  // Quina capçalera de columna té el seu mini-filtre desplegat (una alhora)
+  const [openColumnFilter, setOpenColumnFilter] = useState<string | null>(null);
   // Controla quines tasques tenen les subtasques desplegades al llistat
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const toggleExpanded = (taskId: string) => {
@@ -203,6 +207,9 @@ export default function TaskList({
       if (!taskAssignees.includes(filterAssignee)) return false;
     }
 
+    // Filter Project
+    if (filterProject !== "all" && task.projectId !== filterProject) return false;
+
     return true;
   }).sort((a, b) => {
     if (!sortDirection) return 0;
@@ -251,6 +258,33 @@ export default function TaskList({
       .filter((ws) => !DEPARTMENTS.some((d) => d.id === ws.id))
       .map((ws) => ({ id: ws.id, name: ws.name })),
   ];
+
+  // Capçalera de columna amb el seu propi mini-filtre desplegable — reutilitza
+  // exactament els mateixos estats que el panell "Filtres" general, així que
+  // filtrar des d'una columna o des del panell és sempre coherent.
+  const renderColumnHeader = (label: string, key: string, isActive: boolean, panelContent: React.ReactNode) => (
+    <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>
+      <div className="relative inline-block">
+        <button
+          type="button"
+          onClick={() => setOpenColumnFilter(openColumnFilter === key ? null : key)}
+          className={`flex items-center gap-1 hover:text-indigo-600 transition-colors ${isActive ? "text-indigo-600" : ""}`}
+        >
+          <span>{label}</span>
+          {isActive && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>}
+          <ChevronDown className="w-3 h-3 shrink-0" />
+        </button>
+        {openColumnFilter === key && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setOpenColumnFilter(null)}></div>
+            <div className="absolute top-full left-0 mt-1.5 w-56 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 shadow-xl rounded-none p-2.5 z-50 normal-case font-normal space-y-2">
+              {panelContent}
+            </div>
+          </>
+        )}
+      </div>
+    </th>
+  );
 
   return (
     <div className="space-y-4" id="task-list-section">
@@ -351,6 +385,21 @@ export default function TaskList({
                     </select>
                   </div>
 
+                  {/* Projecte */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Projecte</span>
+                    <select
+                      value={filterProject}
+                      onChange={(e) => setFilterProject(e.target.value)}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    >
+                      <option value="all">Tots</option>
+                      {projects.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="border-t border-slate-150 dark:border-slate-700 pt-3 space-y-1">
                     <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Ordenar per</span>
                     <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-none overflow-hidden text-[11px] font-semibold">
@@ -419,9 +468,11 @@ export default function TaskList({
                         setFilterAssignee("all");
                         setFilterStatus("all");
                         setFilterPriority("all");
+                        setFilterProject("all");
                         setSortDirection(null);
                         setDateFilterFrom("");
                         setDateFilterTo("");
+                        setSearchTerm("");
                       }}
                       className="w-full text-center text-[11px] font-bold text-rose-600 hover:text-rose-800 border-t border-slate-150 dark:border-slate-700 pt-2.5"
                     >
@@ -482,7 +533,7 @@ export default function TaskList({
                 <span>{newDepartmentIds.length} sel.</span>
               </button>
               <div className="hidden group-hover:block absolute z-10 w-full mt-1 p-2 bg-white border border-slate-200 shadow-lg max-h-48 overflow-y-auto">
-                {DEPARTMENTS.map(d => (
+                {filterOptions.map(d => (
                   <label key={d.id} className="flex items-center space-x-2 py-1 cursor-pointer hover:bg-slate-50">
                     <input
                       type="checkbox"
@@ -580,14 +631,165 @@ export default function TaskList({
               <th className={`${isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"} w-12 text-center`}>
                 <Check className="w-3.5 h-3.5 mx-auto text-slate-400 stroke-[2.5]" />
               </th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Nom de la tasca</th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Espai de treball</th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Persona Assignada</th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Estat</th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Prioritat</th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Projecte</th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Data d'inici</th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Data límit</th>
+              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>
+                <div className="relative inline-block">
+                  <button
+                    type="button"
+                    onClick={() => setOpenColumnFilter(openColumnFilter === "name" ? null : "name")}
+                    className={`flex items-center gap-1 hover:text-indigo-600 transition-colors ${searchTerm ? "text-indigo-600" : ""}`}
+                  >
+                    <span>Nom de la tasca</span>
+                    {searchTerm && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>}
+                    <ChevronDown className="w-3 h-3 shrink-0" />
+                  </button>
+                  {openColumnFilter === "name" && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setOpenColumnFilter(null)}></div>
+                      <div className="absolute top-full left-0 mt-1.5 w-56 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 shadow-xl rounded-none p-2.5 z-50 normal-case font-normal">
+                        <input
+                          type="text"
+                          autoFocus
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          placeholder="Cerca pel nom..."
+                          className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </th>
+
+              {renderColumnHeader("Espai de treball", "workspace", filterDepartment !== "all", (
+                <select
+                  value={filterDepartment}
+                  onChange={(e) => setFilterDepartment(e.target.value)}
+                  className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                >
+                  <option value="all">Tots ({filterOptions.length})</option>
+                  {filterOptions.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              ))}
+
+              {renderColumnHeader("Persona Assignada", "assignee", filterAssignee !== "all", (
+                <select
+                  value={filterAssignee}
+                  onChange={(e) => setFilterAssignee(e.target.value)}
+                  className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                >
+                  <option value="all">Totes</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              ))}
+
+              {renderColumnHeader("Estat", "status", filterStatus !== "all", (
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                >
+                  <option value="all">Tots els estats</option>
+                  <option value="todo">Pendent</option>
+                  <option value="in_progress">En Procés</option>
+                  <option value="review">En Revisió</option>
+                  <option value="done">Completada</option>
+                </select>
+              ))}
+
+              {renderColumnHeader("Prioritat", "priority", filterPriority !== "all", (
+                <select
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value)}
+                  className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                >
+                  <option value="all">Totes</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="high">Alta</option>
+                  <option value="medium">Mitjana</option>
+                  <option value="low">Baixa</option>
+                </select>
+              ))}
+
+              {renderColumnHeader("Projecte", "project", filterProject !== "all", (
+                <select
+                  value={filterProject}
+                  onChange={(e) => setFilterProject(e.target.value)}
+                  className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                >
+                  <option value="all">Tots</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              ))}
+
+              {renderColumnHeader("Data d'inici", "startDate", sortField === "startDate" && !!sortDirection || (dateFilterField === "startDate" && hasActiveDateFilter), (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSortClick("startDate")}
+                    className="w-full text-[11px] font-semibold border border-slate-200 dark:border-slate-700 rounded-none py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50"
+                  >
+                    Ordenar {sortField === "startDate" ? (sortDirection === "asc" ? "↑ Ascendent" : sortDirection === "desc" ? "↓ Descendent" : "↕") : "↕"}
+                  </button>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div className="space-y-0.5">
+                      <span className="text-[9px] font-mono font-bold text-slate-400 uppercase block">Des de</span>
+                      <input
+                        type="date"
+                        value={dateFilterField === "startDate" ? dateFilterFrom : ""}
+                        onChange={(e) => { setDateFilterField("startDate"); setDateFilterFrom(e.target.value); }}
+                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-1 py-1 bg-white dark:bg-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[9px] font-mono font-bold text-slate-400 uppercase block">Fins a</span>
+                      <input
+                        type="date"
+                        value={dateFilterField === "startDate" ? dateFilterTo : ""}
+                        onChange={(e) => { setDateFilterField("startDate"); setDateFilterTo(e.target.value); }}
+                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-1 py-1 bg-white dark:bg-slate-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {renderColumnHeader("Data límit", "dueDate", (sortField === "dueDate" && !!sortDirection) || (dateFilterField === "dueDate" && hasActiveDateFilter), (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSortClick("dueDate")}
+                    className="w-full text-[11px] font-semibold border border-slate-200 dark:border-slate-700 rounded-none py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50"
+                  >
+                    Ordenar {sortField === "dueDate" ? (sortDirection === "asc" ? "↑ Ascendent" : sortDirection === "desc" ? "↓ Descendent" : "↕") : "↕"}
+                  </button>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <div className="space-y-0.5">
+                      <span className="text-[9px] font-mono font-bold text-slate-400 uppercase block">Des de</span>
+                      <input
+                        type="date"
+                        value={dateFilterField === "dueDate" ? dateFilterFrom : ""}
+                        onChange={(e) => { setDateFilterField("dueDate"); setDateFilterFrom(e.target.value); }}
+                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-1 py-1 bg-white dark:bg-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[9px] font-mono font-bold text-slate-400 uppercase block">Fins a</span>
+                      <input
+                        type="date"
+                        value={dateFilterField === "dueDate" ? dateFilterTo : ""}
+                        onChange={(e) => { setDateFilterField("dueDate"); setDateFilterTo(e.target.value); }}
+                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-1 py-1 bg-white dark:bg-slate-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
               <th className={`${isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"} text-center`}>Accions</th>
             </tr>
           </thead>

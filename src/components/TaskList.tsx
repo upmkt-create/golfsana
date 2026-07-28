@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Task, UserProfile, Project, TaskStatus, TaskPriority, Department } from "../types";
+import { Task, UserProfile, Project, TaskStatus, TaskPriority, Department, Workspace } from "../types";
 import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle, Star, FileText } from "lucide-react";
 import { DEPARTMENTS } from "../data";
 import RichTextEditor from "./RichTextEditor";
@@ -8,6 +8,7 @@ interface TaskListProps {
   tasks: Task[];
   users: UserProfile[];
   projects: Project[];
+  workspaces: Workspace[];
   activeProjectId: string | null;
   activeWorkspaceId: string;
   onAddTask: (title: string, projectId: string, assigneeIds: string[], priority: TaskPriority, departmentIds?: string[]) => void;
@@ -23,6 +24,7 @@ export default function TaskList({
   tasks,
   users,
   projects,
+  workspaces,
   activeProjectId,
   activeWorkspaceId,
   onAddTask,
@@ -181,12 +183,16 @@ export default function TaskList({
     // Filter Status
     if (filterStatus !== "all" && task.status !== filterStatus) return false;
 
-    // Filter Department (supporting multiple departments)
+    // Filter Department (supporting multiple departments) — es considera
+    // tant el/s departament/s objectiu de la tasca com l'espai de treball
+    // real on viu, ja que ara el filtre inclou tots dos tipus d'opcions.
     if (filterDepartment !== "all") {
       const taskDepts = task.departmentIds && task.departmentIds.length > 0
         ? task.departmentIds
         : (task.departmentId ? [task.departmentId] : ["ALL"]);
-      if (!taskDepts.includes("ALL") && !taskDepts.includes(filterDepartment)) return false;
+      const matchesDept = taskDepts.includes("ALL") || taskDepts.includes(filterDepartment);
+      const matchesWorkspace = task.workspaceId === filterDepartment;
+      if (!matchesDept && !matchesWorkspace) return false;
     }
 
     // Filter Assignee
@@ -235,6 +241,17 @@ export default function TaskList({
     }
   };
 
+  // El filtre "Espai de treball" combina els departaments objectiu fixos
+  // (Esportiu, Comercial, Màrqueting — usats històricament a les tasques)
+  // amb els espais de treball reals i dinàmics (Direcció, RRHH, Rapport,
+  // etc.), perquè no en falti cap dels creats des de la interfície.
+  const filterOptions = [
+    ...DEPARTMENTS.map((d) => ({ id: d.id, name: d.name })),
+    ...workspaces
+      .filter((ws) => !DEPARTMENTS.some((d) => d.id === ws.id))
+      .map((ws) => ({ id: ws.id, name: ws.name })),
+  ];
+
   return (
     <div className="space-y-4" id="task-list-section">
       {/* Search & Bulk Options */}
@@ -280,8 +297,8 @@ export default function TaskList({
                       onChange={(e) => setFilterDepartment(e.target.value)}
                       className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
                     >
-                      <option value="all">Tots ({DEPARTMENTS.length})</option>
-                      {DEPARTMENTS.map(d => (
+                      <option value="all">Tots ({filterOptions.length})</option>
+                      {filterOptions.map(d => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
                     </select>
@@ -568,7 +585,6 @@ export default function TaskList({
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Persona Assignada</th>
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Estat</th>
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Prioritat</th>
-              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Temps</th>
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Projecte</th>
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Data d'inici</th>
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Data límit</th>
@@ -578,7 +594,7 @@ export default function TaskList({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
             {filteredTasks.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-12 text-center text-slate-400">
+                <td colSpan={9} className="py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <AlertCircle className="w-8 h-8 text-slate-300 dark:text-slate-700" />
                     <span>No s'ha trobat cap tasca amb els filtres actius.</span>
@@ -724,40 +740,6 @@ export default function TaskList({
                       </select>
                     </td>
 
-                  <td className={`${cellCls} text-xs font-medium text-slate-500`}>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-slate-600 dark:text-slate-400">
-                          {(() => {
-                            const totalMs = (task.timeEntries || []).reduce((acc, entry) => acc + (entry.duration || 0), 0) * 1000;
-                            const hours = Math.floor(totalMs / 3600000);
-                            const minutes = Math.floor((totalMs % 3600000) / 60000);
-                            const seconds = Math.floor((totalMs % 60000) / 1000);
-                            return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                          })()}
-                        </span>
-                        <button
-                          onClick={() => {
-                            if (activeTimer?.taskId === task.id && !activeTimer?.subtaskId) {
-                              // Stop timer
-                              const startTime = activeTimer.startTime;
-                              const endTime = new Date();
-                              const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-                              onUpdateTask(task.id, {
-                                timeEntries: [...(task.timeEntries || []), { id: Date.now().toString(), startTime, endTime, duration }]
-                              });
-                              setActiveTimer(null);
-                            } else {
-                              // Start timer (de la tasca, no d'una subtasca)
-                              startTimer(task.id);
-                            }
-                          }}
-                          className={`p-1 rounded-full ${activeTimer?.taskId === task.id && !activeTimer?.subtaskId ? "bg-rose-100 text-rose-600" : "bg-emerald-100 text-emerald-600"}`}
-                        >
-                          {activeTimer?.taskId === task.id && !activeTimer?.subtaskId ? <Square className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
-                        </button>
-                      </div>
-                    </td>
-
                     <td className={`${cellCls} text-xs font-medium text-slate-500`}>
                       <span className="px-2.5 py-1 rounded-none border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                         {proj ? proj.name : "Sense projecte"}
@@ -829,7 +811,7 @@ export default function TaskList({
                   {expandedTaskIds.has(task.id) && task.subtasks && task.subtasks.length > 0 && (
                     <tr key={`${task.id}-subtasks`} className="bg-slate-50/60 dark:bg-slate-900/40">
                       <td></td>
-                      <td colSpan={9} className="py-2 px-4">
+                      <td colSpan={8} className="py-2 px-4">
                         <div className="pl-5 border-l-2 border-slate-200 dark:border-slate-700 space-y-1.5">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <div className="text-[9.5px] font-mono font-bold text-slate-400 uppercase tracking-wider">

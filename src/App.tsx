@@ -419,13 +419,21 @@ export default function App() {
   }, []);
 
   const handleCustomLogin = async (email: string, code: string) => {
+    // Normalitzem abans de comparar: un espai accidental al davant/darrere,
+    // o una lletra majúscula diferent a l'email, no havien de fer fallar el
+    // login sense cap avís — són errors tipogràfics habituals, no un
+    // problema de seguretat real per l'email (el codi sí es manté sensible
+    // a majúscules, com una contrasenya).
+    const normEmail = email.trim().toLowerCase();
+    const normCode = code.trim();
+
     // 1r: comprovar contra els membres de fàbrica (ràpid, sense xarxa)
-    let userMatch = STARTER_MEMBERS.find(m => m.email === email && m.accessCode === code);
+    let userMatch = STARTER_MEMBERS.find(m => m.email.trim().toLowerCase() === normEmail && m.accessCode === normCode);
 
     // 2n: comprovar contra els usuaris ja carregats en aquest dispositiu
     // (per exemple si ja s'hi ha entrat abans, o s'han creat en aquesta sessió)
     if (!userMatch) {
-      userMatch = users.find(u => u.email === email && u.accessCode === code);
+      userMatch = users.find(u => u.email?.trim().toLowerCase() === normEmail && u.accessCode === normCode);
     }
 
     // 3r: si l'usuari s'ha creat des d'un ALTRE dispositiu (p.ex. Isabel crea
@@ -441,7 +449,7 @@ export default function App() {
         const usersSnap = await getDocs(collection(db, "users"));
         usersSnap.forEach((docSnap) => {
           const u = docSnap.data() as UserProfile;
-          if (u.email === email && u.accessCode === code) {
+          if (u.email?.trim().toLowerCase() === normEmail && u.accessCode === normCode) {
             userMatch = u;
           }
         });
@@ -1837,10 +1845,10 @@ export default function App() {
     const newU: UserProfile = {
       id,
       name,
-      email,
+      email: email.trim().toLowerCase(),
       role,
       avatar,
-      accessCode,
+      accessCode: accessCode.trim(),
       createdAt: new Date().toISOString()
     };
 

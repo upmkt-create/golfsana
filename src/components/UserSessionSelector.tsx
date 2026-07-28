@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { UserProfile, UserRole } from "../types";
-import { Users, Plus, Check, Shield, User, X, LogOut } from "lucide-react";
+import { Users, Plus, Check, Shield, User, X, LogOut, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface UserSessionSelectorProps {
@@ -8,6 +8,7 @@ interface UserSessionSelectorProps {
   currentUser: UserProfile;
   onSelectUser: (user: UserProfile) => void;
   onAddUser: (name: string, email: string, role: UserRole, accessCode: string) => Promise<void>;
+  onUpdateUserCredentials: (userId: string, email: string, accessCode: string) => Promise<void>;
   onLogout: () => void;
 }
 
@@ -16,6 +17,7 @@ export default function UserSessionSelector({
   currentUser,
   onSelectUser,
   onAddUser,
+  onUpdateUserCredentials,
   onLogout,
 }: UserSessionSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,6 +27,32 @@ export default function UserSessionSelector({
   const [newRole, setNewRole] = useState<UserRole>("member");
   const [newAccessCode, setNewAccessCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Edició de credencials d'un usuari ja existent — per poder veure i
+  // corregir exactament l'email/codi que té desat, en lloc d'endevinar
+  // per què no li funciona l'inici de sessió.
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editEmail, setEditEmail] = useState("");
+  const [editCode, setEditCode] = useState("");
+  const [isSavingCredentials, setIsSavingCredentials] = useState(false);
+
+  const startEditCredentials = (u: UserProfile) => {
+    setEditingUserId(u.id);
+    setEditEmail(u.email || "");
+    setEditCode(u.accessCode || "");
+  };
+
+  const saveCredentials = async () => {
+    if (!editingUserId || !editEmail.trim() || !editCode.trim()) return;
+    setIsSavingCredentials(true);
+    try {
+      await onUpdateUserCredentials(editingUserId, editEmail.trim(), editCode.trim());
+      setEditingUserId(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSavingCredentials(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,37 +127,83 @@ export default function UserSessionSelector({
               <div className="max-h-60 overflow-y-auto p-2 space-y-1">
                 {users.map((u) => {
                   const isSelected = u.id === currentUser.id;
+                  if (editingUserId === u.id) {
+                    return (
+                      <div key={u.id} className="p-2.5 bg-amber-50 border border-amber-200 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-slate-700">Credencials de {u.name}</span>
+                          <button type="button" onClick={() => setEditingUserId(null)} className="text-slate-400 hover:text-slate-600">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          placeholder="correu@entitat.com"
+                          className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+                        />
+                        <input
+                          type="text"
+                          value={editCode}
+                          onChange={(e) => setEditCode(e.target.value)}
+                          placeholder="Codi d'accés"
+                          className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={saveCredentials}
+                          disabled={isSavingCredentials}
+                          className="w-full bg-indigo-600 text-white rounded-none py-1.5 text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-50"
+                        >
+                          {isSavingCredentials ? "Desant..." : "Desar credencials"}
+                        </button>
+                      </div>
+                    );
+                  }
                   return (
-                    <button
+                    <div
                       key={u.id}
-                      onClick={() => {
-                        onSelectUser(u);
-                        setIsOpen(false);
-                      }}
-                      className={`w-full flex items-center justify-between p-2 rounded-none text-left transition-all hover:bg-slate-1050 dark:hover:bg-slate-800 ${
+                      className={`w-full flex items-center justify-between p-2 rounded-none transition-all hover:bg-slate-1050 dark:hover:bg-slate-800 ${
                         isSelected ? "bg-indigo-50/50 dark:bg-indigo-950/20" : ""
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-none bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 text-indigo-600 font-bold flex items-center justify-center text-xs">
+                      <button
+                        onClick={() => {
+                          onSelectUser(u);
+                          setIsOpen(false);
+                        }}
+                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                      >
+                        <div className="w-8 h-8 rounded-none bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 text-indigo-600 font-bold flex items-center justify-center text-xs shrink-0">
                           {u.avatar}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                             {u.name}
                             {u.role === "admin" && (
                               <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
                             )}
                           </p>
-                          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[170px]">{u.email}</p>
+                          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[150px]">{u.email}</p>
                         </div>
+                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-none bg-indigo-650 text-white flex items-center justify-center">
+                            <Check className="w-3 animate-pulse" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => startEditCredentials(u)}
+                          className="text-slate-300 hover:text-indigo-600 p-1"
+                          title="Veure/editar email i codi d'accés"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
                       </div>
-                      {isSelected && (
-                        <div className="w-5 h-5 rounded-none bg-indigo-650 text-white flex items-center justify-center">
-                          <Check className="w-3 animate-pulse" />
-                        </div>
-                      )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>

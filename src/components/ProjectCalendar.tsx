@@ -43,8 +43,6 @@ interface ProjectCalendarProps {
 
 type ViewMode = "month" | "week" | "day";
 
-// ---- Utilitats de data (sempre en hora LOCAL, mai UTC, per no desplaçar
-// el dia — el mateix problema que ja vam trobar amb el comparador) --------
 function formatDateKey(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -61,9 +59,8 @@ function addDays(d: Date, n: number): Date {
   return nd;
 }
 function startOfWeek(d: Date): Date {
-  // Dilluns com a primer dia (com al calendari català)
   const nd = new Date(d);
-  const day = nd.getDay(); // 0=diumenge
+  const day = nd.getDay();
   const diff = day === 0 ? 6 : day - 1;
   nd.setDate(nd.getDate() - diff);
   nd.setHours(0, 0, 0, 0);
@@ -73,7 +70,6 @@ function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 function getMonthGrid(d: Date): Date[] {
-  // 6 setmanes x 7 dies = 42 cel·les, sempre començant en dilluns
   const first = startOfMonth(d);
   const gridStart = startOfWeek(first);
   return Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
@@ -86,7 +82,7 @@ const MONTH_NAMES = ["Gener", "Febrer", "Març", "Abril", "Maig", "Juny", "Julio
 const DAY_NAMES = ["Dl", "Dt", "Dc", "Dj", "Dv", "Ds", "Dg"];
 const DAY_NAMES_LONG = ["Dilluns", "Dimarts", "Dimecres", "Dijous", "Divendres", "Dissabte", "Diumenge"];
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const HOUR_HEIGHT = 48; // px per hora a les vistes Setmana/Dia
+const HOUR_HEIGHT = 48;
 
 function isSameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -125,9 +121,6 @@ export default function ProjectCalendar({
   const [newAssignees, setNewAssignees] = useState<string[]>([]);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
-  // Espai/Projecte al calendari són de selecció MÚLTIPLE (vista transversal,
-  // combina diversos alhora) — la resta de filtres es comparteixen amb el
-  // Llistat de tasques.
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>(() => workspaces.map(w => w.id));
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(() => projects.map(p => p.id));
   const [hasInitializedSelection, setHasInitializedSelection] = useState(false);
@@ -152,8 +145,6 @@ export default function ProjectCalendar({
     return project ? project.workspaceId : "";
   };
 
-  // `tasks` ja arriba filtrada des d'App.tsx (Persona/Estat/Prioritat/Cerca/
-  // Dates) — aquí només cal aplicar la selecció múltiple d'Espai/Projecte.
   const calendarTasks = tasks.filter(t => {
     const wsId = getTaskWorkspaceId(t);
     if (wsId && !selectedWorkspaceIds.includes(wsId)) return false;
@@ -166,14 +157,11 @@ export default function ProjectCalendar({
     return project?.color || "#0f172a";
   };
 
-  // Tasques que apareixen en un dia concret (per dueDate; si dueDate no hi
-  // és, per startDate)
   const tasksForDay = (day: Date) => {
     const key = formatDateKey(day);
     return calendarTasks.filter(t => (t.dueDate || t.startDate) === key);
   };
 
-  // ---- Navegació ----------------------------------------------------------
   const goToday = () => setCurrentDate(new Date());
   const goPrev = () => {
     if (view === "month") setCurrentDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
@@ -195,15 +183,12 @@ export default function ProjectCalendar({
     return `${start.getDate()} ${MONTH_NAMES[start.getMonth()]} – ${end.getDate()} ${MONTH_NAMES[end.getMonth()]} ${end.getFullYear()}`;
   })();
 
-  // ---- Drag and drop --------------------------------------------------------
   const handleDropOnDay = (day: Date) => {
     if (!draggedTaskId || !onUpdateTask) return;
     const task = calendarTasks.find(t => t.id === draggedTaskId);
     if (!task) return;
     const newDueKey = formatDateKey(day);
     const updates: Partial<Task> = { dueDate: newDueKey };
-    // Si tenia data d'inici diferent, la desplacem el mateix nombre de dies
-    // per mantenir la durada de la tasca.
     if (task.startDate && task.dueDate) {
       const oldDue = parseDateKey(task.dueDate);
       const oldStart = parseDateKey(task.startDate);
@@ -225,7 +210,6 @@ export default function ProjectCalendar({
       dueDate: formatDateKey(day),
       startTime: `${hh}:${mm}`,
     };
-    // Manté la durada si ja tenia hora de fi
     if (task.startTime && task.endTime) {
       const [sh, sm] = task.startTime.split(":").map(Number);
       const [eh, em] = task.endTime.split(":").map(Number);
@@ -237,7 +221,6 @@ export default function ProjectCalendar({
     setDraggedTaskId(null);
   };
 
-  // ---- Formulari de nova tasca ràpida ---------------------------------------
   const toggleAssignee = (userId: string) => {
     setNewAssignees(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
   };
@@ -253,7 +236,6 @@ export default function ProjectCalendar({
     setNewTitle(""); setNewAssignees([]); setNewDepartmentIds(["dep-reserves"]); setShowAddForm(false);
   };
 
-  // ---- Petita targeta d'esdeveniment (reutilitzada a Mes/Setmana/Dia) ------
   const EventChip = ({ task, compact = false }: { task: Task; compact?: boolean }) => (
     <div
       draggable
@@ -270,7 +252,6 @@ export default function ProjectCalendar({
 
   return (
     <div className="bg-white border border-slate-200 shadow-sm p-4 min-h-[900px] flex flex-col font-sans">
-      {/* Capçalera */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-4 border-b border-slate-200 pb-3">
         <div className="flex items-center gap-3">
           <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-mono">Calendari del Projecte</h3>
@@ -303,7 +284,6 @@ export default function ProjectCalendar({
         </div>
       </div>
 
-      {/* Filtres — comparteixen l'estat amb el Llistat de tasques */}
       <div className="relative mb-4">
         <button
           onClick={() => setShowFiltersPanel(v => !v)}
@@ -411,7 +391,6 @@ export default function ProjectCalendar({
         )}
       </div>
 
-      {/* Formulari de nova tasca */}
       {showAddForm && (
         <div className="bg-slate-50 border border-slate-200 p-4 mb-4 shadow-sm text-left">
           <form onSubmit={handleCreateQuickTask} className="grid grid-cols-1 md:grid-cols-6 gap-3">
@@ -462,7 +441,6 @@ export default function ProjectCalendar({
         </div>
       )}
 
-      {/* ============================ VISTA MES ============================ */}
       {view === "month" && (
         <div className="flex-1 flex flex-col border border-slate-200">
           <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
@@ -499,14 +477,12 @@ export default function ProjectCalendar({
         </div>
       )}
 
-      {/* ========================= VISTA SETMANA/DIA ========================= */}
       {(view === "week" || view === "day") && (() => {
         const days = view === "week" ? getWeekDays(currentDate) : [currentDate];
         const allDayTasksFor = (day: Date) => tasksForDay(day).filter(t => !t.startTime);
         const timedTasksFor = (day: Date) => tasksForDay(day).filter(t => !!t.startTime);
         return (
           <div className="flex-1 flex flex-col border border-slate-200 overflow-hidden">
-            {/* Capçalera de dies */}
             <div className="flex border-b border-slate-200 bg-slate-50">
               <div className="w-14 shrink-0" />
               {days.map((day, i) => {
@@ -519,7 +495,6 @@ export default function ProjectCalendar({
                 );
               })}
             </div>
-            {/* Franja "tot el dia" */}
             <div className="flex border-b border-slate-200 min-h-[36px]">
               <div className="w-14 shrink-0 text-[9px] font-bold text-slate-400 flex items-center justify-center uppercase">Tot el dia</div>
               {days.map((day, i) => (
@@ -533,7 +508,6 @@ export default function ProjectCalendar({
                 </div>
               ))}
             </div>
-            {/* Graella d'hores */}
             <div className="flex-1 overflow-y-auto">
               <div className="flex relative" style={{ height: HOURS.length * HOUR_HEIGHT }}>
                 <div className="w-14 shrink-0">

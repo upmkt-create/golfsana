@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Calendar, momentLocalizer, Views } from "react-big-calendar";
 import moment from "moment";
 import "moment/locale/ca";
@@ -25,6 +25,28 @@ interface ProjectCalendarProps {
   activeProjectId?: string | null;
   onAddTask?: (title: string, projectId: string, assigneeIds: string[], priority: any, departmentIds?: string[], dueDate?: string) => void;
   onSelectTask?: (task: Task) => void;
+  // Filtres compartits amb el Llistat de tasques (mateix estat, mateix
+  // resultat arreu) — el calendari ja rep `tasks` amb aquests filtres
+  // aplicats des de fora, i només necessita els valors + setters per
+  // mostrar-los al seu propi panell "Filtres".
+  searchTerm: string;
+  setSearchTerm: (v: string) => void;
+  filterPriority: string;
+  setFilterPriority: (v: string) => void;
+  filterStatus: string;
+  setFilterStatus: (v: string) => void;
+  filterDepartment: string;
+  setFilterDepartment: (v: string) => void;
+  filterAssignee: string;
+  setFilterAssignee: (v: string) => void;
+  filterProject: string;
+  setFilterProject: (v: string) => void;
+  dateFilterField: "startDate" | "dueDate";
+  setDateFilterField: (v: "startDate" | "dueDate") => void;
+  dateFilterFrom: string;
+  setDateFilterFrom: (v: string) => void;
+  dateFilterTo: string;
+  setDateFilterTo: (v: string) => void;
 }
 
 export default function ProjectCalendar({ 
@@ -35,31 +57,45 @@ export default function ProjectCalendar({
   activeWorkspaceId,
   activeProjectId,
   onAddTask, 
-  onSelectTask 
+  onSelectTask,
+  searchTerm,
+  setSearchTerm,
+  filterPriority,
+  setFilterPriority,
+  filterStatus,
+  setFilterStatus,
+  filterDepartment,
+  setFilterDepartment,
+  filterAssignee,
+  setFilterAssignee,
+  filterProject,
+  setFilterProject,
+  dateFilterField,
+  setDateFilterField,
+  dateFilterFrom,
+  setDateFilterFrom,
+  dateFilterTo,
+  setDateFilterTo,
 }: ProjectCalendarProps) {
   const [view, setView] = useState<any>(Views.MONTH);
   const [date, setDate] = useState<Date>(new Date());
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTaskDate, setNewTaskDate] = useState<Date | null>(null);
-  
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+  const hasActiveDateFilter = !!dateFilterFrom || !!dateFilterTo;
+  const hasActiveFilters =
+    filterDepartment !== "all" ||
+    filterAssignee !== "all" ||
+    filterStatus !== "all" ||
+    filterPriority !== "all" ||
+    filterProject !== "all" ||
+    hasActiveDateFilter ||
+    !!searchTerm;
+
   const [newTitle, setNewTitle] = useState("");
   const [newProjId, setNewProjId] = useState("");
   const [newDepartmentIds, setNewDepartmentIds] = useState<string[]>(["dep-reserves"]);
   const [newAssignees, setNewAssignees] = useState<string[]>([]);
-
-  // Filter States
-  const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>(() => workspaces.map(w => w.id));
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(() => projects.map(p => p.id));
-  const [hasInitialized, setHasInitialized] = useState(false);
-
-  // Sync to show all workspaces & projects once they initially load from persistence
-  useEffect(() => {
-    if (!hasInitialized && workspaces.length > 0 && projects.length > 0) {
-      setSelectedWorkspaceIds(workspaces.map(w => w.id));
-      setSelectedProjectIds(projects.map(p => p.id));
-      setHasInitialized(true);
-    }
-  }, [workspaces, projects, hasInitialized]);
 
   const toggleAssignee = (userId: string) => {
     setNewAssignees((prev) =>
@@ -73,31 +109,30 @@ export default function ProjectCalendar({
     );
   };
 
-  // Helper helper to locate a task's workspace ID correctly
-  const getTaskWorkspaceId = (t: Task) => {
-    if (t.workspaceId) return t.workspaceId;
-    const project = projects.find(p => p.id === t.projectId);
-    return project ? project.workspaceId : "";
-  };
-
-  // Filter the tasks shown inside the calendar dynamically
-  const filteredTasks = tasks.filter(t => {
-    const wsId = getTaskWorkspaceId(t);
-    // If we have selected workspace filters active, tasks must belong to those workspaces
-    if (wsId && !selectedWorkspaceIds.includes(wsId)) return false;
-
-    // If task template is bound to a project, project must be toggled on
-    if (t.projectId && !selectedProjectIds.includes(t.projectId)) return false;
-
-    return true;
-  });
-
-  const events = filteredTasks.map(t => {
+  // Les tasques ja arriben filtrades des d'App.tsx (mateixos filtres que el
+  // Llistat de tasques) — aquí ja no cal tornar a filtrar per res.
+  const events = tasks.map(t => {
     const startStr = t.startDate || t.dueDate;
     const endStr = t.dueDate;
+    const hasTime = !!t.startTime;
 
-    const startDate = startStr ? moment(startStr).startOf("day").toDate() : new Date();
-    const endDate = endStr ? moment(endStr).endOf("day").toDate() : new Date();
+    let startDate: Date;
+    let endDate: Date;
+
+    if (hasTime && startStr) {
+      // Amb hora concreta: l'esdeveniment ocupa la franja horària real,
+      // així es distribueix a la graella d'hores en lloc d'anar a la franja
+      // de "tot el dia" (que abans s'omplia sempre, encara que la majoria
+      // de tasques no tenen cap hora associada).
+      startDate = moment(`${startStr} ${t.startTime}`, "YYYY-MM-DD HH:mm").toDate();
+      const endBase = endStr || startStr;
+      endDate = t.endTime
+        ? moment(`${endBase} ${t.endTime}`, "YYYY-MM-DD HH:mm").toDate()
+        : moment(startDate).add(1, "hour").toDate();
+    } else {
+      startDate = startStr ? moment(startStr).startOf("day").toDate() : new Date();
+      endDate = endStr ? moment(endStr).endOf("day").toDate() : new Date();
+    }
 
     const project = projects.find(p => p.id === t.projectId);
 
@@ -106,7 +141,7 @@ export default function ProjectCalendar({
       title: t.title,
       start: startDate,
       end: endDate,
-      allDay: true,
+      allDay: !hasTime,
       resource: t,
       color: project ? project.color : "#0f172a",
       status: t.status
@@ -185,174 +220,159 @@ export default function ProjectCalendar({
         </div>
       </div>
 
-      {/* Visual Filters Section */}
-      <div className="bg-slate-50 border border-slate-200 p-4 mb-4 space-y-4 text-left">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
-          <div>
-            <h4 className="text-xs font-bold text-[#022e5f] uppercase tracking-wider font-mono flex items-center gap-2">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-              Filtres de visualització de tasques
-            </h4>
-            <p className="text-[11px] text-slate-500">Selecciona quins espais de treball i projectes es mostren en el calendari d'operacions.</p>
-          </div>
-          <div className="flex gap-2 text-xs">
-            <button
-              onClick={() => {
-                setSelectedWorkspaceIds(workspaces.map(w => w.id));
-                setSelectedProjectIds(projects.map(p => p.id));
-              }}
-              className="text-[#033b7a] hover:underline font-bold text-[10px] uppercase tracking-wider"
-            >
-              Mostrar-ho tot
-            </button>
-            <span className="text-slate-300">|</span>
-            <button
-              onClick={() => {
-                setSelectedWorkspaceIds([]);
-                setSelectedProjectIds([]);
-              }}
-              className="text-slate-500 hover:underline font-bold text-[10px] uppercase tracking-wider"
-            >
-              Ocultar-ho tot
-            </button>
-          </div>
-        </div>
+      {/* Filtres — exactament els mateixos que el Llistat de tasques */}
+      <div className="relative mb-4">
+        <button
+          onClick={() => setShowFiltersPanel((v) => !v)}
+          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-none border font-semibold transition-colors ${
+            hasActiveFilters
+              ? "bg-indigo-50 border-indigo-300 text-indigo-700"
+              : "bg-slate-50 border-slate-200 text-slate-500"
+          }`}
+        >
+          <span>Filtres{hasActiveFilters ? " ●" : ""}</span>
+        </button>
 
-        {/* Workspaces Checkboxes */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Espais de Treball ({workspaces.length})</span>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSelectedWorkspaceIds(workspaces.map(w => w.id))}
-                className="text-[9px] font-bold text-slate-500 hover:text-blue-600 uppercase bg-slate-200/50 px-1 py-0.5 rounded-sm"
-              >
-                Tots
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedWorkspaceIds([])}
-                className="text-[9px] font-bold text-slate-500 hover:text-blue-600 uppercase bg-slate-200/50 px-1 py-0.5 rounded-sm"
-              >
-                Cap
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {workspaces.map(ws => {
-              const isChecked = selectedWorkspaceIds.includes(ws.id);
-              const wsTasksCount = tasks.filter(t => getTaskWorkspaceId(t) === ws.id).length;
-              return (
-                <label
-                  key={ws.id}
-                  className={`flex items-center gap-2 px-2.5 py-1 border text-xs font-semibold cursor-pointer transition-all ${
-                    isChecked
-                      ? "bg-blue-50/80 border-blue-200 text-blue-950 shadow-sm"
-                      : "bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50"
-                  }`}
+        {showFiltersPanel && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setShowFiltersPanel(false)}></div>
+            <div className="absolute top-full left-0 mt-1.5 w-[340px] bg-white border border-slate-200 shadow-xl rounded-none p-3.5 z-50 space-y-3.5 max-h-[80vh] overflow-y-auto">
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Cerca</span>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Cerca pel nom..."
+                  className="w-full text-xs border border-slate-200 rounded-none px-2 py-1.5"
+                />
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Espai de treball</span>
+                <select
+                  value={filterDepartment}
+                  onChange={(e) => setFilterDepartment(e.target.value)}
+                  className="w-full text-xs border border-slate-200 rounded-none px-2 py-1.5 font-semibold"
                 >
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedWorkspaceIds(prev => [...prev, ws.id]);
-                        const wsProjects = projects.filter(p => p.workspaceId === ws.id).map(p => p.id);
-                        setSelectedProjectIds(prev => [...new Set([...prev, ...wsProjects])]);
-                      } else {
-                        setSelectedWorkspaceIds(prev => prev.filter(id => id !== ws.id));
-                        const wsProjects = projects.filter(p => p.workspaceId === ws.id).map(p => p.id);
-                        setSelectedProjectIds(prev => prev.filter(id => !wsProjects.includes(id)));
-                      }
-                    }}
-                    className="rounded-none border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
-                  />
-                  <span>{ws.name}</span>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-sm ${isChecked ? "bg-[#033b7a] text-white" : "bg-slate-100 text-slate-500"}`}>
-                    {wsTasksCount}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Projects Checkboxes */}
-        {selectedWorkspaceIds.length > 0 && (
-          <div className="space-y-1.5 border-t border-slate-200 pt-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">
-                Projectes actius ({projects.filter(p => selectedWorkspaceIds.includes(p.workspaceId)).length})
-              </span>
-              <div className="flex gap-1.5">
+                  <option value="all">Tots</option>
+                  {workspaces.map(w => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Persona</span>
+                <select
+                  value={filterAssignee}
+                  onChange={(e) => setFilterAssignee(e.target.value)}
+                  className="w-full text-xs border border-slate-200 rounded-none px-2 py-1.5 font-semibold"
+                >
+                  <option value="all">Totes</option>
+                  {users.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Estat</span>
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full text-xs border border-slate-200 rounded-none px-2 py-1.5 font-semibold"
+                >
+                  <option value="all">Tots els estats</option>
+                  <option value="todo">Pendent</option>
+                  <option value="in_progress">En Procés</option>
+                  <option value="review">En Revisió</option>
+                  <option value="done">Completada</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Prioritat</span>
+                <select
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value)}
+                  className="w-full text-xs border border-slate-200 rounded-none px-2 py-1.5 font-semibold"
+                >
+                  <option value="all">Totes</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="high">Alta</option>
+                  <option value="medium">Mitjana</option>
+                  <option value="low">Baixa</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Projecte</span>
+                <select
+                  value={filterProject}
+                  onChange={(e) => setFilterProject(e.target.value)}
+                  className="w-full text-xs border border-slate-200 rounded-none px-2 py-1.5 font-semibold"
+                >
+                  <option value="all">Tots</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="border-t border-slate-150 pt-3 space-y-1.5">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Filtrar per rang de dates</span>
+                <div className="flex items-center border border-slate-200 rounded-none overflow-hidden text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setDateFilterField("startDate")}
+                    className={`flex-1 py-1.5 transition-colors ${dateFilterField === "startDate" ? "bg-indigo-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                  >
+                    Data d'inici
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDateFilterField("dueDate")}
+                    className={`flex-1 py-1.5 transition-colors border-l border-slate-200 ${dateFilterField === "dueDate" ? "bg-indigo-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                  >
+                    Data límit
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-mono font-bold text-slate-400 uppercase block">Des de</span>
+                    <input
+                      type="date"
+                      value={dateFilterFrom}
+                      onChange={(e) => setDateFilterFrom(e.target.value)}
+                      className="w-full text-xs border border-slate-200 rounded-none px-1.5 py-1"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-mono font-bold text-slate-400 uppercase block">Fins a</span>
+                    <input
+                      type="date"
+                      value={dateFilterTo}
+                      onChange={(e) => setDateFilterTo(e.target.value)}
+                      className="w-full text-xs border border-slate-200 rounded-none px-1.5 py-1"
+                    />
+                  </div>
+                </div>
+              </div>
+              {hasActiveFilters && (
                 <button
                   type="button"
                   onClick={() => {
-                    const activeWsProjs = projects.filter(p => selectedWorkspaceIds.includes(p.workspaceId)).map(p => p.id);
-                    setSelectedProjectIds(prev => [...new Set([...prev, ...activeWsProjs])]);
+                    setSearchTerm("");
+                    setFilterDepartment("all");
+                    setFilterAssignee("all");
+                    setFilterStatus("all");
+                    setFilterPriority("all");
+                    setFilterProject("all");
+                    setDateFilterFrom("");
+                    setDateFilterTo("");
                   }}
-                  className="text-[9px] font-bold text-slate-500 hover:text-blue-600 uppercase bg-slate-200/50 px-1 py-0.5 rounded-sm"
+                  className="w-full text-center text-[11px] font-bold text-rose-600 hover:text-rose-800 border-t border-slate-150 pt-2.5"
                 >
-                  Tots
+                  Netejar tots els filtres
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const activeWsProjs = projects.filter(p => selectedWorkspaceIds.includes(p.workspaceId)).map(p => p.id);
-                    setSelectedProjectIds(prev => prev.filter(id => !activeWsProjs.includes(id)));
-                  }}
-                  className="text-[9px] font-bold text-slate-500 hover:text-blue-600 uppercase bg-slate-200/50 px-1 py-0.5 rounded-sm"
-                >
-                  Cap
-                </button>
-              </div>
+              )}
             </div>
-            {projects.filter(p => selectedWorkspaceIds.includes(p.workspaceId)).length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic">No hi ha projectes a l'espai de treball seleccionat.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-1">
-                {projects.filter(p => selectedWorkspaceIds.includes(p.workspaceId)).map(p => {
-                  const isChecked = selectedProjectIds.includes(p.id);
-                  const pTasksCount = tasks.filter(t => t.projectId === p.id).length;
-                  const parentWs = workspaces.find(w => w.id === p.workspaceId);
-                  return (
-                    <label
-                      key={p.id}
-                      className={`flex items-center gap-2 px-2.5 py-1 border text-xs cursor-pointer transition-all ${
-                        isChecked
-                          ? "bg-white border-slate-300 text-slate-900 shadow-xs"
-                          : "bg-slate-50/60 border-slate-200 text-slate-400 hover:bg-slate-50"
-                      }`}
-                      style={{ borderLeft: isChecked ? `3px solid ${p.color}` : `3.5px solid #cbd5e1` }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProjectIds(prev => [...prev, p.id]);
-                          } else {
-                            setSelectedProjectIds(prev => prev.filter(id => id !== p.id));
-                          }
-                        }}
-                        className="rounded-none border-slate-300 text-blue-600 focus:ring-blue-500 w-3 h-3"
-                      />
-                      <span className="font-semibold">{p.name}</span>
-                      {parentWs && (
-                        <span className="text-[9px] px-1 py-px bg-slate-100 text-slate-500 font-medium rounded-sm">
-                          {parentWs.name}
-                        </span>
-                      )}
-                      <span className={`text-[9px] font-bold px-1 rounded-sm ${isChecked ? "bg-slate-200 text-slate-700" : "bg-slate-100 text-slate-400"}`}>
-                        {pTasksCount}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          </>
         )}
       </div>
 
@@ -448,7 +468,7 @@ export default function ProjectCalendar({
       )}
 
       {/* Styled Big Calendar Container */}
-      <div className="flex-1 min-h-0 custom-calendar-wrapper">
+      <div className="flex-1 min-h-[550px] custom-calendar-wrapper">
         <style>{`
           .custom-calendar-wrapper .rbc-toolbar button {
             color: #475569;

@@ -18,6 +18,30 @@ interface TaskListProps {
   isCompactView?: boolean;
   activeTimer: { taskId: string; subtaskId?: string; startTime: Date } | null;
   setActiveTimer: React.Dispatch<React.SetStateAction<{ taskId: string; subtaskId?: string; startTime: Date } | null>>;
+  // Filtres/ordenació — controlats des de fora (App.tsx) perquè el mateix
+  // criteri s'apliqui també al Calendari, no només al llistat.
+  searchTerm: string;
+  setSearchTerm: (v: string) => void;
+  filterPriority: string;
+  setFilterPriority: (v: string) => void;
+  filterStatus: string;
+  setFilterStatus: (v: string) => void;
+  filterDepartment: string;
+  setFilterDepartment: (v: string) => void;
+  filterAssignee: string;
+  setFilterAssignee: (v: string) => void;
+  filterProject: string;
+  setFilterProject: (v: string) => void;
+  sortField: "dueDate" | "startDate";
+  sortDirection: "asc" | "desc" | null;
+  setSortDirection: (v: "asc" | "desc" | null) => void;
+  onSortClick: (field: "dueDate" | "startDate") => void;
+  dateFilterField: "startDate" | "dueDate";
+  setDateFilterField: (v: "startDate" | "dueDate") => void;
+  dateFilterFrom: string;
+  setDateFilterFrom: (v: string) => void;
+  dateFilterTo: string;
+  setDateFilterTo: (v: string) => void;
 }
 
 export default function TaskList({
@@ -34,6 +58,28 @@ export default function TaskList({
   isCompactView = false,
   activeTimer,
   setActiveTimer,
+  searchTerm,
+  setSearchTerm,
+  filterPriority,
+  setFilterPriority,
+  filterStatus,
+  setFilterStatus,
+  filterDepartment,
+  setFilterDepartment,
+  filterAssignee,
+  setFilterAssignee,
+  filterProject,
+  setFilterProject,
+  sortField,
+  sortDirection,
+  setSortDirection,
+  onSortClick: handleSortClick,
+  dateFilterField,
+  setDateFilterField,
+  dateFilterFrom,
+  setDateFilterFrom,
+  dateFilterTo,
+  setDateFilterTo,
 }: TaskListProps) {
   const [newTitle, setNewTitle] = useState("");
   const [showAddForm, setShowAddForm] = useState(false);
@@ -44,30 +90,9 @@ export default function TaskList({
   });
   const [newPriority, setNewPriority] = useState<TaskPriority>("medium");
   const [newProjId, setNewProjId] = useState("");
-  
-  // Filters
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterPriority, setFilterPriority] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [filterDepartment, setFilterDepartment] = useState<string>("all");
-  const [filterAssignee, setFilterAssignee] = useState<string>("all");
-  const [filterProject, setFilterProject] = useState<string>("all");
-  const [sortField, setSortField] = useState<"dueDate" | "startDate">("dueDate");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
-  const handleSortClick = (field: "dueDate" | "startDate") => {
-    if (sortField === field) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : prev === "desc" ? null : "asc"));
-    } else {
-      setSortField(field);
-      setSortDirection("asc");
-    }
-  };
+
   // Filtre de rang de dates (independent de l'ordenació): restringeix quines
   // tasques es veuen segons si la seva data d'inici o límit cau dins del rang.
-  const [dateFilterField, setDateFilterField] = useState<"startDate" | "dueDate">("dueDate");
-  const [dateFilterFrom, setDateFilterFrom] = useState<string>("");
-  const [dateFilterTo, setDateFilterTo] = useState<string>("");
-  const [showDateFilterPanel, setShowDateFilterPanel] = useState(false);
   const hasActiveDateFilter = !!dateFilterFrom || !!dateFilterTo;
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
   const hasActiveFilters =
@@ -160,66 +185,20 @@ export default function TaskList({
     );
   };
 
-  // Filter tasks belonging strictly to active projects or workspace
+  // Filter tasks belonging strictly to active projects or workspace — la
+  // resta de filtres (cerca, prioritat, estat, departament, assignat,
+  // projecte, rang de dates) i l'ordenació ja arriben aplicats des d'App.tsx
+  // (es comparteixen amb el Calendari, que no té aquest concepte d'espai/
+  // projecte "actiu": ell mostra sempre de manera transversal).
   const filteredTasks = tasks.filter(task => {
     // Project filter
     if (activeProjectId && task.projectId !== activeProjectId) return false;
-    
+
     // Workspace filter if no project selected
     const tWorkspaceId = task.workspaceId || projects.find(p => p.id === task.projectId)?.workspaceId;
     if (!activeProjectId && tWorkspaceId !== activeWorkspaceId) return false;
 
-    // Search term
-    if (searchTerm && !task.title.toLowerCase().includes(searchTerm.toLowerCase()) && !task.description.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
-
-    // Filter Priority
-    if (filterPriority !== "all" && task.priority !== filterPriority) return false;
-
-    if (hasActiveDateFilter) {
-      const rawDate = dateFilterField === "dueDate" ? task.dueDate : task.startDate;
-      if (!rawDate) return false;
-      if (dateFilterFrom && rawDate < dateFilterFrom) return false;
-      if (dateFilterTo && rawDate > dateFilterTo) return false;
-    }
-
-    // Filter Status
-    if (filterStatus !== "all" && task.status !== filterStatus) return false;
-
-    // Filter Department (supporting multiple departments) — es considera
-    // tant el/s departament/s objectiu de la tasca com l'espai de treball
-    // real on viu, ja que ara el filtre inclou tots dos tipus d'opcions.
-    if (filterDepartment !== "all") {
-      const taskDepts = task.departmentIds && task.departmentIds.length > 0
-        ? task.departmentIds
-        : (task.departmentId ? [task.departmentId] : ["ALL"]);
-      const matchesDept = taskDepts.includes("ALL") || taskDepts.includes(filterDepartment);
-      const matchesWorkspace = task.workspaceId === filterDepartment;
-      if (!matchesDept && !matchesWorkspace) return false;
-    }
-
-    // Filter Assignee
-    if (filterAssignee !== "all") {
-      const taskAssignees = task.assigneeIds && task.assigneeIds.length > 0
-        ? task.assigneeIds
-        : (task.assigneeId ? [task.assigneeId] : []);
-      if (!taskAssignees.includes(filterAssignee)) return false;
-    }
-
-    // Filter Project
-    if (filterProject !== "all" && task.projectId !== filterProject) return false;
-
     return true;
-  }).sort((a, b) => {
-    if (!sortDirection) return 0;
-    const rawA = sortField === "dueDate" ? a.dueDate : a.startDate;
-    const rawB = sortField === "dueDate" ? b.dueDate : b.startDate;
-    const dateA = rawA ? new Date(rawA).getTime() : 0;
-    const dateB = rawB ? new Date(rawB).getTime() : 0;
-
-    if (sortDirection === "asc") return dateA - dateB;
-    return dateB - dateA;
   });
 
   const getPriorityBadgeColor = (p: TaskPriority) => {

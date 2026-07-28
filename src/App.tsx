@@ -259,6 +259,8 @@ export default function App() {
   // Quina subtasca té l'editor de descripció desplegat, dins del drawer de
   // detall de tasca (una alhora, per no allargar excessivament la llista)
   const [expandedSubtaskDescId, setExpandedSubtaskDescId] = useState<string | null>(null);
+  // Criteri d'ordenació de les subtasques dins del drawer de detall de tasca
+  const [drawerSubtaskSortField, setDrawerSubtaskSortField] = useState<"startDate" | "endDate" | "none">("none");
   const [taskComments, setTaskComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -4667,13 +4669,55 @@ export default function App() {
                       <span>Afegir subtasca</span>
                     </button>
                   </div>
+
+                  {selectedTask.subtasks && selectedTask.subtasks.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9.5px] font-mono font-bold text-slate-400 uppercase tracking-wider">Ordenar per:</span>
+                      <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-none overflow-hidden text-[9.5px] font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setDrawerSubtaskSortField("none")}
+                          className={`px-2 py-0.5 transition-colors ${drawerSubtaskSortField === "none" ? "bg-indigo-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50"}`}
+                        >
+                          Creació
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDrawerSubtaskSortField("startDate")}
+                          className={`px-2 py-0.5 transition-colors border-l border-slate-200 dark:border-slate-700 ${drawerSubtaskSortField === "startDate" ? "bg-indigo-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50"}`}
+                        >
+                          Data d'inici
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDrawerSubtaskSortField("endDate")}
+                          className={`px-2 py-0.5 transition-colors border-l border-slate-200 dark:border-slate-700 ${drawerSubtaskSortField === "endDate" ? "bg-indigo-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50"}`}
+                        >
+                          Data de venciment
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="space-y-4">
                     {(!selectedTask.subtasks || selectedTask.subtasks.length === 0) ? (
                       <p className="text-[11px] text-slate-400 italic py-2">No s'han registrat subtasques. Clica per afegir camps de control.</p>
                     ) : (
                       <div className="space-y-3">
-                        {selectedTask.subtasks.map((sub) => {
+                        {(() => {
+                          const sorted = [...selectedTask.subtasks];
+                          if (drawerSubtaskSortField !== "none") {
+                            sorted.sort((a, b) => {
+                              const fieldA = drawerSubtaskSortField === "endDate" ? a.endDate : a.startDate;
+                              const fieldB = drawerSubtaskSortField === "endDate" ? b.endDate : b.startDate;
+                              if (!fieldA && !fieldB) return 0;
+                              if (!fieldA) return 1;
+                              if (!fieldB) return -1;
+                              return fieldA.localeCompare(fieldB);
+                            });
+                          }
+                          return sorted;
+                        })().map((sub) => {
                           const taskMinDate = selectedTask.startDate || "";
                           const taskMaxDate = selectedTask.dueDate || "";
                           

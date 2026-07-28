@@ -261,6 +261,11 @@ export default function App() {
   const [expandedSubtaskDescId, setExpandedSubtaskDescId] = useState<string | null>(null);
   // Criteri d'ordenació de les subtasques dins del drawer de detall de tasca
   const [drawerSubtaskSortField, setDrawerSubtaskSortField] = useState<"startDate" | "endDate" | "none">("none");
+  // Títol de la subtasca nova mentre s'escriu — null = no s'està afegint
+  // cap. Es crea la subtasca de veritat només en confirmar, just on ja
+  // estava l'usuari (a dalt), en lloc d'afegir-la buida al final de la
+  // llista i obligar a baixar-hi per omplir-la.
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState<string | null>(null);
   const [taskComments, setTaskComments] = useState<Comment[]>([]);
   const [newCommentText, setNewCommentText] = useState("");
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
@@ -4062,9 +4067,7 @@ export default function App() {
                                 type="button"
                                 onClick={() => {
                                   setShowActionMenu(false);
-                                  const current = selectedTask.subtasks || [];
-                                  const next = [...current, { id: "sub-" + Date.now(), title: "", completed: false }];
-                                  handleUpdateTask(selectedTask.id, { subtasks: next });
+                                  setNewSubtaskTitle("");
                                 }}
                                 className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-slate-700 border-b border-slate-50"
                               >
@@ -4649,26 +4652,78 @@ export default function App() {
                     <span className="text-[11px] text-slate-450 font-bold uppercase tracking-wider block font-mono">Subtasques Integrades</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        const current = selectedTask.subtasks || [];
-                        const next = [...current, { 
-                          id: "sub-" + Date.now(), 
-                          title: "", 
-                          completed: false, 
-                          createdBy: currentUser?.id, 
-                          createdAt: new Date().toISOString(),
-                          startDate: selectedTask.startDate || "",
-                          endDate: selectedTask.dueDate || ""
-                        }];
-                        handleUpdateTask(selectedTask.id, { subtasks: next });
-                        setSelectedTask({ ...selectedTask, subtasks: next });
-                      }}
+                      onClick={() => setNewSubtaskTitle("")}
                       className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 font-sans bg-indigo-50 border border-indigo-100 px-2 py-1 transition-colors hover:bg-indigo-100"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Afegir subtasca</span>
                     </button>
                   </div>
+
+                  {newSubtaskTitle !== null && (
+                    <div className="flex items-center gap-1.5 bg-indigo-50/50 border border-indigo-200 p-2 rounded-sm">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={newSubtaskTitle}
+                        onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            if (newSubtaskTitle.trim()) {
+                              const current = selectedTask.subtasks || [];
+                              const next = [...current, {
+                                id: "sub-" + Date.now(),
+                                title: newSubtaskTitle.trim(),
+                                completed: false,
+                                createdBy: currentUser?.id,
+                                createdAt: new Date().toISOString(),
+                                startDate: selectedTask.startDate || "",
+                                endDate: selectedTask.dueDate || ""
+                              }];
+                              handleUpdateTask(selectedTask.id, { subtasks: next });
+                              setSelectedTask({ ...selectedTask, subtasks: next });
+                            }
+                            setNewSubtaskTitle(null);
+                          }
+                          if (e.key === "Escape") setNewSubtaskTitle(null);
+                        }}
+                        placeholder="Nom de la subtasca... (Enter per crear-la)"
+                        className="flex-1 text-xs border border-slate-200 rounded-sm px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newSubtaskTitle.trim()) {
+                            const current = selectedTask.subtasks || [];
+                            const next = [...current, {
+                              id: "sub-" + Date.now(),
+                              title: newSubtaskTitle.trim(),
+                              completed: false,
+                              createdBy: currentUser?.id,
+                              createdAt: new Date().toISOString(),
+                              startDate: selectedTask.startDate || "",
+                              endDate: selectedTask.dueDate || ""
+                            }];
+                            handleUpdateTask(selectedTask.id, { subtasks: next });
+                            setSelectedTask({ ...selectedTask, subtasks: next });
+                          }
+                          setNewSubtaskTitle(null);
+                        }}
+                        className="text-emerald-600 hover:text-emerald-700 p-1.5 shrink-0"
+                        title="Crear subtasca"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewSubtaskTitle(null)}
+                        className="text-slate-400 hover:text-rose-600 p-1.5 shrink-0"
+                        title="Cancel·lar"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
 
                   {selectedTask.subtasks && selectedTask.subtasks.length > 1 && (
                     <div className="flex items-center gap-2">

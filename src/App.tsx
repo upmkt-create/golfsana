@@ -3791,6 +3791,7 @@ export default function App() {
                   tasks={displayedTasks.filter((t) => !t.isBaseTask)}
                   users={users}
                   projects={projects}
+                  workspaces={workspaces}
                   activeProjectId={activeProjectId}
                   activeWorkspaceId={activeWorkspaceId}
                   onAddTask={handleAddTask}
@@ -3808,6 +3809,7 @@ export default function App() {
                   tasks={displayedTasks.filter((t) => t.isBaseTask)}
                   users={users}
                   projects={projects}
+                  workspaces={workspaces}
                   activeProjectId={activeProjectId}
                   activeWorkspaceId={activeWorkspaceId}
                   onAddTask={handleAddTask}

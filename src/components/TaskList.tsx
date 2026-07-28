@@ -49,7 +49,16 @@ export default function TaskList({
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterDepartment, setFilterDepartment] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
+  const [sortField, setSortField] = useState<"dueDate" | "startDate">("dueDate");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc" | null>(null);
+  const handleSortClick = (field: "dueDate" | "startDate") => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : prev === "desc" ? null : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
   // Controla quines tasques tenen les subtasques desplegades al llistat
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const toggleExpanded = (taskId: string) => {
@@ -63,6 +72,8 @@ export default function TaskList({
   // Quina subtasca té l'editor de descripció desplegat (una alhora, per no
   // carregar la llista quan hi ha moltes subtasques)
   const [expandedSubtaskDescId, setExpandedSubtaskDescId] = useState<string | null>(null);
+  // Criteri d'ordenació de les subtasques dins de cada tasca desplegada
+  const [subtaskSortField, setSubtaskSortField] = useState<"startDate" | "endDate">("endDate");
 
   // Inicia un cronòmetre (de tasca o subtasca). Si ja n'hi havia un altre
   // actiu en un altre lloc, l'atura i en desa el temps abans, per no perdre'l.
@@ -167,9 +178,11 @@ export default function TaskList({
     return true;
   }).sort((a, b) => {
     if (!sortDirection) return 0;
-    const dateA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-    const dateB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-    
+    const rawA = sortField === "dueDate" ? a.dueDate : a.startDate;
+    const rawB = sortField === "dueDate" ? b.dueDate : b.startDate;
+    const dateA = rawA ? new Date(rawA).getTime() : 0;
+    const dateB = rawB ? new Date(rawB).getTime() : 0;
+
     if (sortDirection === "asc") return dateA - dateB;
     return dateB - dateA;
   });
@@ -282,12 +295,18 @@ export default function TaskList({
             </select>
           </div>
 
-          {/* Sort by Due Date */}
+          {/* Sort by Start Date / Due Date */}
           <button
-            onClick={() => setSortDirection(prev => prev === "asc" ? "desc" : "asc")}
+            onClick={() => handleSortClick("startDate")}
             className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-none border border-slate-200 dark:border-slate-700 font-semibold"
           >
-            Data límit {sortDirection === "asc" ? "↑" : sortDirection === "desc" ? "↓" : "↕"}
+            Data d'inici {sortField === "startDate" ? (sortDirection === "asc" ? "↑" : sortDirection === "desc" ? "↓" : "↕") : "↕"}
+          </button>
+          <button
+            onClick={() => handleSortClick("dueDate")}
+            className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-none border border-slate-200 dark:border-slate-700 font-semibold"
+          >
+            Data límit {sortField === "dueDate" ? (sortDirection === "asc" ? "↑" : sortDirection === "desc" ? "↓" : "↕") : "↕"}
           </button>
 
           {/* Nova Tasca Trigger Button */}
@@ -697,16 +716,36 @@ export default function TaskList({
                       <td></td>
                       <td colSpan={8} className="py-2 px-4">
                         <div className="pl-5 border-l-2 border-slate-200 dark:border-slate-700 space-y-1.5">
-                          <div className="text-[9.5px] font-mono font-bold text-slate-400 uppercase tracking-wider mb-1">
-                            Subtasques (ordenades per data de venciment)
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <div className="text-[9.5px] font-mono font-bold text-slate-400 uppercase tracking-wider">
+                              Subtasques
+                            </div>
+                            <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-none overflow-hidden text-[9.5px] font-semibold">
+                              <button
+                                type="button"
+                                onClick={() => setSubtaskSortField("startDate")}
+                                className={`px-2 py-0.5 transition-colors ${subtaskSortField === "startDate" ? "bg-indigo-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50"}`}
+                              >
+                                Data d'inici
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSubtaskSortField("endDate")}
+                                className={`px-2 py-0.5 transition-colors ${subtaskSortField === "endDate" ? "bg-indigo-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50"}`}
+                              >
+                                Data de venciment
+                              </button>
+                            </div>
                           </div>
                           {[...task.subtasks]
                             .sort((a, b) => {
-                              // Sense data de venciment van al final
-                              if (!a.endDate && !b.endDate) return 0;
-                              if (!a.endDate) return 1;
-                              if (!b.endDate) return -1;
-                              return a.endDate.localeCompare(b.endDate);
+                              const fieldA = subtaskSortField === "endDate" ? a.endDate : a.startDate;
+                              const fieldB = subtaskSortField === "endDate" ? b.endDate : b.startDate;
+                              // Sense data van al final
+                              if (!fieldA && !fieldB) return 0;
+                              if (!fieldA) return 1;
+                              if (!fieldB) return -1;
+                              return fieldA.localeCompare(fieldB);
                             })
                             .map((sub) => {
                               const subAssignees = (sub.assigneeIds || []).map((aId) => users.find((u) => u.id === aId)).filter(Boolean);

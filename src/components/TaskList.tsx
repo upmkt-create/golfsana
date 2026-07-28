@@ -880,27 +880,17 @@ export default function TaskList({
                     </td>
 
                     <td className={cellCls}>
-                      <div className="flex flex-wrap gap-1 max-w-[160px]">
-                        {(() => {
-                          const taskDepts = task.departmentIds && task.departmentIds.length > 0
-                            ? task.departmentIds
-                            : (task.departmentId ? [task.departmentId] : ["dep-reserves"]);
-                          return taskDepts.map(depId => {
-                            const d = DEPARTMENTS.find(dep => dep.id === depId);
-                            if (!d) return null;
-                            return (
-                              <span
-                                key={depId}
-                                className="px-2 py-0.5 rounded text-[9.5px] font-bold text-white tracking-wide uppercase shadow-xs shrink-0 font-sans"
-                                style={{ backgroundColor: d.color }}
-                                title={d.name}
-                              >
-                                {d.name.replace("Departament de ", "").replace("Departament ", "")}
-                              </span>
-                            );
-                          });
-                        })()}
-                      </div>
+                      {(() => {
+                        const ws = workspaces.find((w) => w.id === task.workspaceId);
+                        return (
+                          <span
+                            className="px-2 py-0.5 rounded text-[9.5px] font-bold text-white tracking-wide uppercase shadow-xs shrink-0 font-sans bg-blue-600 inline-block max-w-[160px] truncate"
+                            title={ws?.name || "Sense espai assignat"}
+                          >
+                            {ws?.name || "—"}
+                          </span>
+                        );
+                      })()}
                     </td>
 
                     <td className={cellCls}>

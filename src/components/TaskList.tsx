@@ -66,6 +66,14 @@ export default function TaskList({
   const [dateFilterTo, setDateFilterTo] = useState<string>("");
   const [showDateFilterPanel, setShowDateFilterPanel] = useState(false);
   const hasActiveDateFilter = !!dateFilterFrom || !!dateFilterTo;
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+  const hasActiveFilters =
+    filterDepartment !== "all" ||
+    filterAssignee !== "all" ||
+    filterStatus !== "all" ||
+    filterPriority !== "all" ||
+    sortDirection !== null ||
+    hasActiveDateFilter;
   // Controla quines tasques tenen les subtasques desplegades al llistat
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const toggleExpanded = (taskId: string) => {
@@ -243,106 +251,111 @@ export default function TaskList({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Workspace filter */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-none border border-slate-200 dark:border-slate-700">
-            <Landmark className="w-3.5 h-3.5 text-amber-500" />
-            <span>Espai de treball:</span>
-            <select
-              value={filterDepartment}
-              onChange={(e) => setFilterDepartment(e.target.value)}
-              className="bg-transparent border-none text-slate-700 dark:text-slate-300 font-semibold focus:outline-none"
-            >
-              <option value="all">Tots ({DEPARTMENTS.length})</option>
-              {DEPARTMENTS.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Assignee filter */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-none border border-slate-200 dark:border-slate-700">
-            <Landmark className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Persona:</span>
-            <select
-              value={filterAssignee}
-              onChange={(e) => setFilterAssignee(e.target.value)}
-              className="bg-transparent border-none text-slate-700 dark:text-slate-300 font-semibold focus:outline-none"
-            >
-              <option value="all">Totes</option>
-              {users.map(u => (
-                <option key={u.id} value={u.id}>{u.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Status filter */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-none border border-slate-200 dark:border-slate-700">
-            <AlertCircle className="w-3.5 h-3.5" />
-            <span>Estat:</span>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-transparent border-none text-slate-700 dark:text-slate-300 font-semibold focus:outline-none"
-            >
-              <option value="all">Tots els estats</option>
-              <option value="todo">Pendent</option>
-              <option value="in_progress">En Procés</option>
-              <option value="review">En Revisió</option>
-              <option value="done">Completada</option>
-            </select>
-          </div>
-
-          {/* Priority filter */}
-          <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-none border border-slate-200 dark:border-slate-700">
-            <Filter className="w-3.5 h-3.5" />
-            <span>Prioritat:</span>
-            <select
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value)}
-              className="bg-transparent border-none text-slate-700 dark:text-slate-300 font-semibold focus:outline-none"
-            >
-              <option value="all">Totes</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">Alta</option>
-              <option value="medium">Mitjana</option>
-              <option value="low">Baixa</option>
-            </select>
-          </div>
-
-          {/* Sort by Start Date / Due Date */}
-          <button
-            onClick={() => handleSortClick("startDate")}
-            className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-none border border-slate-200 dark:border-slate-700 font-semibold"
-          >
-            Data d'inici {sortField === "startDate" ? (sortDirection === "asc" ? "↑" : sortDirection === "desc" ? "↓" : "↕") : "↕"}
-          </button>
-          <button
-            onClick={() => handleSortClick("dueDate")}
-            className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-none border border-slate-200 dark:border-slate-700 font-semibold"
-          >
-            Data límit {sortField === "dueDate" ? (sortDirection === "asc" ? "↑" : sortDirection === "desc" ? "↓" : "↕") : "↕"}
-          </button>
-
-          {/* Filtre per rang de dates (restringeix, no reordena) */}
+          {/* Botó únic de Filtres — consolida espai/persona/estat/prioritat,
+              ordenació i rang de dates, que abans anaven escampats en 8
+              controls separats a la barra. */}
           <div className="relative">
             <button
-              onClick={() => setShowDateFilterPanel((v) => !v)}
+              onClick={() => setShowFiltersPanel((v) => !v)}
               className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-none border font-semibold transition-colors ${
-                hasActiveDateFilter
+                hasActiveFilters
                   ? "bg-indigo-50 border-indigo-300 text-indigo-700"
                   : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
               }`}
             >
               <Filter className="w-3.5 h-3.5" />
-              <span>Filtrar per data{hasActiveDateFilter ? " ●" : ""}</span>
+              <span>Filtres{hasActiveFilters ? " ●" : ""}</span>
             </button>
 
-            {showDateFilterPanel && (
+            {showFiltersPanel && (
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowDateFilterPanel(false)}></div>
-                <div className="absolute top-full left-0 mt-1.5 w-72 bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 shadow-xl rounded-none p-3 z-50 space-y-3">
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Filtrar per</span>
+                <div className="fixed inset-0 z-40" onClick={() => setShowFiltersPanel(false)}></div>
+                <div className="absolute top-full right-0 mt-1.5 w-[340px] bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 shadow-xl rounded-none p-3.5 z-50 space-y-3.5 max-h-[80vh] overflow-y-auto">
+
+                  {/* Espai de treball */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Espai de treball</span>
+                    <select
+                      value={filterDepartment}
+                      onChange={(e) => setFilterDepartment(e.target.value)}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    >
+                      <option value="all">Tots ({DEPARTMENTS.length})</option>
+                      {DEPARTMENTS.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Persona */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Persona</span>
+                    <select
+                      value={filterAssignee}
+                      onChange={(e) => setFilterAssignee(e.target.value)}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    >
+                      <option value="all">Totes</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Estat */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Estat</span>
+                    <select
+                      value={filterStatus}
+                      onChange={(e) => setFilterStatus(e.target.value)}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    >
+                      <option value="all">Tots els estats</option>
+                      <option value="todo">Pendent</option>
+                      <option value="in_progress">En Procés</option>
+                      <option value="review">En Revisió</option>
+                      <option value="done">Completada</option>
+                    </select>
+                  </div>
+
+                  {/* Prioritat */}
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Prioritat</span>
+                    <select
+                      value={filterPriority}
+                      onChange={(e) => setFilterPriority(e.target.value)}
+                      className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-2 py-1.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    >
+                      <option value="all">Totes</option>
+                      <option value="urgent">Urgent</option>
+                      <option value="high">Alta</option>
+                      <option value="medium">Mitjana</option>
+                      <option value="low">Baixa</option>
+                    </select>
+                  </div>
+
+                  <div className="border-t border-slate-150 dark:border-slate-700 pt-3 space-y-1">
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Ordenar per</span>
+                    <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-none overflow-hidden text-[11px] font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => handleSortClick("startDate")}
+                        className={`flex-1 py-1.5 transition-colors ${sortField === "startDate" && sortDirection ? "bg-indigo-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50"}`}
+                      >
+                        Data d'inici {sortField === "startDate" ? (sortDirection === "asc" ? "↑" : sortDirection === "desc" ? "↓" : "↕") : "↕"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSortClick("dueDate")}
+                        className={`flex-1 py-1.5 transition-colors border-l border-slate-200 dark:border-slate-700 ${sortField === "dueDate" && sortDirection ? "bg-indigo-600 text-white" : "bg-white dark:bg-slate-800 text-slate-500 hover:bg-slate-50"}`}
+                      >
+                        Data límit {sortField === "dueDate" ? (sortDirection === "asc" ? "↑" : sortDirection === "desc" ? "↓" : "↕") : "↕"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-150 dark:border-slate-700 pt-3 space-y-1.5">
+                    <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Filtrar per rang de dates</span>
                     <div className="flex items-center border border-slate-200 dark:border-slate-700 rounded-none overflow-hidden text-[11px] font-semibold">
                       <button
                         type="button"
@@ -359,39 +372,43 @@ export default function TaskList({
                         Data límit
                       </button>
                     </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <span className="text-[9.5px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Des de</span>
+                        <input
+                          type="date"
+                          value={dateFilterFrom}
+                          onChange={(e) => setDateFilterFrom(e.target.value)}
+                          className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white dark:bg-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[9.5px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Fins a</span>
+                        <input
+                          type="date"
+                          value={dateFilterTo}
+                          onChange={(e) => setDateFilterTo(e.target.value)}
+                          className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white dark:bg-slate-800"
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Des de</span>
-                      <input
-                        type="date"
-                        value={dateFilterFrom}
-                        onChange={(e) => setDateFilterFrom(e.target.value)}
-                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white dark:bg-slate-800"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block">Fins a</span>
-                      <input
-                        type="date"
-                        value={dateFilterTo}
-                        onChange={(e) => setDateFilterTo(e.target.value)}
-                        className="w-full text-xs border border-slate-200 dark:border-slate-700 rounded-none px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white dark:bg-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  {hasActiveDateFilter && (
+                  {hasActiveFilters && (
                     <button
                       type="button"
                       onClick={() => {
+                        setFilterDepartment("all");
+                        setFilterAssignee("all");
+                        setFilterStatus("all");
+                        setFilterPriority("all");
+                        setSortDirection(null);
                         setDateFilterFrom("");
                         setDateFilterTo("");
                       }}
-                      className="text-[11px] font-semibold text-slate-500 hover:text-rose-600"
+                      className="w-full text-center text-[11px] font-bold text-rose-600 hover:text-rose-800 border-t border-slate-150 dark:border-slate-700 pt-2.5"
                     >
-                      Netejar filtre de data
+                      Netejar tots els filtres
                     </button>
                   )}
                 </div>

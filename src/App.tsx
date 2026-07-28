@@ -419,21 +419,13 @@ export default function App() {
   }, []);
 
   const handleCustomLogin = async (email: string, code: string) => {
-    // Normalitzem abans de comparar: un espai accidental al davant/darrere,
-    // o una lletra majúscula diferent a l'email, no havien de fer fallar el
-    // login sense cap avís — són errors tipogràfics habituals, no un
-    // problema de seguretat real per l'email (el codi sí es manté sensible
-    // a majúscules, com una contrasenya).
-    const normEmail = email.trim().toLowerCase();
-    const normCode = code.trim();
-
     // 1r: comprovar contra els membres de fàbrica (ràpid, sense xarxa)
-    let userMatch = STARTER_MEMBERS.find(m => m.email.trim().toLowerCase() === normEmail && m.accessCode === normCode);
+    let userMatch = STARTER_MEMBERS.find(m => m.email === email && m.accessCode === code);
 
     // 2n: comprovar contra els usuaris ja carregats en aquest dispositiu
     // (per exemple si ja s'hi ha entrat abans, o s'han creat en aquesta sessió)
     if (!userMatch) {
-      userMatch = users.find(u => u.email?.trim().toLowerCase() === normEmail && u.accessCode === normCode);
+      userMatch = users.find(u => u.email === email && u.accessCode === code);
     }
 
     // 3r: si l'usuari s'ha creat des d'un ALTRE dispositiu (p.ex. Isabel crea
@@ -449,7 +441,7 @@ export default function App() {
         const usersSnap = await getDocs(collection(db, "users"));
         usersSnap.forEach((docSnap) => {
           const u = docSnap.data() as UserProfile;
-          if (u.email?.trim().toLowerCase() === normEmail && u.accessCode === normCode) {
+          if (u.email === email && u.accessCode === code) {
             userMatch = u;
           }
         });
@@ -1845,10 +1837,10 @@ export default function App() {
     const newU: UserProfile = {
       id,
       name,
-      email: email.trim().toLowerCase(),
+      email,
       role,
       avatar,
-      accessCode: accessCode.trim(),
+      accessCode,
       createdAt: new Date().toISOString()
     };
 
@@ -4521,49 +4513,6 @@ export default function App() {
                       <Star className={`w-3.5 h-3.5 ${selectedTask.isBaseTask ? "fill-amber-400" : ""}`} />
                       {selectedTask.isBaseTask ? "Tasca Base del Projecte" : "Marcar com a Base del Projecte"}
                     </button>
-                  </div>
-
-                  {/* Multi-Department Section */}
-                  <div className="grid grid-cols-[130px_1fr] items-start gap-2 py-2 border-b border-slate-100 font-sans text-xs">
-                    <span className="text-slate-400 font-medium select-none">Dept.</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {DEPARTMENTS.map((dept) => {
-                        const currentDepts = selectedTask.departmentIds && selectedTask.departmentIds.length > 0
-                          ? selectedTask.departmentIds
-                          : (selectedTask.departmentId ? [selectedTask.departmentId] : ["dep-reserves"]);
-                        const isSelected = currentDepts.includes(dept.id);
-                        return (
-                          <button
-                            key={dept.id}
-                            type="button"
-                            onClick={() => {
-                              let nextIds: string[];
-                              if (isSelected) {
-                                if (currentDepts.length <= 1) return; // Keep at least one
-                                nextIds = currentDepts.filter(id => id !== dept.id);
-                              } else {
-                                nextIds = [...currentDepts, dept.id];
-                              }
-                              handleUpdateTask(selectedTask.id, {
-                                departmentIds: nextIds,
-                                departmentId: nextIds[0] || dept.id
-                              });
-                            }}
-                            className={`px-2 py-0.5 text-[10px] font-semibold border transition-all flex items-center gap-1 rounded-md ${
-                              isSelected
-                                ? "text-white shadow-xs"
-                                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                            }`}
-                            style={isSelected ? { backgroundColor: dept.color, borderColor: dept.color } : undefined}
-                            title="Afegeix o treu aquest departament asana"
-                          >
-                            <span className={`w-1 h-1 rounded-full ${isSelected ? "bg-white" : ""}`} style={!isSelected ? { backgroundColor: dept.color } : undefined} />
-                            <span>{dept.name.replace("Departament de ", "").replace("Departament ", "")}</span>
-                            {isSelected && <span className="text-[8px] font-black">✓</span>}
-                          </button>
-                        );
-                      })}
-                    </div>
                   </div>
 
                   {/* Custom Tags Section */}

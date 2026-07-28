@@ -1903,6 +1903,80 @@ export default function App() {
     });
   }, [tasks, workspaces, projects, isAdmin]);
 
+  // Filtres de tasques COMPARTITS entre el Llistat i el Calendari — abans
+  // cada component tenia la seva pròpia còpia (el calendari només filtrava
+  // per Espai/Projecte, i mai coincidia amb el que es veia al llistat).
+  // Ara viuen en un sol lloc, i qualsevol vista que mostri tasques els fa
+  // servir igual.
+  const [taskSearchTerm, setTaskSearchTerm] = useState("");
+  const [taskFilterPriority, setTaskFilterPriority] = useState<string>("all");
+  const [taskFilterStatus, setTaskFilterStatus] = useState<string>("all");
+  const [taskFilterDepartment, setTaskFilterDepartment] = useState<string>("all");
+  const [taskFilterAssignee, setTaskFilterAssignee] = useState<string>("all");
+  const [taskFilterProject, setTaskFilterProject] = useState<string>("all");
+  const [taskSortField, setTaskSortField] = useState<"dueDate" | "startDate">("dueDate");
+  const [taskSortDirection, setTaskSortDirection] = useState<"asc" | "desc" | null>(null);
+  const handleTaskSortClick = (field: "dueDate" | "startDate") => {
+    if (taskSortField === field) {
+      setTaskSortDirection((prev) => (prev === "asc" ? "desc" : prev === "desc" ? null : "asc"));
+    } else {
+      setTaskSortField(field);
+      setTaskSortDirection("asc");
+    }
+  };
+  const [taskDateFilterField, setTaskDateFilterField] = useState<"startDate" | "dueDate">("dueDate");
+  const [taskDateFilterFrom, setTaskDateFilterFrom] = useState<string>("");
+  const [taskDateFilterTo, setTaskDateFilterTo] = useState<string>("");
+
+  // Aplica els filtres/ordenació compartits sobre qualsevol llista de
+  // tasques — tant el Llistat com el Calendari en surten d'aquí.
+  const applyTaskFilters = React.useCallback((list: Task[]): Task[] => {
+    const hasActiveDateFilter = !!taskDateFilterFrom || !!taskDateFilterTo;
+    const filtered = list.filter((task) => {
+      if (taskSearchTerm.trim() !== "") {
+        const q = taskSearchTerm.toLowerCase();
+        if (!task.title.toLowerCase().includes(q)) return false;
+      }
+      if (taskFilterStatus !== "all" && task.status !== taskFilterStatus) return false;
+      if (taskFilterPriority !== "all" && task.priority !== taskFilterPriority) return false;
+      if (taskFilterDepartment !== "all") {
+        const taskDepts = task.departmentIds && task.departmentIds.length > 0
+          ? task.departmentIds
+          : (task.departmentId ? [task.departmentId] : ["ALL"]);
+        const matchesDept = taskDepts.includes("ALL") || taskDepts.includes(taskFilterDepartment);
+        const matchesWorkspace = task.workspaceId === taskFilterDepartment;
+        if (!matchesDept && !matchesWorkspace) return false;
+      }
+      if (taskFilterAssignee !== "all") {
+        const taskAssignees = task.assigneeIds && task.assigneeIds.length > 0
+          ? task.assigneeIds
+          : (task.assigneeId ? [task.assigneeId] : []);
+        if (!taskAssignees.includes(taskFilterAssignee)) return false;
+      }
+      if (taskFilterProject !== "all" && task.projectId !== taskFilterProject) return false;
+      if (hasActiveDateFilter) {
+        const rawDate = taskDateFilterField === "dueDate" ? task.dueDate : task.startDate;
+        if (!rawDate) return false;
+        if (taskDateFilterFrom && rawDate < taskDateFilterFrom) return false;
+        if (taskDateFilterTo && rawDate > taskDateFilterTo) return false;
+      }
+      return true;
+    });
+
+    if (!taskSortDirection) return filtered;
+    return [...filtered].sort((a, b) => {
+      const rawA = taskSortField === "dueDate" ? a.dueDate : a.startDate;
+      const rawB = taskSortField === "dueDate" ? b.dueDate : b.startDate;
+      const dateA = rawA ? new Date(rawA).getTime() : 0;
+      const dateB = rawB ? new Date(rawB).getTime() : 0;
+      return taskSortDirection === "asc" ? dateA - dateB : dateB - dateA;
+    });
+  }, [
+    taskSearchTerm, taskFilterStatus, taskFilterPriority, taskFilterDepartment,
+    taskFilterAssignee, taskFilterProject, taskDateFilterField, taskDateFilterFrom,
+    taskDateFilterTo, taskSortField, taskSortDirection
+  ]);
+
   // Filter tasks dynamically if a team member is clicked in sidebar and by global search query (Improvement 3)
   const displayedTasks = tasks.filter((t) => {
     // Member filter
@@ -3788,7 +3862,7 @@ export default function App() {
 
               {activeTab === "list" && (
                 <TaskList
-                  tasks={displayedTasks.filter((t) => !t.isBaseTask)}
+                  tasks={applyTaskFilters(displayedTasks.filter((t) => !t.isBaseTask))}
                   users={users}
                   projects={projects}
                   workspaces={workspaces}
@@ -3801,12 +3875,34 @@ export default function App() {
                   isCompactView={isCompactView}
                   activeTimer={activeTimer}
                   setActiveTimer={setActiveTimer}
+                  searchTerm={taskSearchTerm}
+                  setSearchTerm={setTaskSearchTerm}
+                  filterPriority={taskFilterPriority}
+                  setFilterPriority={setTaskFilterPriority}
+                  filterStatus={taskFilterStatus}
+                  setFilterStatus={setTaskFilterStatus}
+                  filterDepartment={taskFilterDepartment}
+                  setFilterDepartment={setTaskFilterDepartment}
+                  filterAssignee={taskFilterAssignee}
+                  setFilterAssignee={setTaskFilterAssignee}
+                  filterProject={taskFilterProject}
+                  setFilterProject={setTaskFilterProject}
+                  sortField={taskSortField}
+                  sortDirection={taskSortDirection}
+                  setSortDirection={setTaskSortDirection}
+                  onSortClick={handleTaskSortClick}
+                  dateFilterField={taskDateFilterField}
+                  setDateFilterField={setTaskDateFilterField}
+                  dateFilterFrom={taskDateFilterFrom}
+                  setDateFilterFrom={setTaskDateFilterFrom}
+                  dateFilterTo={taskDateFilterTo}
+                  setDateFilterTo={setTaskDateFilterTo}
                 />
               )}
 
               {activeTab === "base_tasks" && (
                 <TaskList
-                  tasks={displayedTasks.filter((t) => t.isBaseTask)}
+                  tasks={applyTaskFilters(displayedTasks.filter((t) => t.isBaseTask))}
                   users={users}
                   projects={projects}
                   workspaces={workspaces}
@@ -3819,6 +3915,28 @@ export default function App() {
                   isCompactView={isCompactView}
                   activeTimer={activeTimer}
                   setActiveTimer={setActiveTimer}
+                  searchTerm={taskSearchTerm}
+                  setSearchTerm={setTaskSearchTerm}
+                  filterPriority={taskFilterPriority}
+                  setFilterPriority={setTaskFilterPriority}
+                  filterStatus={taskFilterStatus}
+                  setFilterStatus={setTaskFilterStatus}
+                  filterDepartment={taskFilterDepartment}
+                  setFilterDepartment={setTaskFilterDepartment}
+                  filterAssignee={taskFilterAssignee}
+                  setFilterAssignee={setTaskFilterAssignee}
+                  filterProject={taskFilterProject}
+                  setFilterProject={setTaskFilterProject}
+                  sortField={taskSortField}
+                  sortDirection={taskSortDirection}
+                  setSortDirection={setTaskSortDirection}
+                  onSortClick={handleTaskSortClick}
+                  dateFilterField={taskDateFilterField}
+                  setDateFilterField={setTaskDateFilterField}
+                  dateFilterFrom={taskDateFilterFrom}
+                  setDateFilterFrom={setTaskDateFilterFrom}
+                  dateFilterTo={taskDateFilterTo}
+                  setDateFilterTo={setTaskDateFilterTo}
                 />
               )}
 
@@ -3891,7 +4009,7 @@ export default function App() {
               {activeTab === "calendar" && (
                 <div className="p-6">
                   <ProjectCalendar 
-                    tasks={displayedTasks}
+                    tasks={applyTaskFilters(displayedTasks)}
                     projects={projects}
                     users={users}
                     workspaces={workspaces}
@@ -3899,6 +4017,24 @@ export default function App() {
                     activeProjectId={activeProjectId}
                     onAddTask={handleAddTask}
                     onSelectTask={(task) => setSelectedTask(task)}
+                    searchTerm={taskSearchTerm}
+                    setSearchTerm={setTaskSearchTerm}
+                    filterPriority={taskFilterPriority}
+                    setFilterPriority={setTaskFilterPriority}
+                    filterStatus={taskFilterStatus}
+                    setFilterStatus={setTaskFilterStatus}
+                    filterDepartment={taskFilterDepartment}
+                    setFilterDepartment={setTaskFilterDepartment}
+                    filterAssignee={taskFilterAssignee}
+                    setFilterAssignee={setTaskFilterAssignee}
+                    filterProject={taskFilterProject}
+                    setFilterProject={setTaskFilterProject}
+                    dateFilterField={taskDateFilterField}
+                    setDateFilterField={setTaskDateFilterField}
+                    dateFilterFrom={taskDateFilterFrom}
+                    setDateFilterFrom={setTaskDateFilterFrom}
+                    dateFilterTo={taskDateFilterTo}
+                    setDateFilterTo={setTaskDateFilterTo}
                   />
                 </div>
               )}
@@ -4434,12 +4570,31 @@ export default function App() {
                       <CalendarDays className="w-3.5 h-3.5 text-slate-450" />
                       <span>Data d'inici</span>
                     </span>
-                    <input
-                      type="date"
-                      value={selectedTask.startDate || ""}
-                      onChange={(e) => handleUpdateTask(selectedTask.id, { startDate: e.target.value })}
-                      className="bg-transparent hover:bg-slate-50 border-none outline-none font-semibold text-sky-600 cursor-pointer p-1 rounded-sm w-fit focus:ring-1 focus:ring-indigo-500 text-xs"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={selectedTask.startDate || ""}
+                        onChange={(e) => handleUpdateTask(selectedTask.id, { startDate: e.target.value })}
+                        className="bg-transparent hover:bg-slate-50 border-none outline-none font-semibold text-sky-600 cursor-pointer p-1 rounded-sm w-fit focus:ring-1 focus:ring-indigo-500 text-xs"
+                      />
+                      <input
+                        type="time"
+                        value={selectedTask.startTime || ""}
+                        onChange={(e) => handleUpdateTask(selectedTask.id, { startTime: e.target.value })}
+                        title="Hora d'inici (opcional — només per reunions, visites o esdeveniments puntuals)"
+                        className="bg-transparent hover:bg-slate-50 border border-slate-200 outline-none font-semibold text-slate-500 cursor-pointer p-1 rounded-sm w-fit focus:ring-1 focus:ring-indigo-500 text-[11px]"
+                      />
+                      {selectedTask.startTime && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateTask(selectedTask.id, { startTime: undefined })}
+                          className="text-slate-300 hover:text-rose-600"
+                          title="Treure l'hora (tornar a 'tot el dia')"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Data Límit */}
@@ -4448,12 +4603,31 @@ export default function App() {
                       <CalendarDays className="w-3.5 h-3.5 text-slate-450" />
                       <span>Data de venciment</span>
                     </span>
-                    <input
-                      type="date"
-                      value={selectedTask.dueDate || ""}
-                      onChange={(e) => handleUpdateTask(selectedTask.id, { dueDate: e.target.value })}
-                      className="bg-transparent hover:bg-slate-50 border-none outline-none font-semibold text-rose-600 cursor-pointer p-1 rounded-sm w-fit focus:ring-1 focus:ring-indigo-500 text-xs"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={selectedTask.dueDate || ""}
+                        onChange={(e) => handleUpdateTask(selectedTask.id, { dueDate: e.target.value })}
+                        className="bg-transparent hover:bg-slate-50 border-none outline-none font-semibold text-rose-600 cursor-pointer p-1 rounded-sm w-fit focus:ring-1 focus:ring-indigo-500 text-xs"
+                      />
+                      <input
+                        type="time"
+                        value={selectedTask.endTime || ""}
+                        onChange={(e) => handleUpdateTask(selectedTask.id, { endTime: e.target.value })}
+                        title="Hora de fi (opcional)"
+                        className="bg-transparent hover:bg-slate-50 border border-slate-200 outline-none font-semibold text-slate-500 cursor-pointer p-1 rounded-sm w-fit focus:ring-1 focus:ring-indigo-500 text-[11px]"
+                      />
+                      {selectedTask.endTime && (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateTask(selectedTask.id, { endTime: undefined })}
+                          className="text-slate-300 hover:text-rose-600"
+                          title="Treure l'hora"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Periodicitat */}

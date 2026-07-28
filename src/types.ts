@@ -111,6 +111,8 @@ export interface Task {
   priority: TaskPriority;
   dueDate: string; // YYYY-MM-DD
   startDate?: string; // YYYY-MM-DD (Data d'inici)
+  startTime?: string; // HH:MM — hora opcional (reunions, visites...); si no es defineix, la tasca es tracta com "de tot el dia"
+  endTime?: string; // HH:MM — hora de fi opcional, associada a dueDate
   recurrence?: "none" | "weekly" | "fortnightly" | "monthly" | "bimonthly" | "quarterly" | "semiannually" | "yearly"; // Periodicitat
   isBaseTask?: boolean; // Tasca estructural del projecte (Base del Projecte), a diferència de les puntuals/ad-hoc
   completedAt?: string; // YYYY-MM-DD

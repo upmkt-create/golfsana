@@ -553,6 +553,7 @@ export default function TaskList({
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Prioritat</th>
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Temps</th>
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Projecte</th>
+              <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Data d'inici</th>
               <th className={isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"}>Data límit</th>
               <th className={`${isCompactView ? "py-1.5 px-3 text-[10px]" : "py-3.5 px-4"} text-center`}>Accions</th>
             </tr>
@@ -560,7 +561,7 @@ export default function TaskList({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
             {filteredTasks.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-slate-400">
+                <td colSpan={10} className="py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <AlertCircle className="w-8 h-8 text-slate-300 dark:text-slate-700" />
                     <span>No s'ha trobat cap tasca amb els filtres actius.</span>
@@ -747,6 +748,18 @@ export default function TaskList({
                     </td>
 
                     <td className={cellCls}>
+                      <div className="flex items-center gap-1.5 text-xs font-mono text-slate-500">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <input
+                          type="date"
+                          value={task.startDate || ""}
+                          onChange={(e) => onUpdateTask(task.id, { startDate: e.target.value })}
+                          className="bg-transparent border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none px-1 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+
+                    <td className={cellCls}>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5 text-xs font-mono text-slate-500">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
@@ -757,11 +770,6 @@ export default function TaskList({
                             className="bg-transparent border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none px-1 cursor-pointer"
                           />
                         </div>
-                        {task.startDate && (
-                          <div className="text-[10px] text-slate-450 font-mono">
-                            Inici: {task.startDate}
-                          </div>
-                        )}
                         {task.recurrence && task.recurrence !== "none" && (
                           <div className="text-[9.5px] text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1.5 mt-0.5 tracking-tight">
                             <RefreshCw className="w-2.5 h-2.5 text-indigo-505 animate-spin-slow" />
@@ -804,7 +812,7 @@ export default function TaskList({
                   {expandedTaskIds.has(task.id) && task.subtasks && task.subtasks.length > 0 && (
                     <tr key={`${task.id}-subtasks`} className="bg-slate-50/60 dark:bg-slate-900/40">
                       <td></td>
-                      <td colSpan={8} className="py-2 px-4">
+                      <td colSpan={9} className="py-2 px-4">
                         <div className="pl-5 border-l-2 border-slate-200 dark:border-slate-700 space-y-1.5">
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <div className="text-[9.5px] font-mono font-bold text-slate-400 uppercase tracking-wider">

@@ -517,32 +517,61 @@ function buildLiveSummary(courseName: string, dateStr: string, teeTimes: TeeTime
   };
 }
 
-async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<TeeTime[] | null> {
+interface ScrapeResult {
+  teeTimes: TeeTime[] | null;
+  debug: string; // Causa exacta de la fallada (o "ok" si ha anat bé) — així
+                  // sabem per què cau al model sense necessitat d'accedir
+                  // nosaltres mateixos al servidor de GolfManager.
+}
+
+async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<ScrapeResult> {
+  const url = `${ep.base}/availability.json?date=${dateStr}`;
   try {
-    const url = `${ep.base}/availability.json?date=${dateStr}`;
     const resp = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
         "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
+        "Accept-Encoding": "gzip, deflate, br",
         "Referer": `${ep.base}/book?date=${dateStr}`,
+        "Origin": ep.base.replace(/\/consumer$/, ""),
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "sec-ch-ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
       },
       signal: AbortSignal.timeout(8000),
     });
-    if (!resp.ok) return null;
+
+    if (!resp.ok) {
+      return { teeTimes: null, debug: `HTTP ${resp.status} ${resp.statusText} a ${url}` };
+    }
+
     const ct = resp.headers.get("content-type") || "";
-    if (!ct.includes("json")) return null;
+    if (!ct.includes("json")) {
+      const bodyPreview = (await resp.text()).slice(0, 200);
+      return { teeTimes: null, debug: `Content-Type inesperat: "${ct}". Inici de la resposta: ${JSON.stringify(bodyPreview)}` };
+    }
 
     const data = (await resp.json()) as GolfManagerResponse;
-    if (!Array.isArray(data?.items)) return null;
+    if (!Array.isArray(data?.items)) {
+      return { teeTimes: null, debug: `Resposta JSON sense el camp "items" esperat. Claus rebudes: ${Object.keys(data || {}).join(", ")}` };
+    }
 
     const teeTimes = parseGolfManagerItems(data.items, ep.allowedTariffs);
-    return teeTimes.length > 0 ? teeTimes : null;
-  } catch {
-    return null;
+    if (teeTimes.length === 0) {
+      return { teeTimes: null, debug: `Resposta correcta amb ${data.items.length} items, però cap coincideix amb les tarifes permeses (${ep.allowedTariffs.join(", ")}) o el resourceType Golf.` };
+    }
+    return { teeTimes, debug: "ok" };
+  } catch (err: any) {
+    const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+    return { teeTimes: null, debug: isTimeout ? `Timeout (8s) connectant a ${url}` : `Error de xarxa: ${String(err?.message || err)}` };
   }
 }
 
-async function scrapeTeeOne(ep: CourseEndpoint, dateStr: string): Promise<TeeTime[] | null> {
+async function scrapeTeeOne(ep: CourseEndpoint, dateStr: string): Promise<ScrapeResult> {
   try {
     const url = `${ep.base}/disponibilidad?date=${dateStr}`;
     const resp = await fetch(url, {
@@ -552,12 +581,10 @@ async function scrapeTeeOne(ep: CourseEndpoint, dateStr: string): Promise<TeeTim
       },
       signal: AbortSignal.timeout(8000),
     });
-    if (!resp.ok) return null;
-    const ct = resp.headers.get("content-type") || "";
-    if (!ct.includes("json")) return null;
-    return null; // format TeeOne encara no confirmat
-  } catch {
-    return null;
+    if (!resp.ok) return { teeTimes: null, debug: `HTTP ${resp.status} ${resp.statusText} a ${url}` };
+    return { teeTimes: null, debug: "Format TeeOne encara no confirmat (pendent de captura real des de DevTools)" };
+  } catch (err: any) {
+    return { teeTimes: null, debug: `Error de xarxa: ${String(err?.message || err)}` };
   }
 }
 
@@ -590,11 +617,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
 
           let liveTeeTimes: TeeTime[] | null = null;
+          let scrapeDebug = "";
           try {
-            if (ep.system === "golfmanager") liveTeeTimes = await scrapeGolfManager(ep, dateStr);
-            else if (ep.system === "teeone") liveTeeTimes = await scrapeTeeOne(ep, dateStr);
-          } catch {
+            if (ep.system === "golfmanager") {
+              const result = await scrapeGolfManager(ep, dateStr);
+              liveTeeTimes = result.teeTimes;
+              scrapeDebug = result.debug;
+            } else if (ep.system === "teeone") {
+              const result = await scrapeTeeOne(ep, dateStr);
+              liveTeeTimes = result.teeTimes;
+              scrapeDebug = result.debug;
+            }
+          } catch (e: any) {
             liveTeeTimes = null;
+            scrapeDebug = `Excepció no capturada: ${String(e?.message || e)}`;
           }
 
           if (liveTeeTimes && liveTeeTimes.length > 0) {
@@ -607,6 +643,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           return {
             course: ep.name, slug: ep.slug, source: "model",
+            // Motiu exacte pel qual l'scraping en directe no ha funcionat —
+            // sense això, "cau al model" no dona cap pista de per què.
+            scrapeDebug,
             teeTimes: getCompetitorTeeTimes(ep.name, dateStr),
             summary: getDaySummary(ep.name, dateStr),
           };

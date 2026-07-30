@@ -1885,6 +1885,23 @@ export default function App() {
     }
   };
 
+  // Elimina un usuari completament (per exemple per tornar-lo a crear net
+  // quan les credencials donen problemes que no es resolen editant-les).
+  const handleDeleteUserProfile = async (userId: string) => {
+    const target = users.find((u) => u.id === userId);
+    const updated = users.filter((u) => u.id !== userId);
+    setUsers(updated);
+    localStorage.setItem("golfsana_users", JSON.stringify(updated));
+    logEnterpriseAction(`Usuari eliminat: ${target?.name || userId}`);
+    addToast(`Usuari ${target?.name || ""} eliminat`, "success");
+
+    try {
+      await deleteDoc(doc(db, "users", userId));
+    } catch (err) {
+      console.warn("[Firestore Write Warning] delete user: removed in client sandbox", err);
+    }
+  };
+
   // Helper audit logger
   const logEnterpriseAction = (action: string) => {
     setAuditLogs(prev => [
@@ -2681,6 +2698,7 @@ export default function App() {
                   }}
                   onAddUser={handleAddUserProfile}
                   onUpdateUserCredentials={handleUpdateUserCredentials}
+                  onDeleteUser={handleDeleteUserProfile}
                   onLogout={handleLogout}
                 />
               </>
@@ -3974,6 +3992,7 @@ export default function App() {
                   tasks={displayedTasks}
                   users={users}
                   projects={projects}
+                  workspaces={workspaces}
                   activeProjectId={activeProjectId}
                   activeWorkspaceId={activeWorkspaceId}
                   onUpdateTask={handleUpdateTask}

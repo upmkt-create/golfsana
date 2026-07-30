@@ -21,6 +21,7 @@ import {
   setDoc,
   getDocs,
   getDoc,
+  getDocFromServer,
   onSnapshot,
   updateDoc,
   deleteDoc,
@@ -1897,7 +1898,12 @@ export default function App() {
       try {
         await deleteDoc(doc(db, "users", userId));
         await saveDoc(doc(db, "deletedItems", userId), { type: "user", id: userId, deletedAt: new Date().toISOString() });
-        const check = await getDoc(doc(db, "users", userId));
+        // Verifiquem contra el SERVIDOR real, no la memòria cau local de
+        // Firestore — un `getDoc` normal pot dir "ja no existeix" reflectint
+        // només l'estat local optimista, encara que l'esborrat real al
+        // servidor hagi fallat per algun motiu (per exemple de connexió),
+        // que és exactament el que semblava estar passant amb la Marina.
+        const check = await getDocFromServer(doc(db, "users", userId));
         return !check.exists();
       } catch (err) {
         console.warn("[Firestore Delete User Error]", err);

@@ -139,26 +139,12 @@ export default function App() {
   const [users, setUsers] = useState<UserProfile[]>(() => {
     try {
       const saved = localStorage.getItem("golfsana_users");
-      const loaded: UserProfile[] = saved ? JSON.parse(saved) : [...STARTER_MEMBERS];
-      // Un membre "de fàbrica" (STARTER_MEMBERS) eliminat explícitament no
-      // s'ha de tornar a recrear — abans això feia que un usuari com
-      // "Marina" reaparegués sempre, encara que se l'esborrés.
-      const deletedIds: string[] = JSON.parse(localStorage.getItem("golfsana_deleted") || "[]");
-      // Ja NO filtrem fora els usuaris que no siguin STARTER_MEMBERS —
-      // aquest filtre eliminava els usuaris afegits des del formulari
-      // "Afegir Usuari" ja des de la càrrega inicial, abans fins i tot
-      // que la sincronització amb Firestore es completés.
-      const updated = [...loaded].filter((u) => !deletedIds.includes(u.id));
-      STARTER_MEMBERS.forEach((starter) => {
-        if (deletedIds.includes(starter.id)) return;
-        const idx = updated.findIndex((u) => u.id === starter.id);
-        if (idx !== -1) {
-          updated[idx] = { ...updated[idx], ...starter };
-        } else {
-          updated.push(starter);
-        }
-      });
-      return updated;
+      // Un cop hi ha usuaris desats (sigui una primera vegada o després),
+      // es carreguen tal com són — cap membre "de fàbrica" es torna a
+      // reafegir automàticament. Amb rotació de personal habitual al club,
+      // qui s'elimina s'ha de quedar eliminat, sense excepcions.
+      if (saved) return JSON.parse(saved);
+      return [...STARTER_MEMBERS];
     } catch {
       return [...STARTER_MEMBERS];
     }
@@ -622,28 +608,16 @@ export default function App() {
         items.push(docSnap.data() as UserProfile);
       });
       
-      // If collection is empty, trigger seed loading
+      // If collection is empty, trigger seed loading (única vegada que
+      // STARTER_MEMBERS s'utilitza per crear documents — la primera càrrega
+      // de la base de dades, mai més. Un cop hi ha usuaris a Firestore,
+      // reflectim exactament el que hi ha, sense recrear ningú que s'hagi
+      // eliminat — amb la rotació de personal del club, qui s'elimina s'ha
+      // de quedar eliminat).
       if (items.length === 0) {
         seedInitialUsers();
       } else {
-        // Un STARTER_MEMBER eliminat explícitament (ex. Marina) no s'ha de
-        // tornar a recrear a cada sincronització.
-        const merged = items.filter((u) => !deletedItemIdsRef.current.has(u.id));
-        STARTER_MEMBERS.forEach((starter) => {
-          if (deletedItemIdsRef.current.has(starter.id)) return;
-          const idx = merged.findIndex(u => u.id === starter.id);
-          if (idx === -1) {
-            merged.push(starter);
-            saveDoc(doc(db, "users", starter.id), starter).catch(err => console.warn(err));
-          } else {
-            const existing = merged[idx];
-            const hasDeptChanged = existing.departmentId !== starter.departmentId || JSON.stringify(existing.departmentIds) !== JSON.stringify(starter.departmentIds);
-            if (existing.name !== starter.name || existing.avatar !== starter.avatar || existing.email !== starter.email || existing.role !== starter.role || hasDeptChanged) {
-              merged[idx] = { ...existing, ...starter };
-              saveDoc(doc(db, "users", starter.id), starter).catch(err => console.warn(err));
-            }
-          }
-        });
+        const merged = [...items];
 
         const starterIds = new Set(STARTER_MEMBERS.map(m => m.id));
         // Ja NO filtrem fora els usuaris que no siguin STARTER_MEMBERS —

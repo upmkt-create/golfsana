@@ -124,6 +124,7 @@ import AdminMonitoringDashboard from "./components/AdminMonitoringDashboard";
 import UserManualDashboard from "./components/UserManualDashboard";
 import AllTasksGlobalView from "./components/AllTasksGlobalView";
 import RichTextEditor from "./components/RichTextEditor";
+import { getTaskUrgency, URGENCY_STYLES } from "./lib/taskUrgency";
 import MeetingMinutes from "./components/MeetingMinutes";
 // @ts-ignore
 import golfBallIcon from "./campo-de-golf.png";
@@ -239,6 +240,9 @@ export default function App() {
   });
 
   const [deletedItemIds, setDeletedItemIds] = useState<Set<string>>(new Set());
+  // Quin membre té la llista desplegada a l'informe de tasques que vencen
+  // aviat (vista d'administrador, a la pestanya d'Inici).
+  const [expandedUrgencyMemberId, setExpandedUrgencyMemberId] = useState<string | null>(null);
   const deletedItemIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -2982,6 +2986,156 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Tasques que vencen en els pròxims 3 dies, o ja vençudes.
+                      Un administrador veu un informe de TOT l'equip agrupat
+                      per persona (per fer seguiment de qui té feina crítica
+                      pendent); un membre normal només veu les seves pròpies. */}
+                  {currentUser.role === "admin" ? (() => {
+                    const urgentByMember = new Map<string, { task: Task; urgency: ReturnType<typeof getTaskUrgency> }[]>();
+                    visibleTasks.forEach((t) => {
+                      const urgency = getTaskUrgency(t.dueDate, t.status);
+                      if (urgency === "normal") return;
+                      const assigneeIds = t.assigneeIds && t.assigneeIds.length > 0 ? t.assigneeIds : (t.assigneeId ? [t.assigneeId] : []);
+                      assigneeIds.forEach((uid) => {
+                        if (!urgentByMember.has(uid)) urgentByMember.set(uid, []);
+                        urgentByMember.get(uid)!.push({ task: t, urgency });
+                      });
+                    });
+
+                    const memberSummaries = Array.from(urgentByMember.entries())
+                      .map(([uid, items]) => {
+                        const memberUser = users.find((u) => u.id === uid);
+                        const overdueCount = items.filter((i) => i.urgency === "overdue").length;
+                        const urgentCount = items.filter((i) => i.urgency === "urgent").length;
+                        const sortedItems = [...items].sort((a, b) => (a.task.dueDate || "").localeCompare(b.task.dueDate || ""));
+                        return { uid, memberUser, items: sortedItems, overdueCount, urgentCount };
+                      })
+                      .filter((m) => !!m.memberUser)
+                      .sort((a, b) => b.overdueCount - a.overdueCount || (b.overdueCount + b.urgentCount) - (a.overdueCount + a.urgentCount));
+
+                    if (memberSummaries.length === 0) return null;
+
+                    const totalOverdue = memberSummaries.reduce((sum, m) => sum + m.overdueCount, 0);
+
+                    return (
+                      <div className="bg-white border-l-4 border-rose-400 shadow-sm">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-rose-50/40">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-rose-500" />
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Estat de l'equip — tasques que vencen aviat</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-rose-600">
+                            {totalOverdue > 0 ? `${totalOverdue} vençuda${totalOverdue > 1 ? "s" : ""} en total` : `${memberSummaries.length} persona${memberSummaries.length > 1 ? "es" : ""} amb properes`}
+                          </span>
+                        </div>
+                        <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+                          {memberSummaries.map(({ uid, memberUser, items, overdueCount, urgentCount }) => (
+                            <div key={uid}>
+                              <button
+                                onClick={() => setExpandedUrgencyMemberId(expandedUrgencyMemberId === uid ? null : uid)}
+                                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-bold flex items-center justify-center text-[10px] shrink-0">
+                                    {memberUser!.avatar}
+                                  </div>
+                                  <span className="text-xs font-semibold text-slate-800 truncate">{memberUser!.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {overdueCount > 0 && (
+                                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm bg-rose-50 text-rose-700">
+                                      {overdueCount} vençuda{overdueCount > 1 ? "s" : ""}
+                                    </span>
+                                  )}
+                                  {urgentCount > 0 && (
+                                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-sm bg-amber-50 text-amber-700">
+                                      {urgentCount} propera{urgentCount > 1 ? "es" : ""}
+                                    </span>
+                                  )}
+                                  <ChevronRight className={`w-3.5 h-3.5 text-slate-400 transition-transform ${expandedUrgencyMemberId === uid ? "rotate-90" : ""}`} />
+                                </div>
+                              </button>
+                              {expandedUrgencyMemberId === uid && (
+                                <div className="bg-slate-50/60 divide-y divide-slate-100">
+                                  {items.map(({ task, urgency }) => {
+                                    const style = URGENCY_STYLES[urgency];
+                                    const proj = projects.find((p) => p.id === task.projectId);
+                                    return (
+                                      <button
+                                        key={task.id}
+                                        onClick={() => setSelectedTask(task)}
+                                        className="w-full flex items-center justify-between gap-3 pl-11 pr-4 py-2 hover:bg-slate-100 text-left transition-colors"
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot} ${urgency === "overdue" ? "animate-pulse" : ""}`} />
+                                          <div className="min-w-0">
+                                            <p className="text-[11px] font-semibold text-slate-700 truncate">{task.title}</p>
+                                            <p className="text-[9.5px] text-slate-400 truncate">{proj?.name || "Sense projecte"}</p>
+                                          </div>
+                                        </div>
+                                        <span className={`text-[9.5px] font-mono font-bold shrink-0 px-1.5 py-0.5 rounded-sm ${style.bg} ${style.text}`}>
+                                          {urgency === "overdue" ? "Vençuda" : task.dueDate}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })() : (() => {
+                    const myUrgentTasks = visibleTasks
+                      .filter((t) => (t.assigneeIds?.includes(currentUser.id) || t.assigneeId === currentUser.id))
+                      .map((t) => ({ task: t, urgency: getTaskUrgency(t.dueDate, t.status) }))
+                      .filter((x) => x.urgency !== "normal")
+                      .sort((a, b) => (a.task.dueDate || "").localeCompare(b.task.dueDate || ""));
+
+                    if (myUrgentTasks.length === 0) return null;
+
+                    const overdueCount = myUrgentTasks.filter((x) => x.urgency === "overdue").length;
+
+                    return (
+                      <div className="bg-white border-l-4 border-rose-400 shadow-sm">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-rose-50/40">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-rose-500" />
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Les teves tasques que vencen aviat</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-rose-600">
+                            {overdueCount > 0 ? `${overdueCount} vençuda${overdueCount > 1 ? "s" : ""}` : `${myUrgentTasks.length} propera${myUrgentTasks.length > 1 ? "es" : ""}`}
+                          </span>
+                        </div>
+                        <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                          {myUrgentTasks.map(({ task, urgency }) => {
+                            const style = URGENCY_STYLES[urgency];
+                            const proj = projects.find((p) => p.id === task.projectId);
+                            return (
+                              <button
+                                key={task.id}
+                                onClick={() => setSelectedTask(task)}
+                                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot} ${urgency === "overdue" ? "animate-pulse" : ""}`} />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-slate-800 truncate">{task.title}</p>
+                                    <p className="text-[10px] text-slate-400 truncate">{proj?.name || "Sense projecte"}</p>
+                                  </div>
+                                </div>
+                                <span className={`text-[10px] font-mono font-bold shrink-0 px-2 py-0.5 rounded-sm ${style.bg} ${style.text}`}>
+                                  {urgency === "overdue" ? "Vençuda" : task.dueDate}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* 4 Bento-styled KPI metrics across ALL departments */}
                   {(() => {

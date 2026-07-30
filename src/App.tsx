@@ -123,6 +123,7 @@ import AdminMonitoringDashboard from "./components/AdminMonitoringDashboard";
 import UserManualDashboard from "./components/UserManualDashboard";
 import AllTasksGlobalView from "./components/AllTasksGlobalView";
 import RichTextEditor from "./components/RichTextEditor";
+import { getTaskUrgency, URGENCY_STYLES } from "./lib/taskUrgency";
 import MeetingMinutes from "./components/MeetingMinutes";
 // @ts-ignore
 import golfBallIcon from "./campo-de-golf.png";
@@ -139,12 +140,26 @@ export default function App() {
   const [users, setUsers] = useState<UserProfile[]>(() => {
     try {
       const saved = localStorage.getItem("golfsana_users");
-      // Un cop hi ha usuaris desats (sigui una primera vegada o després),
-      // es carreguen tal com són — cap membre "de fàbrica" es torna a
-      // reafegir automàticament. Amb rotació de personal habitual al club,
-      // qui s'elimina s'ha de quedar eliminat, sense excepcions.
-      if (saved) return JSON.parse(saved);
-      return [...STARTER_MEMBERS];
+      const loaded: UserProfile[] = saved ? JSON.parse(saved) : [...STARTER_MEMBERS];
+      // Un membre "de fàbrica" (STARTER_MEMBERS) eliminat explícitament no
+      // s'ha de tornar a recrear — abans això feia que un usuari com
+      // "Marina" reaparegués sempre, encara que se l'esborrés.
+      const deletedIds: string[] = JSON.parse(localStorage.getItem("golfsana_deleted") || "[]");
+      // Ja NO filtrem fora els usuaris que no siguin STARTER_MEMBERS —
+      // aquest filtre eliminava els usuaris afegits des del formulari
+      // "Afegir Usuari" ja des de la càrrega inicial, abans fins i tot
+      // que la sincronització amb Firestore es completés.
+      const updated = [...loaded].filter((u) => !deletedIds.includes(u.id));
+      STARTER_MEMBERS.forEach((starter) => {
+        if (deletedIds.includes(starter.id)) return;
+        const idx = updated.findIndex((u) => u.id === starter.id);
+        if (idx !== -1) {
+          updated[idx] = { ...updated[idx], ...starter };
+        } else {
+          updated.push(starter);
+        }
+      });
+      return updated;
     } catch {
       return [...STARTER_MEMBERS];
     }
@@ -608,16 +623,28 @@ export default function App() {
         items.push(docSnap.data() as UserProfile);
       });
       
-      // If collection is empty, trigger seed loading (única vegada que
-      // STARTER_MEMBERS s'utilitza per crear documents — la primera càrrega
-      // de la base de dades, mai més. Un cop hi ha usuaris a Firestore,
-      // reflectim exactament el que hi ha, sense recrear ningú que s'hagi
-      // eliminat — amb la rotació de personal del club, qui s'elimina s'ha
-      // de quedar eliminat).
+      // If collection is empty, trigger seed loading
       if (items.length === 0) {
         seedInitialUsers();
       } else {
-        const merged = [...items];
+        // Un STARTER_MEMBER eliminat explícitament (ex. Marina) no s'ha de
+        // tornar a recrear a cada sincronització.
+        const merged = items.filter((u) => !deletedItemIdsRef.current.has(u.id));
+        STARTER_MEMBERS.forEach((starter) => {
+          if (deletedItemIdsRef.current.has(starter.id)) return;
+          const idx = merged.findIndex(u => u.id === starter.id);
+          if (idx === -1) {
+            merged.push(starter);
+            saveDoc(doc(db, "users", starter.id), starter).catch(err => console.warn(err));
+          } else {
+            const existing = merged[idx];
+            const hasDeptChanged = existing.departmentId !== starter.departmentId || JSON.stringify(existing.departmentIds) !== JSON.stringify(starter.departmentIds);
+            if (existing.name !== starter.name || existing.avatar !== starter.avatar || existing.email !== starter.email || existing.role !== starter.role || hasDeptChanged) {
+              merged[idx] = { ...existing, ...starter };
+              saveDoc(doc(db, "users", starter.id), starter).catch(err => console.warn(err));
+            }
+          }
+        });
 
         const starterIds = new Set(STARTER_MEMBERS.map(m => m.id));
         // Ja NO filtrem fora els usuaris que no siguin STARTER_MEMBERS —
@@ -1080,13 +1107,14 @@ export default function App() {
     }
   }, [tasks, selectedTask?.id]);
 
-  const createNotification = async (targetUserId: string, taskId: string, taskTitle: string, messageText: string) => {
+  const createNotification = async (targetUserId: string, taskId: string, taskTitle: string, messageText: string, type: string = "mention") => {
     const newNotif = {
       id: "notif-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
       userId: targetUserId,
       taskId: taskId,
       taskTitle: taskTitle,
       message: messageText,
+      type,
       read: false,
       createdAt: new Date().toISOString()
     };
@@ -1098,6 +1126,35 @@ export default function App() {
     // Speculative update for speed or offline use
     setNotifications((prev) => [newNotif, ...prev.filter(n => n.id !== newNotif.id)]);
   };
+
+  // Revisa les tasques pròpies i avisa a la campaneta quan una vença en els
+  // pròxims 3 dies o ja hagi vençut — com a màxim una notificació per tasca
+  // i dia (comprovant-ho contra les que ja hi ha), perquè no s'inundi la
+  // campaneta cada vegada que Firestore es torna a sincronitzar.
+  const notificationsRef = useRef(notifications);
+  useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
+
+  useEffect(() => {
+    if (!currentUser || authLoading) return;
+    const todayStr = new Date().toISOString().split("T")[0];
+    const myTasks = tasks.filter((t) => (t.assigneeIds?.includes(currentUser.id) || t.assigneeId === currentUser.id));
+
+    myTasks.forEach((t) => {
+      const urgency = getTaskUrgency(t.dueDate, t.status);
+      if (urgency === "normal") return;
+
+      const alreadyNotifiedToday = notificationsRef.current.some(
+        (n) => n.taskId === t.id && n.type === "due-reminder" && (n.createdAt || "").startsWith(todayStr)
+      );
+      if (alreadyNotifiedToday) return;
+
+      const msg = urgency === "overdue"
+        ? `La tasca "${t.title}" ja ha vençut i encara no està completada.`
+        : `La tasca "${t.title}" venç el ${t.dueDate}.`;
+      createNotification(currentUser.id, t.id, t.title, msg, "due-reminder");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, currentUser?.id, authLoading]);
 
   // ---- ACTES DE REUNIÓ ----
   const handleSaveMinute = async (minute: MeetingMinute, isNew: boolean) => {
@@ -2958,6 +3015,58 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Tasques pròpies que vencen en els pròxims 3 dies, o ja
+                      vençudes — perquè ningú les perdi de vista per descuit. */}
+                  {(() => {
+                    const myUrgentTasks = visibleTasks
+                      .filter((t) => (t.assigneeIds?.includes(currentUser.id) || t.assigneeId === currentUser.id))
+                      .map((t) => ({ task: t, urgency: getTaskUrgency(t.dueDate, t.status) }))
+                      .filter((x) => x.urgency !== "normal")
+                      .sort((a, b) => (a.task.dueDate || "").localeCompare(b.task.dueDate || ""));
+
+                    if (myUrgentTasks.length === 0) return null;
+
+                    const overdueCount = myUrgentTasks.filter((x) => x.urgency === "overdue").length;
+
+                    return (
+                      <div className="bg-white border-l-4 border-rose-400 shadow-sm">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-rose-50/40">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-rose-500" />
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Les teves tasques que vencen aviat</span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-rose-600">
+                            {overdueCount > 0 ? `${overdueCount} vençuda${overdueCount > 1 ? "s" : ""}` : `${myUrgentTasks.length} propera${myUrgentTasks.length > 1 ? "es" : ""}`}
+                          </span>
+                        </div>
+                        <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                          {myUrgentTasks.map(({ task, urgency }) => {
+                            const style = URGENCY_STYLES[urgency];
+                            const proj = projects.find((p) => p.id === task.projectId);
+                            return (
+                              <button
+                                key={task.id}
+                                onClick={() => setSelectedTask(task)}
+                                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot} ${urgency === "overdue" ? "animate-pulse" : ""}`} />
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold text-slate-800 truncate">{task.title}</p>
+                                    <p className="text-[10px] text-slate-400 truncate">{proj?.name || "Sense projecte"}</p>
+                                  </div>
+                                </div>
+                                <span className={`text-[10px] font-mono font-bold shrink-0 px-2 py-0.5 rounded-sm ${style.bg} ${style.text}`}>
+                                  {urgency === "overdue" ? "Vençuda" : task.dueDate}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* 4 Bento-styled KPI metrics across ALL departments */}
                   {(() => {

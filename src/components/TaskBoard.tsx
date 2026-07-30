@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Task, UserProfile, Project, TaskStatus } from "../types";
+import { Task, UserProfile, Project, TaskStatus, Workspace } from "../types";
 import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Kanban, LayoutGrid, Star } from "lucide-react";
 import { motion } from "motion/react";
 import { DEPARTMENTS } from "../data";
@@ -8,6 +8,7 @@ interface TaskBoardProps {
   tasks: Task[];
   users: UserProfile[];
   projects: Project[];
+  workspaces: Workspace[];
   activeProjectId: string | null;
   activeWorkspaceId: string;
   onUpdateTask: (taskId: string, updates: Partial<Task>) => void;
@@ -19,6 +20,7 @@ export default function TaskBoard({
   tasks,
   users,
   projects,
+  workspaces,
   activeProjectId,
   activeWorkspaceId,
   onUpdateTask,
@@ -27,6 +29,26 @@ export default function TaskBoard({
 }: TaskBoardProps) {
   // Option to group the board by status ("status") or by department ("department")
   const [groupBy, setGroupBy] = useState<"status" | "department">("department");
+
+  // Paleta per als espais de treball reals, que no tenen un camp "color"
+  // propi (a diferència de DEPARTMENTS) — es tria de manera determinista
+  // segons l'id, perquè cada espai sempre tingui el mateix color.
+  const WORKSPACE_COLOR_PALETTE = ["#0ea5e9", "#8b5cf6", "#f97316", "#14b8a6", "#ec4899", "#84cc16", "#6366f1", "#eab308"];
+  const colorForWorkspace = (id: string) => {
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = (hash << 5) - hash + id.charCodeAt(i);
+    return WORKSPACE_COLOR_PALETTE[Math.abs(hash) % WORKSPACE_COLOR_PALETTE.length];
+  };
+
+  // Combina els departaments objectiu fixos (retrocompatibilitat amb
+  // tasques antigues) amb tots els espais de treball reals i dinàmics
+  // (Direcció, RRHH, Rapport...), perquè el Kanban no en deixi cap fora.
+  const boardDeptOptions = [
+    ...DEPARTMENTS.map((d) => ({ id: d.id, name: d.name, color: d.color })),
+    ...workspaces
+      .filter((ws) => !DEPARTMENTS.some((d) => d.id === ws.id))
+      .map((ws) => ({ id: ws.id, name: ws.name, color: colorForWorkspace(ws.id) })),
+  ];
 
   interface BoardColumn {
     id: string;
@@ -45,7 +67,7 @@ export default function TaskBoard({
   ];
 
   // Columns for grouping by Department
-  const deptColumns: BoardColumn[] = DEPARTMENTS.map((d) => ({
+  const deptColumns: BoardColumn[] = boardDeptOptions.map((d) => ({
     id: d.id,
     title: d.name.replace("Departament de ", "").replace("Departament ", ""),
     color: `text-slate-800 bg-white`,
@@ -87,7 +109,7 @@ export default function TaskBoard({
   const handleMoveDept = (task: Task, direction: "left" | "right", e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening detail panel
     const currentDepts = getTaskDepartments(task);
-    const allDeptIds = DEPARTMENTS.map((d) => d.id);
+    const allDeptIds = boardDeptOptions.map((d) => d.id);
     
     // Cycle the primary (first) department
     const currIdx = allDeptIds.indexOf(currentDepts[0] || "dep-reserves");
@@ -248,7 +270,7 @@ export default function TaskBoard({
                           {/* Assigned Departments Pills */}
                           <div className="flex flex-wrap gap-1">
                             {taskDepts.map((dId) => {
-                              const deptObj = DEPARTMENTS.find((dep) => dep.id === dId);
+                              const deptObj = boardDeptOptions.find((dep) => dep.id === dId);
                               if (!deptObj) return null;
                               return (
                                 <span

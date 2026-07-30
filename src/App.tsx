@@ -20,6 +20,7 @@ import {
   doc,
   setDoc,
   getDocs,
+  getDoc,
   onSnapshot,
   updateDoc,
   deleteDoc,
@@ -1871,16 +1872,12 @@ export default function App() {
   // quan les credencials donen problemes que no es resolen editant-les).
   const handleDeleteUserProfile = async (userId: string) => {
     const target = users.find((u) => u.id === userId);
+
+    // Actualització optimista a la interfície
     const updated = users.filter((u) => u.id !== userId);
     setUsers(updated);
     localStorage.setItem("golfsana_users", JSON.stringify(updated));
-    logEnterpriseAction(`Usuari eliminat: ${target?.name || userId}`);
-    addToast(`Usuari ${target?.name || ""} eliminat`, "success");
 
-    // Registrem l'eliminació a "deletedItems" (el mateix mecanisme que ja
-    // fem servir per tasques/projectes/espais) — sense això, si l'usuari
-    // és un membre "de fàbrica" (STARTER_MEMBERS), la propera sincronització
-    // el tornaria a crear automàticament.
     const deletedL: string[] = JSON.parse(localStorage.getItem("golfsana_deleted") || "[]");
     if (!deletedL.includes(userId)) {
       deletedL.push(userId);
@@ -1888,11 +1885,38 @@ export default function App() {
     }
     setDeletedItemIds((prev) => new Set(prev).add(userId));
 
-    try {
-      await deleteDoc(doc(db, "users", userId));
-      await saveDoc(doc(db, "deletedItems", userId), { type: "user", id: userId, deletedAt: new Date().toISOString() });
-    } catch (err) {
-      console.warn("[Firestore Write Warning] delete user: removed in client sandbox", err);
+    // Eliminació real a Firestore, amb VERIFICACIÓ posterior i un reintent
+    // — si l'escriptura fallava en silenci (com passava abans), l'usuari
+    // semblava eliminat a l'instant però reapareixia a cada sincronització,
+    // sense que ningú s'assabentés que en realitat no s'havia esborrat.
+    const attemptDelete = async (): Promise<boolean> => {
+      try {
+        await deleteDoc(doc(db, "users", userId));
+        await saveDoc(doc(db, "deletedItems", userId), { type: "user", id: userId, deletedAt: new Date().toISOString() });
+        const check = await getDoc(doc(db, "users", userId));
+        return !check.exists();
+      } catch (err) {
+        console.warn("[Firestore Delete User Error]", err);
+        return false;
+      }
+    };
+
+    let success = await attemptDelete();
+    if (!success) {
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      success = await attemptDelete();
+    }
+
+    if (success) {
+      logEnterpriseAction(`Usuari eliminat: ${target?.name || userId}`);
+      addToast(`Usuari ${target?.name || ""} eliminat`, "success");
+    } else {
+      // Revertim l'actualització optimista — és millor que sembli "no
+      // eliminat" i es torni a provar, que no pas donar per fet un èxit
+      // fals i que l'usuari reaparegui sol més tard sense explicació.
+      setUsers(users);
+      localStorage.setItem("golfsana_users", JSON.stringify(users));
+      addToast(`No s'ha pogut eliminar ${target?.name || "l'usuari"} — revisa la connexió i torna-ho a provar`, "warning");
     }
   };
 

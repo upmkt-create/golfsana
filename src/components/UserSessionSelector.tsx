@@ -9,6 +9,7 @@ interface UserSessionSelectorProps {
   onSelectUser: (user: UserProfile) => void;
   onAddUser: (name: string, email: string, role: UserRole, accessCode: string) => Promise<void>;
   onUpdateUserCredentials: (userId: string, email: string, accessCode: string) => Promise<void>;
+  onDeleteUser: (userId: string) => Promise<void>;
   onLogout: () => void;
 }
 
@@ -18,6 +19,7 @@ export default function UserSessionSelector({
   onSelectUser,
   onAddUser,
   onUpdateUserCredentials,
+  onDeleteUser,
   onLogout,
 }: UserSessionSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -34,6 +36,21 @@ export default function UserSessionSelector({
   const [editEmail, setEditEmail] = useState("");
   const [editCode, setEditCode] = useState("");
   const [isSavingCredentials, setIsSavingCredentials] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async (userId: string) => {
+    setIsDeleting(true);
+    try {
+      await onDeleteUser(userId);
+      setConfirmingDeleteId(null);
+      setEditingUserId(null);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const startEditCredentials = (u: UserProfile) => {
     setEditingUserId(u.id);
@@ -158,6 +175,39 @@ export default function UserSessionSelector({
                         >
                           {isSavingCredentials ? "Desant..." : "Desar credencials"}
                         </button>
+
+                        <div className="border-t border-amber-200 pt-2">
+                          {confirmingDeleteId === u.id ? (
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] text-rose-700 font-semibold">Segur? Aquesta acció no es pot desfer.</p>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmingDeleteId(null)}
+                                  className="py-1.5 text-[10px] font-bold border border-slate-300 text-slate-600 hover:bg-slate-100"
+                                >
+                                  Cancel·lar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(u.id)}
+                                  disabled={isDeleting}
+                                  className="py-1.5 text-[10px] font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
+                                >
+                                  {isDeleting ? "Eliminant..." : "Sí, eliminar"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingDeleteId(u.id)}
+                              className="w-full text-[10px] font-semibold text-rose-600 hover:text-rose-800 py-1"
+                            >
+                              Eliminar aquest usuari
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   }

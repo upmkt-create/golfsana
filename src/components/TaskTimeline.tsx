@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { Task, UserProfile, Project } from "../types";
-import { Calendar, Clock, AlertTriangle } from "lucide-react";
+import { Clock, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface TaskTimelineProps {
   tasks: Task[];
@@ -10,6 +10,23 @@ interface TaskTimelineProps {
   activeWorkspaceId: string;
 }
 
+const MONTH_SHORT = ["Gen", "Feb", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Des"];
+
+function startOfWeek(d: Date): Date {
+  const nd = new Date(d);
+  const day = nd.getDay(); // 0 = diumenge
+  const diff = day === 0 ? 6 : day - 1;
+  nd.setDate(nd.getDate() - diff);
+  nd.setHours(0, 0, 0, 0);
+  return nd;
+}
+
+function parseDateKey(key: string): Date | null {
+  const parts = key.split("-").map(Number);
+  if (parts.length < 3 || parts.some(isNaN)) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
 export default function TaskTimeline({
   tasks,
   users,
@@ -17,65 +34,52 @@ export default function TaskTimeline({
   activeProjectId,
   activeWorkspaceId,
 }: TaskTimelineProps) {
+  // Setmanes generades DINÀMICAMENT a partir d'avui (abans era una llista
+  // fixa de 8 setmanes de juny-juliol 2026, que deixava de mostrar res un
+  // cop passat aquell rang). weekOffset permet navegar cap enrere/endavant.
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  const timelineWeeks = useMemo(() => {
+    const firstWeekStart = startOfWeek(new Date());
+    firstWeekStart.setDate(firstWeekStart.getDate() + weekOffset * 7);
+    return Array.from({ length: 8 }, (_, i) => {
+      const start = new Date(firstWeekStart);
+      start.setDate(start.getDate() + i * 7);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      return {
+        start,
+        end,
+        label: `${MONTH_SHORT[start.getMonth()]} ${start.getDate()}–${end.getDate()}`,
+      };
+    });
+  }, [weekOffset]);
+
+  const rangeLabel = `${timelineWeeks[0].start.getDate()} ${MONTH_SHORT[timelineWeeks[0].start.getMonth()]} – ${timelineWeeks[7].end.getDate()} ${MONTH_SHORT[timelineWeeks[7].end.getMonth()]} ${timelineWeeks[7].end.getFullYear()}`;
+
   // Filter tasks to active scope
-  const filteredTasks = tasks.filter(task => {
+  const scopedTasks = tasks.filter(task => {
     if (activeProjectId && task.projectId !== activeProjectId) return false;
     const tWorkspaceId = task.workspaceId || projects.find(p => p.id === task.projectId)?.workspaceId;
     if (!activeProjectId && tWorkspaceId !== activeWorkspaceId) return false;
-    // We only display tasks that have valid dueDates
     return !!task.dueDate;
   });
 
-  // Calculate some timeline months/weeks (June - July 2026)
-  const timelineDates = [
-    { label: "Juny Setmana 1", key: "06-05" },
-    { label: "Juny Setmana 2", key: "06-12" },
-    { label: "Juny Setmana 3", key: "06-19" },
-    { label: "Juny Setmana 4", key: "06-26" },
-    { label: "Juliol Setmana 1", key: "07-03" },
-    { label: "Juliol Setmana 2", key: "07-10" },
-    { label: "Juliol Setmana 3", key: "07-17" },
-    { label: "Juliol Setmana 4", key: "07-24" },
-  ];
-
-  // Helper to place task in the timeline grid (crudely maps due month/day to column indices)
-  const getTimelinePosition = (dueDateStr: string): { startCol: number; span: number; color: string } => {
-    let color = "from-blue-500 to-indigo-600";
-
-    try {
-      const parts = dueDateStr.split("-");
-      if (parts.length < 3) return { startCol: 2, span: 2, color };
-      
-      const month = parseInt(parts[1], 10);
-      const day = parseInt(parts[2], 10);
-
-      let startCol = 1;
-      
-      if (month === 6) {
-        if (day <= 7) startCol = 1;
-        else if (day <= 14) startCol = 2;
-        else if (day <= 21) startCol = 3;
-        else startCol = 4;
-      } else if (month === 7) {
-        if (day <= 7) startCol = 5;
-        else if (day <= 14) startCol = 6;
-        else if (day <= 21) startCol = 7;
-        else startCol = 8;
-      } else {
-        startCol = 4; // default spill
-      }
-
-      // Span based on starting col or priority
-      const span = Math.min(3, 9 - startCol);
-
-      return { startCol, span, color };
-    } catch {
-      return { startCol: 3, span: 2, color };
-    }
+  // Troba a quina de les 8 setmanes visibles cau cada tasca — si cau fora
+  // del rang actual, es compta a banda en lloc de dibuixar-se malament.
+  const getWeekIndex = (dueDateStr: string): number => {
+    const dueDate = parseDateKey(dueDateStr);
+    if (!dueDate) return -1;
+    return timelineWeeks.findIndex(w => dueDate >= w.start && dueDate <= w.end);
   };
+
+  const visibleTasks = scopedTasks.filter(t => getWeekIndex(t.dueDate) !== -1);
+  const outOfRangeCount = scopedTasks.length - visibleTasks.length;
 
   const getPriorityGradient = (p: string) => {
     switch (p) {
+      case "urgent":
       case "high":
         return "from-rose-500 to-red-650";
       case "medium":
@@ -87,61 +91,86 @@ export default function TaskTimeline({
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-none p-6 shadow-none" id="timeline-gantt-section">
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
         <div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2 uppercase tracking-wider">
             <Clock className="w-4 h-4 text-blue-600" />
-            <span>Cronograma de Projecte (Pla Enterprise)</span>
+            <span>Cronograma de Projecte (Gantt)</span>
           </h3>
           <p className="text-xs text-slate-500 mt-1">
-            Planificació visual de l'Asana Enterprise dels mesos de Juny i Juliol del 2026.
+            Planificació visual per les 8 properes setmanes: {rangeLabel}.
           </p>
         </div>
-        <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
-          <div className="flex items-center gap-1.5 font-mono">
-            <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
-            <span>Alta Prioritat</span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <button onClick={() => setWeekOffset(o => o - 8)} className="p-1 border border-slate-200 hover:bg-slate-50" title="8 setmanes enrere">
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setWeekOffset(0)}
+              disabled={weekOffset === 0}
+              className="text-[10px] font-bold px-2 py-1 border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Avui
+            </button>
+            <button onClick={() => setWeekOffset(o => o + 8)} className="p-1 border border-slate-200 hover:bg-slate-50" title="8 setmanes endavant">
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div className="flex items-center gap-1.5 font-mono">
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
-            <span>Mitjana</span>
-          </div>
-          <div className="flex items-center gap-1.5 font-mono">
-            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-            <span>Baixa</span>
+          <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
+            <div className="flex items-center gap-1.5 font-mono">
+              <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
+              <span>Alta/Urgent</span>
+            </div>
+            <div className="flex items-center gap-1.5 font-mono">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
+              <span>Mitjana</span>
+            </div>
+            <div className="flex items-center gap-1.5 font-mono">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+              <span>Baixa</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {filteredTasks.length === 0 ? (
+      {outOfRangeCount > 0 && (
+        <div className="mb-4 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 flex items-center gap-1.5">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          <span>{outOfRangeCount} tasca{outOfRangeCount > 1 ? "ques" : ""} amb venciment fora d'aquest rang de 8 setmanes — navega amb les fletxes per veure-les.</span>
+        </div>
+      )}
+
+      {scopedTasks.length === 0 ? (
         <div className="py-12 border border-dashed border-slate-250 dark:border-slate-800 rounded-none text-center text-slate-400 text-xs">
           <AlertTriangle className="w-6 h-6 mx-auto text-slate-350 mb-2" />
           <span>No hi ha tasques amb data límit assignada en aquest projecte per graficar.</span>
         </div>
+      ) : visibleTasks.length === 0 ? (
+        <div className="py-12 border border-dashed border-slate-250 dark:border-slate-800 rounded-none text-center text-slate-400 text-xs">
+          <AlertTriangle className="w-6 h-6 mx-auto text-slate-350 mb-2" />
+          <span>Cap tasca amb venciment en aquestes 8 setmanes. Prova de navegar amb les fletxes.</span>
+        </div>
       ) : (
         <div className="overflow-x-auto">
-          {/* Timeline Grid layout */}
           <div className="min-w-[800px]">
-            {/* Headers */}
             <div className="grid grid-cols-12 gap-1 border-b border-slate-200 dark:border-slate-800 pb-3 mb-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
               <div className="col-span-4 text-left px-2">Tasca</div>
-              {timelineDates.map((date) => (
-                <div key={date.key} className="col-span-1 border-l border-slate-200 dark:border-slate-800 font-mono text-[10px]">
-                  {date.label}
+              {timelineWeeks.map((w, i) => (
+                <div key={i} className="col-span-1 border-l border-slate-200 dark:border-slate-800 font-mono text-[10px]">
+                  {w.label}
                 </div>
               ))}
             </div>
 
-            {/* List of Tasks represented as Gantt Bars */}
             <div className="space-y-3">
-              {filteredTasks.map((task) => {
-                const { startCol, span } = getTimelinePosition(task.dueDate);
+              {visibleTasks.map((task) => {
+                const startCol = getWeekIndex(task.dueDate) + 1;
                 const gradient = getPriorityGradient(task.priority);
                 const assignee = users.find(u => (task.assigneeIds?.includes(u.id) || u.id === task.assigneeId));
 
                 return (
                   <div key={task.id} className="grid grid-cols-12 gap-1 items-center hover:bg-slate-50/50 dark:hover:bg-slate-800/10 py-1.5 rounded-none transition-all">
-                    {/* Task Title & Assignee left hand */}
                     <div className="col-span-4 flex items-center gap-2.5 pl-2 truncate pr-4">
                       <div className="w-5.5 h-5.5 rounded-none bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 flex items-center justify-center font-extrabold text-[9px] text-blue-600">
                         {assignee ? assignee.avatar : "U"}
@@ -156,13 +185,12 @@ export default function TaskTimeline({
                       </div>
                     </div>
 
-                    {/* Timeline bar right hand offset */}
                     <div className="col-span-8 grid grid-cols-8 gap-1 h-8 relative items-center">
                       <div
                         className="h-6 bg-gradient-to-r text-[10px] text-white flex items-center px-1.5 font-bold overflow-hidden whitespace-nowrap rounded-none select-none border border-black/10 truncate font-mono"
                         style={{
                           gridColumnStart: startCol,
-                          gridColumnEnd: `span ${span}`,
+                          gridColumnEnd: `span 1`,
                         }}
                       >
                         <span className={`w-full h-full bg-gradient-to-r ${gradient} flex items-center px-2 shadow-none rounded-none truncate`}>

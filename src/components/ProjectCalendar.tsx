@@ -1,14 +1,6 @@
 // ============================================================================
 // PROJECT CALENDAR — component propi, sense dependre de react-big-calendar
 // ============================================================================
-// Reconstruït des de zero perquè react-big-calendar tenia massa peculiaritats
-// internes difícils de controlar (events "tot el dia" sempre, alçada
-// inestable, filtres desconnectats, clics que no obrien el detall). Aquest
-// component és un calendari propi inspirat en Google Calendar: vistes de
-// Mes / Setmana / Dia, arrossegar per canviar data/hora, i colors per
-// projecte — amb control total sobre cada comportament.
-// ============================================================================
-
 import React, { useState } from "react";
 import { Task, Project, UserProfile, Workspace } from "../types";
 import { ChevronLeft, ChevronRight, Plus, Filter, X } from "lucide-react";
@@ -24,21 +16,23 @@ interface ProjectCalendarProps {
   onAddTask?: (title: string, projectId: string, assigneeIds: string[], priority: any, departmentIds?: string[], dueDate?: string) => void;
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onSelectTask?: (task: Task) => void;
-  // Filtres compartits amb el Llistat de tasques
-  searchTerm: string;
-  setSearchTerm: (v: string) => void;
-  filterPriority: string;
-  setFilterPriority: (v: string) => void;
-  filterStatus: string;
-  setFilterStatus: (v: string) => void;
-  filterAssignee: string;
-  setFilterAssignee: (v: string) => void;
-  dateFilterField: "startDate" | "dueDate";
-  setDateFilterField: (v: "startDate" | "dueDate") => void;
-  dateFilterFrom: string;
-  setDateFilterFrom: (v: string) => void;
-  dateFilterTo: string;
-  setDateFilterTo: (v: string) => void;
+  // Filtres compartits amb el Llistat de tasques — OPCIONALS: si no es
+  // passen (p.ex. des del Dashboard de Membre, que no comparteix filtres
+  // amb cap llistat), el component gestiona el seu propi estat intern.
+  searchTerm?: string;
+  setSearchTerm?: (v: string) => void;
+  filterPriority?: string;
+  setFilterPriority?: (v: string) => void;
+  filterStatus?: string;
+  setFilterStatus?: (v: string) => void;
+  filterAssignee?: string;
+  setFilterAssignee?: (v: string) => void;
+  dateFilterField?: "startDate" | "dueDate";
+  setDateFilterField?: (v: "startDate" | "dueDate") => void;
+  dateFilterFrom?: string;
+  setDateFilterFrom?: (v: string) => void;
+  dateFilterTo?: string;
+  setDateFilterTo?: (v: string) => void;
 }
 
 type ViewMode = "month" | "week" | "day";
@@ -96,20 +90,20 @@ export default function ProjectCalendar({
   onAddTask,
   onUpdateTask,
   onSelectTask,
-  searchTerm,
-  setSearchTerm,
-  filterPriority,
-  setFilterPriority,
-  filterStatus,
-  setFilterStatus,
-  filterAssignee,
-  setFilterAssignee,
-  dateFilterField,
-  setDateFilterField,
-  dateFilterFrom,
-  setDateFilterFrom,
-  dateFilterTo,
-  setDateFilterTo,
+  searchTerm: searchTermProp,
+  setSearchTerm: setSearchTermProp,
+  filterPriority: filterPriorityProp,
+  setFilterPriority: setFilterPriorityProp,
+  filterStatus: filterStatusProp,
+  setFilterStatus: setFilterStatusProp,
+  filterAssignee: filterAssigneeProp,
+  setFilterAssignee: setFilterAssigneeProp,
+  dateFilterField: dateFilterFieldProp,
+  setDateFilterField: setDateFilterFieldProp,
+  dateFilterFrom: dateFilterFromProp,
+  setDateFilterFrom: setDateFilterFromProp,
+  dateFilterTo: dateFilterToProp,
+  setDateFilterTo: setDateFilterToProp,
 }: ProjectCalendarProps) {
   const [view, setView] = useState<ViewMode>("month");
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -120,6 +114,32 @@ export default function ProjectCalendar({
   const [newDepartmentIds, setNewDepartmentIds] = useState<string[]>(["dep-reserves"]);
   const [newAssignees, setNewAssignees] = useState<string[]>([]);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+
+  // Filtres "no controlats": si el component pare no els passa, es
+  // gestionen aquí mateix amb el seu propi estat (per exemple des del
+  // Dashboard de Membre, que no comparteix filtres amb cap llistat).
+  const [localSearchTerm, setLocalSearchTerm] = useState("");
+  const [localFilterPriority, setLocalFilterPriority] = useState("all");
+  const [localFilterStatus, setLocalFilterStatus] = useState("all");
+  const [localFilterAssignee, setLocalFilterAssignee] = useState("all");
+  const [localDateFilterField, setLocalDateFilterField] = useState<"startDate" | "dueDate">("dueDate");
+  const [localDateFilterFrom, setLocalDateFilterFrom] = useState("");
+  const [localDateFilterTo, setLocalDateFilterTo] = useState("");
+
+  const searchTerm = searchTermProp ?? localSearchTerm;
+  const setSearchTerm = setSearchTermProp ?? setLocalSearchTerm;
+  const filterPriority = filterPriorityProp ?? localFilterPriority;
+  const setFilterPriority = setFilterPriorityProp ?? setLocalFilterPriority;
+  const filterStatus = filterStatusProp ?? localFilterStatus;
+  const setFilterStatus = setFilterStatusProp ?? setLocalFilterStatus;
+  const filterAssignee = filterAssigneeProp ?? localFilterAssignee;
+  const setFilterAssignee = setFilterAssigneeProp ?? setLocalFilterAssignee;
+  const dateFilterField = dateFilterFieldProp ?? localDateFilterField;
+  const setDateFilterField = setDateFilterFieldProp ?? setLocalDateFilterField;
+  const dateFilterFrom = dateFilterFromProp ?? localDateFilterFrom;
+  const setDateFilterFrom = setDateFilterFromProp ?? setLocalDateFilterFrom;
+  const dateFilterTo = dateFilterToProp ?? localDateFilterTo;
+  const setDateFilterTo = setDateFilterToProp ?? setLocalDateFilterTo;
 
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>(() => workspaces.map(w => w.id));
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>(() => projects.map(p => p.id));
@@ -145,7 +165,24 @@ export default function ProjectCalendar({
     return project ? project.workspaceId : "";
   };
 
+  // Aplica els filtres (compartits o locals) + la selecció múltiple
+  // d'Espai/Projecte sobre les tasques rebudes.
   const calendarTasks = tasks.filter(t => {
+    if (searchTerm.trim() !== "") {
+      if (!t.title.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    }
+    if (filterStatus !== "all" && t.status !== filterStatus) return false;
+    if (filterPriority !== "all" && t.priority !== filterPriority) return false;
+    if (filterAssignee !== "all") {
+      const taskAssignees = t.assigneeIds && t.assigneeIds.length > 0 ? t.assigneeIds : (t.assigneeId ? [t.assigneeId] : []);
+      if (!taskAssignees.includes(filterAssignee)) return false;
+    }
+    if (hasActiveDateFilter) {
+      const rawDate = dateFilterField === "dueDate" ? t.dueDate : t.startDate;
+      if (!rawDate) return false;
+      if (dateFilterFrom && rawDate < dateFilterFrom) return false;
+      if (dateFilterTo && rawDate > dateFilterTo) return false;
+    }
     const wsId = getTaskWorkspaceId(t);
     if (wsId && !selectedWorkspaceIds.includes(wsId)) return false;
     if (t.projectId && !selectedProjectIds.includes(t.projectId)) return false;

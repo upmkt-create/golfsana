@@ -8,7 +8,7 @@ import {
   TaskPriority
 } from "../types";
 import { DEPARTMENTS } from "../data";
-import MemberCalendar from "./MemberCalendar";
+import ProjectCalendar from "./ProjectCalendar";
 import { stripHtmlToText } from "../lib/textUtils";
 import { 
   CalendarDays, 
@@ -37,6 +37,7 @@ interface MemberDashboardProps {
   workspaces: Workspace[];
   onClose: () => void;
   onUpdateTaskStatus?: (taskId: string, newStatus: TaskStatus) => Promise<void>;
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onAddTask?: (title: string, projectId: string, assigneeIds: string[], priority: TaskPriority, departmentIds?: string[], dueDate?: string) => Promise<string | void>;
   onSelectTask?: (task: Task) => void;
 }
@@ -49,6 +50,7 @@ export default function MemberDashboard({
   workspaces,
   onClose,
   onUpdateTaskStatus,
+  onUpdateTask,
   onAddTask,
   onSelectTask
 }: MemberDashboardProps) {
@@ -881,20 +883,18 @@ export default function MemberDashboard({
         </div>
       )}
 
-      {/* TAB CONTENT: CALENDARI */}
+      {/* TAB CONTENT: CALENDARI — mateix component que el calendari dels
+          espais de treball, només amb les tasques d'aquest membre */}
       {activeTab === "calendari" && (
         <div className="space-y-6">
-          <MemberCalendar
+          <ProjectCalendar
             tasks={memberTasks}
             projects={projects}
-            onAddTask={(date) => {
-              setNewDueDate(date.toISOString().split("T")[0]);
-              setShowAddForm(true);
-              setActiveTab("tasques"); // Switch back to 'tasques' tab where the form is located
-            }}
-            onAddProject={() => {
-              alert("Per afegir projectes, navega al Panell de Projectes del grup.");
-            }}
+            users={users}
+            workspaces={workspaces}
+            onAddTask={onAddTask}
+            onUpdateTask={onUpdateTask}
+            onSelectTask={onSelectTask}
           />
         </div>
       )}

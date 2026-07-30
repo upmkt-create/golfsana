@@ -30,6 +30,10 @@ export default function TaskBoard({
 }: TaskBoardProps) {
   // Option to group the board by status ("status") or by department ("department")
   const [groupBy, setGroupBy] = useState<"status" | "department">("department");
+  // Tasca que s'està arrossegant actualment (drag-and-drop natiu, com al
+  // Calendari) — abans només es podia moure amb els botons de fletxes.
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverColId, setDragOverColId] = useState<string | null>(null);
 
   // Paleta per als espais de treball reals, que no tenen un camp "color"
   // propi (a diferència de DEPARTMENTS) — es tria de manera determinista
@@ -143,13 +147,36 @@ export default function TaskBoard({
     }
   };
 
+  // Deixar anar una targeta arrossegada sobre una columna: canvia l'estat
+  // (mode "status") o afegeix aquell departament com a principal (mode
+  // "department"), mantenint els altres departaments ja assignats.
+  const handleDropOnColumn = (colId: string) => {
+    if (!draggedTaskId) return;
+    const task = tasks.find((t) => t.id === draggedTaskId);
+    setDraggedTaskId(null);
+    setDragOverColId(null);
+    if (!task) return;
+
+    if (groupBy === "status") {
+      if (task.status === colId) return;
+      onUpdateTask(task.id, { status: colId as TaskStatus });
+    } else {
+      const currentDepts = getTaskDepartments(task);
+      if (currentDepts[0] === colId) return;
+      const nextDeptsList = currentDepts.includes(colId)
+        ? [colId, ...currentDepts.filter((id) => id !== colId)]
+        : [colId, ...currentDepts];
+      onUpdateTask(task.id, { departmentId: colId, departmentIds: nextDeptsList });
+    }
+  };
+
   return (
     <div className="space-y-4" id="task-board-wrapper">
       {/* Board Controls */}
       <div className="flex items-center justify-between pb-2">
         <div>
           <h3 className="text-sm font-bold text-slate-800 dark:text-slate-150">Taulell Interactiu d'Acció</h3>
-          <p className="text-[11px] text-slate-400">Canvia la distribució de les columnes per obtenir perspectives d'estat o de càrrega de treball per equips.</p>
+          <p className="text-[11px] text-slate-400">Arrossega una targeta a una altra columna per moure-la, o utilitza les fletxes. Desplaça't lateralment per veure totes les columnes.</p>
         </div>
         
         {/* Toggle Selector */}
@@ -180,11 +207,12 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Grid columns */}
+      {/* Board columns — fila única amb desplaçament lateral, com qualsevol
+          Kanban real (Trello, Jira...). Abans era una graella amb un nombre
+          fix de columnes per fila, que es trencava en un mosaic confús quan
+          hi havia més espais de treball que columnes previstes. */}
       <div 
-        className={`grid grid-cols-1 md:grid-cols-2 ${
-          groupBy === "status" ? "lg:grid-cols-4" : "lg:grid-cols-5"
-        } gap-5`}
+        className="flex gap-4 overflow-x-auto pb-2"
         id="kanban-board-cols"
       >
         {activeColumns.map((col) => {
@@ -201,7 +229,12 @@ export default function TaskBoard({
           return (
             <div
               key={col.id}
-              className={`rounded-xl border border-slate-200/80 flex flex-col transition-all ${col.bg} ${
+              onDragOver={(e) => { e.preventDefault(); setDragOverColId(col.id); }}
+              onDragLeave={() => setDragOverColId((cur) => (cur === col.id ? null : cur))}
+              onDrop={() => handleDropOnColumn(col.id)}
+              className={`rounded-xl border flex flex-col transition-all shrink-0 w-[300px] ${col.bg} ${
+                dragOverColId === col.id ? "border-blue-400 bg-blue-50/40 ring-2 ring-blue-200" : "border-slate-200/80"
+              } ${
                 isCompactView ? "p-2.5 min-h-[400px]" : "p-4 min-h-[550px]"
               }`}
               style={groupBy === "department" ? { borderTop: `4px solid ${col.borderTopColor}` } : undefined}
@@ -241,10 +274,13 @@ export default function TaskBoard({
                       <motion.div
                         layout
                         key={`${task.id}-${col.id}`}
+                        draggable
+                        onDragStart={(e) => { e.stopPropagation(); setDraggedTaskId(task.id); }}
+                        onDragEnd={() => { setDraggedTaskId(null); setDragOverColId(null); }}
                         onClick={() => onSelectTaskForDetails(task)}
-                        className={`block bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_1.5px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:translate-y-[-1px] transition-all cursor-pointer relative group-card border-l-4 ${
+                        className={`block bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_1.5px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:translate-y-[-1px] transition-all cursor-grab active:cursor-grabbing relative group-card border-l-4 ${
                           isCompactView ? "p-2.5 rounded-lg" : "p-4 rounded-xl"
-                        } ${task.isBaseTask ? "ring-2 ring-amber-300" : ""} ${urgency === "overdue" ? "ring-2 ring-rose-400" : urgency === "urgent" ? "ring-1 ring-amber-300" : ""}`}
+                        } ${task.isBaseTask ? "ring-2 ring-amber-300" : ""} ${urgency === "overdue" ? "ring-2 ring-rose-400" : urgency === "urgent" ? "ring-1 ring-amber-300" : ""} ${draggedTaskId === task.id ? "opacity-40" : ""}`}
                         style={{ borderLeftColor: proj ? proj.color : "#cbd5e1" }}
                       >
                         {urgency !== "normal" && (

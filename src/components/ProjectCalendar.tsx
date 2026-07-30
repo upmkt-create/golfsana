@@ -5,6 +5,7 @@ import React, { useState } from "react";
 import { Task, Project, UserProfile, Workspace } from "../types";
 import { ChevronLeft, ChevronRight, Plus, Filter, X } from "lucide-react";
 import { DEPARTMENTS } from "../data";
+import { getTaskUrgency } from "../lib/taskUrgency";
 
 interface ProjectCalendarProps {
   tasks: Task[];
@@ -273,19 +274,23 @@ export default function ProjectCalendar({
     setNewTitle(""); setNewAssignees([]); setNewDepartmentIds(["dep-reserves"]); setShowAddForm(false);
   };
 
-  const EventChip = ({ task, compact = false }: { task: Task; compact?: boolean }) => (
-    <div
-      draggable
-      onDragStart={(e) => { e.stopPropagation(); setDraggedTaskId(task.id); }}
-      onClick={(e) => { e.stopPropagation(); onSelectTask?.(task); }}
-      title={task.title}
-      className={`cursor-pointer truncate rounded-sm px-1.5 font-bold text-white ${compact ? "text-[9.5px] py-0.5" : "text-[10px] py-1"} ${task.status === "done" ? "opacity-50 line-through" : ""}`}
-      style={{ backgroundColor: getTaskColor(task) }}
-    >
-      {task.startTime && <span className="font-mono mr-1">{task.startTime}</span>}
-      {task.title}
-    </div>
-  );
+  const EventChip = ({ task, compact = false }: { task: Task; compact?: boolean }) => {
+    const urgency = getTaskUrgency(task.dueDate, task.status);
+    return (
+      <div
+        draggable
+        onDragStart={(e) => { e.stopPropagation(); setDraggedTaskId(task.id); }}
+        onClick={(e) => { e.stopPropagation(); onSelectTask?.(task); }}
+        title={`${task.title}${urgency === "overdue" ? " — Vençuda" : urgency === "urgent" ? " — Venciment proper" : ""}`}
+        className={`cursor-pointer truncate rounded-sm px-1.5 font-bold text-white ${compact ? "text-[9.5px] py-0.5" : "text-[10px] py-1"} ${task.status === "done" ? "opacity-50 line-through" : ""} ${urgency === "overdue" ? "ring-2 ring-rose-500 animate-pulse" : urgency === "urgent" ? "ring-2 ring-amber-400" : ""}`}
+        style={{ backgroundColor: getTaskColor(task) }}
+      >
+        {task.startTime && <span className="font-mono mr-1">{task.startTime}</span>}
+        {urgency === "overdue" && <span className="mr-1">⚠</span>}
+        {task.title}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-white border border-slate-200 shadow-sm p-4 min-h-[900px] flex flex-col font-sans">

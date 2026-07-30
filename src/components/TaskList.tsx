@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus, TaskPriority, Department, Workspace } from "../types";
 import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle, Star, FileText } from "lucide-react";
 import { DEPARTMENTS } from "../data";
+import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
 import RichTextEditor from "./RichTextEditor";
 
 interface TaskListProps {
@@ -931,15 +932,26 @@ export default function TaskList({
 
                     <td className={cellCls}>
                       <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-xs font-mono text-slate-500">
-                          <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          <input
-                            type="date"
-                            value={task.dueDate}
-                            onChange={(e) => onUpdateTask(task.id, { dueDate: e.target.value })}
-                            className="bg-transparent border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none px-1 cursor-pointer"
-                          />
-                        </div>
+                        {(() => {
+                          const urgency = getTaskUrgency(task.dueDate, task.status);
+                          const style = URGENCY_STYLES[urgency];
+                          return (
+                            <div className={`flex items-center gap-1.5 text-xs font-mono px-1 -mx-1 rounded-sm ${urgency !== "normal" ? `${style.bg} ${style.text} border-l-2 ${style.border}` : "text-slate-500"}`}>
+                              {urgency !== "normal" ? (
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${style.dot} ${urgency === "overdue" ? "animate-pulse" : ""}`} title={style.label} />
+                              ) : (
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                              )}
+                              <input
+                                type="date"
+                                value={task.dueDate}
+                                onChange={(e) => onUpdateTask(task.id, { dueDate: e.target.value })}
+                                className="bg-transparent border border-slate-200 dark:border-slate-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-none px-1 cursor-pointer"
+                              />
+                              {urgency !== "normal" && <span className="text-[9px] font-bold uppercase shrink-0">{style.label}</span>}
+                            </div>
+                          );
+                        })()}
                         {task.recurrence && task.recurrence !== "none" && (
                           <div className="text-[9.5px] text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1.5 mt-0.5 tracking-tight">
                             <RefreshCw className="w-2.5 h-2.5 text-indigo-505 animate-spin-slow" />

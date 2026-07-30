@@ -3,6 +3,7 @@ import { Task, UserProfile, Project, TaskStatus, Workspace } from "../types";
 import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Kanban, LayoutGrid, Star } from "lucide-react";
 import { motion } from "motion/react";
 import { DEPARTMENTS } from "../data";
+import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -233,6 +234,8 @@ export default function TaskBoard({
                     const assignee = users.find((u) => (task.assigneeIds?.includes(u.id) || u.id === task.assigneeId));
                     const proj = projects.find((p) => p.id === task.projectId);
                     const taskDepts = getTaskDepartments(task);
+                    const urgency = getTaskUrgency(task.dueDate, task.status);
+                    const urgencyStyle = URGENCY_STYLES[urgency];
 
                     return (
                       <motion.div
@@ -241,9 +244,14 @@ export default function TaskBoard({
                         onClick={() => onSelectTaskForDetails(task)}
                         className={`block bg-white border-0 shadow-[0_1px_3px_rgba(0,0,0,0.03),0_1px_1.5px_rgba(0,0,0,0.02)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:translate-y-[-1px] transition-all cursor-pointer relative group-card border-l-4 ${
                           isCompactView ? "p-2.5 rounded-lg" : "p-4 rounded-xl"
-                        } ${task.isBaseTask ? "ring-2 ring-amber-300" : ""}`}
+                        } ${task.isBaseTask ? "ring-2 ring-amber-300" : ""} ${urgency === "overdue" ? "ring-2 ring-rose-400" : urgency === "urgent" ? "ring-1 ring-amber-300" : ""}`}
                         style={{ borderLeftColor: proj ? proj.color : "#cbd5e1" }}
                       >
+                        {urgency !== "normal" && (
+                          <div className={`absolute -top-1.5 -right-1.5 flex items-center gap-1 text-[8.5px] font-black uppercase px-1.5 py-0.5 rounded-full text-white shadow-sm ${urgency === "overdue" ? "bg-rose-500 animate-pulse" : "bg-amber-500"}`}>
+                            {urgencyStyle.label}
+                          </div>
+                        )}
                         {/* Title & Priority */}
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="text-xs font-bold text-slate-800 hover:text-blue-600 leading-snug tracking-tight flex items-center gap-1.5">
@@ -298,8 +306,8 @@ export default function TaskBoard({
                             <div className="flex items-center gap-2">
                               {/* Due Date Indicator */}
                               {task.dueDate && (
-                                <div className="flex items-center gap-1 text-[9.5px] text-slate-500 font-sans font-bold">
-                                  <Calendar className="w-3 h-3 text-slate-400" />
+                                <div className={`flex items-center gap-1 text-[9.5px] font-sans font-bold ${urgency !== "normal" ? urgencyStyle.text : "text-slate-500"}`}>
+                                  <Calendar className={`w-3 h-3 ${urgency !== "normal" ? urgencyStyle.text : "text-slate-400"}`} />
                                   <span>{task.dueDate.split("-").slice(1).join("/")}</span>
                                 </div>
                               )}

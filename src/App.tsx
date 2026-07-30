@@ -140,12 +140,17 @@ export default function App() {
     try {
       const saved = localStorage.getItem("golfsana_users");
       const loaded: UserProfile[] = saved ? JSON.parse(saved) : [...STARTER_MEMBERS];
+      // Un membre "de fàbrica" (STARTER_MEMBERS) eliminat explícitament no
+      // s'ha de tornar a recrear — abans això feia que un usuari com
+      // "Marina" reaparegués sempre, encara que se l'esborrés.
+      const deletedIds: string[] = JSON.parse(localStorage.getItem("golfsana_deleted") || "[]");
       // Ja NO filtrem fora els usuaris que no siguin STARTER_MEMBERS —
       // aquest filtre eliminava els usuaris afegits des del formulari
       // "Afegir Usuari" ja des de la càrrega inicial, abans fins i tot
       // que la sincronització amb Firestore es completés.
-      const updated = [...loaded];
+      const updated = [...loaded].filter((u) => !deletedIds.includes(u.id));
       STARTER_MEMBERS.forEach((starter) => {
+        if (deletedIds.includes(starter.id)) return;
         const idx = updated.findIndex((u) => u.id === starter.id);
         if (idx !== -1) {
           updated[idx] = { ...updated[idx], ...starter };
@@ -621,8 +626,11 @@ export default function App() {
       if (items.length === 0) {
         seedInitialUsers();
       } else {
-        const merged = [...items];
+        // Un STARTER_MEMBER eliminat explícitament (ex. Marina) no s'ha de
+        // tornar a recrear a cada sincronització.
+        const merged = items.filter((u) => !deletedItemIdsRef.current.has(u.id));
         STARTER_MEMBERS.forEach((starter) => {
+          if (deletedItemIdsRef.current.has(starter.id)) return;
           const idx = merged.findIndex(u => u.id === starter.id);
           if (idx === -1) {
             merged.push(starter);
@@ -1895,8 +1903,20 @@ export default function App() {
     logEnterpriseAction(`Usuari eliminat: ${target?.name || userId}`);
     addToast(`Usuari ${target?.name || ""} eliminat`, "success");
 
+    // Registrem l'eliminació a "deletedItems" (el mateix mecanisme que ja
+    // fem servir per tasques/projectes/espais) — sense això, si l'usuari
+    // és un membre "de fàbrica" (STARTER_MEMBERS), la propera sincronització
+    // el tornaria a crear automàticament.
+    const deletedL: string[] = JSON.parse(localStorage.getItem("golfsana_deleted") || "[]");
+    if (!deletedL.includes(userId)) {
+      deletedL.push(userId);
+      localStorage.setItem("golfsana_deleted", JSON.stringify(deletedL));
+    }
+    setDeletedItemIds((prev) => new Set(prev).add(userId));
+
     try {
       await deleteDoc(doc(db, "users", userId));
+      await saveDoc(doc(db, "deletedItems", userId), { type: "user", id: userId, deletedAt: new Date().toISOString() });
     } catch (err) {
       console.warn("[Firestore Write Warning] delete user: removed in client sandbox", err);
     }

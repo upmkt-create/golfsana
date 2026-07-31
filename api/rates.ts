@@ -525,7 +525,21 @@ interface ScrapeResult {
 }
 
 async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<ScrapeResult> {
-  const url = `${ep.base}/availability.json?date=${dateStr}`;
+  const targetUrl = `${ep.base}/availability.json?date=${dateStr}`;
+
+  // Si hi ha una clau de ScraperAPI configurada (variable d'entorn
+  // SCRAPERAPI_KEY a Vercel), la petició es fa a través del seu servei en
+  // lloc de directament — GolfManager bloqueja amb 403 les peticions fetes
+  // directament des del nostre servidor (confirmat), i ScraperAPI evita
+  // aquest bloqueig fent la petició des dels seus propis servidors.
+  // Sense la clau configurada, es manté l'intent directe (que seguirà
+  // caient al model, tal com fins ara) perquè res es trenqui mentre
+  // s'acaba de configurar.
+  const scraperApiKey = process.env.SCRAPERAPI_KEY;
+  const url = scraperApiKey
+    ? `https://api.scraperapi.com/?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}`
+    : targetUrl;
+
   try {
     const resp = await fetch(url, {
       headers: {
@@ -542,11 +556,11 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(scraperApiKey ? 20000 : 8000), // ScraperAPI pot trigar més (fa una petició real de navegador)
     });
 
     if (!resp.ok) {
-      return { teeTimes: null, debug: `HTTP ${resp.status} ${resp.statusText} a ${url}` };
+      return { teeTimes: null, debug: `HTTP ${resp.status} ${resp.statusText} a ${targetUrl}${scraperApiKey ? " (via ScraperAPI)" : ""}` };
     }
 
     const ct = resp.headers.get("content-type") || "";
@@ -567,7 +581,7 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
     return { teeTimes, debug: "ok" };
   } catch (err: any) {
     const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
-    return { teeTimes: null, debug: isTimeout ? `Timeout (8s) connectant a ${url}` : `Error de xarxa: ${String(err?.message || err)}` };
+    return { teeTimes: null, debug: isTimeout ? `Timeout connectant a ${targetUrl}${scraperApiKey ? " (via ScraperAPI)" : ""}` : `Error de xarxa: ${String(err?.message || err)}` };
   }
 }
 

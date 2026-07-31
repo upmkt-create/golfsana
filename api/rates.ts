@@ -556,7 +556,7 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
       },
-      signal: AbortSignal.timeout(scraperApiKey ? 20000 : 8000), // ScraperAPI pot trigar més (fa una petició real de navegador)
+      signal: AbortSignal.timeout(scraperApiKey ? 45000 : 8000), // ScraperAPI pot trigar molt (proxies premium per sortejar bloquejos), aprofitem el nou marge de 60s de la funció
     });
 
     if (!resp.ok) {

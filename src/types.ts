@@ -7,6 +7,12 @@ export interface Department {
   color: string;
 }
 
+export interface MemberNote {
+  id: string;
+  content: string; // Contingut amb format (HTML de RichTextEditor)
+  createdAt: string; // ISO
+}
+
 export interface UserProfile {
   id: string; // uid
   name: string;
@@ -17,7 +23,8 @@ export interface UserProfile {
   departmentIds?: string[]; // Multiple associated departments
   createdAt?: any; // Firestore Timestamp
   accessCode?: string; // Custom access code for non-google auth
-  notes?: string; // Notes internes sobre aquest membre (visibles per l'administrador)
+  notes?: string; // (Antic — format previ d'una sola nota. Es manté per compatibilitat de lectura.)
+  notesList?: MemberNote[]; // Notes internes sobre aquest membre — se'n poden afegir vàries
 }
 
 export interface ActivityLog {

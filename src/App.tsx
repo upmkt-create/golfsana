@@ -1872,21 +1872,40 @@ export default function App() {
     }
   };
 
-  const handleUpdateUserNotes = async (userId: string, notes: string) => {
-    const updated = users.map((u) => (u.id === userId ? { ...u, notes } : u));
+  const handleAddUserNote = async (userId: string, content: string) => {
+    if (!content.trim()) return;
+    const newNote = { id: "note-" + Date.now() + "-" + Math.floor(Math.random() * 1000), content, createdAt: new Date().toISOString() };
+    const target = users.find((u) => u.id === userId);
+    const nextList = [...(target?.notesList || []), newNote];
+    const updated = users.map((u) => (u.id === userId ? { ...u, notesList: nextList } : u));
     setUsers(updated);
     localStorage.setItem("golfsana_users", JSON.stringify(updated));
-    addToast("Nota desada", "success");
+    addToast("Nota afegida", "success");
 
     try {
-      await saveDoc(doc(db, "users", userId), { notes }, { merge: true });
+      await saveDoc(doc(db, "users", userId), { notesList: nextList }, { merge: true });
     } catch (err) {
       console.warn("[Firestore Write Warning] user notes: saved in client sandbox", err);
     }
 
-    // Avisa al membre que té una nota nova per llegir (no quan s'esborra).
-    if (notes.trim() !== "" && userId !== currentUser?.id) {
+    // Avisa al membre que té una nota nova per llegir.
+    if (userId !== currentUser?.id) {
       createNotification(userId, "", "Nota interna", "Tens una nota nova al teu perfil per llegir.", "note");
+    }
+  };
+
+  const handleDeleteUserNote = async (userId: string, noteId: string) => {
+    const target = users.find((u) => u.id === userId);
+    const nextList = (target?.notesList || []).filter((n) => n.id !== noteId);
+    const updated = users.map((u) => (u.id === userId ? { ...u, notesList: nextList } : u));
+    setUsers(updated);
+    localStorage.setItem("golfsana_users", JSON.stringify(updated));
+    addToast("Nota eliminada", "success");
+
+    try {
+      await saveDoc(doc(db, "users", userId), { notesList: nextList }, { merge: true });
+    } catch (err) {
+      console.warn("[Firestore Write Warning] user notes: saved in client sandbox", err);
     }
   };
 
@@ -2880,7 +2899,8 @@ export default function App() {
                   }}
                   onAddTask={handleAddTask}
                   onSelectTask={(task) => setSelectedTask(task)}
-                  onUpdateUserNotes={handleUpdateUserNotes}
+                  onAddUserNote={handleAddUserNote}
+                  onDeleteUserNote={handleDeleteUserNote}
                 />
               ) : (
                 <>

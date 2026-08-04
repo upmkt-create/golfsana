@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { GolfCourse } from "../types";
 import { STARTER_GOLF_CORES, getRealWorldCompetitorPrices, parseAndCleanPrice, isAllowedTariff } from "../data";
+import { getCompetitorTeeTimes } from "../competitorRates";
 import {
   LineChart,
   Line,
@@ -1883,29 +1884,29 @@ export default function GolfAdminDashboard({
 
           const isWeekendDay = [0, 6].includes(new Date(selectedMatrixDate).getDay());
           
-          // Generate detailed list of slots
-          const interval = activeCourse.teeTimeInterval || 10;
-          const startMins = 7 * 60; // 07:00
-          const endMins = 20 * 60 + 48; // 20:48
           const slots = [];
 
-          for (let t = startMins; t <= endMins; t += interval) {
-            const hrs = Math.floor(t / 60);
-            const mins = t % 60;
-            const timeStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+          if (activeCourse.isOurClub) {
+            // Propi club: bucle basat en l'interval configurable de la
+            // pestanya (per defecte 10 min), amb ocupació simulada.
+            const interval = activeCourse.teeTimeInterval || 10;
+            const startMins = 7 * 60; // 07:00
+            const endMins = 20 * 60 + 48; // 20:48
 
-            // Filtering search
-            if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
-              continue;
-            }
+            for (let t = startMins; t <= endMins; t += interval) {
+              const hrs = Math.floor(t / 60);
+              const mins = t % 60;
+              const timeStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
 
-            let occupancyLevel = "disponible";
-            let availablePlayers = 4;
-            let statusColor = "bg-emerald-500";
-            
-            // Generate stable pseudorandom mock occupancy based on minutes and active course name index
-            const seedValue = (t * 13 + activeCourse.name.charCodeAt(0)) % 100;
-            if (activeCourse.isOurClub) {
+              if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
+                continue;
+              }
+
+              let occupancyLevel = "disponible";
+              let availablePlayers = 4;
+              let statusColor = "bg-emerald-500";
+
+              const seedValue = (t * 13 + activeCourse.name.charCodeAt(0)) % 100;
               if (t >= 510 && t <= 750) { // prime morning slots
                 if (seedValue > 65) {
                   occupancyLevel = "complet";
@@ -1935,7 +1936,38 @@ export default function GolfAdminDashboard({
                   statusColor = "bg-emerald-500";
                 }
               }
-            } else {
+
+              const rates = getOurClubDetailedTeeTimes(t);
+
+              slots.push({
+                time: timeStr,
+                occupancyLevel,
+                availablePlayers,
+                statusColor,
+                rates
+              });
+            }
+          } else {
+            // Competidor: s'usa DIRECTAMENT la llista real de tee-times del
+            // model verificat (cada 9 o 10 minuts, segons el sistema propi
+            // de cada camp, amb els canvis de tarifa reals capturats) — en
+            // lloc de la taula genèrica de 7 blocs compartida per tothom
+            // que hi havia abans, que ocultava els canvis de preu reals
+            // entre franges.
+            const realTeeTimes = getCompetitorTeeTimes(activeCourse.name, selectedMatrixDate);
+
+            realTeeTimes.forEach((tt) => {
+              const timeStr = tt.time;
+              if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
+                return;
+              }
+
+              const t = tt.minutes;
+              let occupancyLevel = "disponible";
+              let availablePlayers = 4;
+              let statusColor = "bg-emerald-500";
+
+              const seedValue = (t * 13 + activeCourse.name.charCodeAt(0)) % 100;
               if (seedValue > 80) {
                 occupancyLevel = "complet";
                 availablePlayers = 0;
@@ -1953,46 +1985,35 @@ export default function GolfAdminDashboard({
                 availablePlayers = 4;
                 statusColor = "bg-emerald-500";
               }
-            }
 
-            let rates: { tariff: string; price: number; discountPct?: number; originalPrice?: number }[] = [];
-            
-            if (activeCourse.isOurClub) {
-              rates = getOurClubDetailedTeeTimes(t);
-            } else {
-              // Competitor rates computation
-              // Find the hourly key
-              const range = HOUR_RANGES.find(r => {
-                const [sh, sm] = r.key.split("-")[0].split(":").map(Number);
-                const [eh, em] = r.key.split("-")[1].split(":").map(Number);
-                const startT = sh * 60 + sm;
-                const endT = eh * 60 + em;
-                return t >= startT && t < endT;
+              const rates = tt.rates.map((r) => ({
+                tariff: r.tariff,
+                price: r.price,
+                discountPct: r.discountPct,
+                originalPrice: r.originalPrice,
+              }));
+
+              slots.push({
+                time: timeStr,
+                occupancyLevel,
+                availablePlayers,
+                statusColor,
+                rates
               });
-              
-              const hourKey = range ? range.key : "08:00-12:00";
-              const realPrices = getRealWorldCompetitorPrices(activeCourse.name, isWeekendDay);
-              
-              if (realPrices && realPrices.hourlyRates?.[hourKey] !== undefined) {
-                const p = realPrices.hourlyRates[hourKey];
-                const tf = realPrices.hourlyTariffs?.[hourKey] || "Tarifa Oficial Web";
-                rates = [{ tariff: tf, price: p }];
-              } else {
-                const baseGreenFee = activeCourse.greenFeeHigh || 115;
-                const defaultDisc = range ? range.defaultDiscount : 0;
-                const pr = Math.round(baseGreenFee * (1 - defaultDisc / 100));
-                rates = [{ tariff: range ? range.tariff : "Tarifa General", price: pr, discountPct: defaultDisc, originalPrice: baseGreenFee }];
-              }
-            }
-
-            slots.push({
-              time: timeStr,
-              occupancyLevel,
-              availablePlayers,
-              statusColor,
-              rates
             });
           }
+
+          // Interval real mostrat a la capçalera — es calcula a partir dels
+          // dos primers slots generats, perquè funcioni igual tant pel
+          // propi club (interval configurable) com pels competidors
+          // (interval propi de cada model, no exposat directament).
+          const displayInterval = slots.length >= 2
+            ? (() => {
+                const [h1, m1] = slots[0].time.split(":").map(Number);
+                const [h2, m2] = slots[1].time.split(":").map(Number);
+                return (h2 * 60 + m2) - (h1 * 60 + m1);
+              })()
+            : (activeCourse.teeTimeInterval || 10);
 
           return (
             <div className="space-y-4">
@@ -2012,7 +2033,7 @@ export default function GolfAdminDashboard({
                     {activeCourse.name}
                   </h4>
                   <p className="text-xs text-slate-500">
-                    Sincronitzador actiu: <span className="font-semibold text-slate-700 dark:text-slate-300">{activeCourse.updatedBy || "Robot Headless"}</span> • Interval de sortides: <span className="font-bold text-slate-700 dark:text-slate-300">{interval} minuts</span> • Total sortides visualitzades: <span className="font-extrabold text-blue-600">{slots.length} sortides</span>
+                    Sincronitzador actiu: <span className="font-semibold text-slate-700 dark:text-slate-300">{activeCourse.updatedBy || "Robot Headless"}</span> • Interval de sortides: <span className="font-bold text-slate-700 dark:text-slate-300">{displayInterval} minuts</span> • Total sortides visualitzades: <span className="font-extrabold text-blue-600">{slots.length} sortides</span>
                   </p>
                 </div>
 

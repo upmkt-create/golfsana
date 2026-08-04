@@ -74,7 +74,7 @@ export async function fetchCourseRates(courseName: string, dateStr: string): Pro
   const slug = slugFor(courseName);
   try {
     const resp = await fetch(`/api/rates?course=${slug}&date=${dateStr}`, {
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(50000), // el backend pot trigar fins a 45s quan usa proxy premium
     });
     if (resp.ok) {
       const data: RatesResponse = await resp.json();
@@ -92,7 +92,7 @@ export async function fetchCourseRates(courseName: string, dateStr: string): Pro
 export async function fetchAllRates(courseNames: string[], dateStr: string): Promise<RatesResponse> {
   try {
     const resp = await fetch(`/api/rates?date=${dateStr}`, {
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(55000), // tots els camps corren en paral·lel al backend, però amb proxy premium cadascun pot trigar fins a 45s
     });
     if (resp.ok) {
       const data: RatesResponse = await resp.json();

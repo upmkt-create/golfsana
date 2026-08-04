@@ -210,7 +210,6 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
     else if (user.id === "member_erika") roleTitle = "Màrqueting / Digitals";
     else if (user.id === "member_ester") roleTitle = "Social i Esportiu";
     else if (user.id === "member_monica") roleTitle = "Responsable Proshop";
-    else if (user.id === "member_marina") roleTitle = "Atenció i Reserves";
     else if (user.id === "member_saba") roleTitle = "Comercial / Operacions";
 
     return {

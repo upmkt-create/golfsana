@@ -158,7 +158,6 @@ export default function AllTasksGlobalView({
                                                    user.id === "member_erika" ? "#EF4444" : 
                                                    user.id === "member_ester" ? "#8B5CF6" : 
                                                    user.id === "member_monica" ? "#EC4899" : 
-                                                   user.id === "member_marina" ? "#06B6D4" : 
                                                    user.id === "member_saba" ? "#14B8A6" : "#4B5563",
                                 }}
                                 title={user.name}

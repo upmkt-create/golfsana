@@ -17,6 +17,7 @@ export interface UserProfile {
   departmentIds?: string[]; // Multiple associated departments
   createdAt?: any; // Firestore Timestamp
   accessCode?: string; // Custom access code for non-google auth
+  notes?: string; // Notes internes sobre aquest membre (visibles per l'administrador)
 }
 
 export interface ActivityLog {

@@ -27,6 +27,10 @@ interface MeetingMinutesProps {
   onSaveMinute: (minute: MeetingMinute, isNew: boolean) => Promise<void> | void;
   onDeleteMinute: (id: string) => Promise<void> | void;
   onCreateTaskFromAgreement: (minute: MeetingMinute, agreement: MeetingAgreement, projectId: string) => Promise<void> | void;
+  // Permet obrir directament una acta concreta des de fora del component
+  // (per exemple en clicar una notificació) — abans, clicar una notificació
+  // d'acta només portava a la llista general i calia buscar-la a mà.
+  openMinuteId?: string | null;
 }
 
 const NAVY = "#033b7a";
@@ -61,9 +65,21 @@ export default function MeetingMinutes({
   onSaveMinute,
   onDeleteMinute,
   onCreateTaskFromAgreement,
+  openMinuteId,
 }: MeetingMinutesProps) {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Si arribem aquí des d'una notificació ("openMinuteId"), obrim
+  // directament aquesta acta en lloc de deixar la llista general.
+  React.useEffect(() => {
+    if (openMinuteId) {
+      setIsCreatingNew(false);
+      setEditingId(openMinuteId);
+    }
+  }, [openMinuteId]);
+
+
   // Acord per al qual s'està triant l'espai i el projecte de destinació
   // abans de crear-ne la tasca — evita crear-la "a cegues" al projecte que
   // casualment estigués obert (això feia que la tasca quedés en un espai

@@ -335,7 +335,7 @@ export default function App() {
   const [newWorkspaceDesc, setNewWorkspaceDesc] = useState("");
 
   const [auditLogs, setAuditLogs] = useState<{ id: string; action: string; time: string; user: string }[]>([
-    { id: "1", action: "Plataforma Asana Enterprise Inicialitzada", time: "Fa un moment", user: "Sistema" },
+    { id: "1", action: "Plataforma GolfSana Enterprise Inicialitzada", time: "Fa un moment", user: "Sistema" },
   ]);
 
   const cleanedProjectIdsRef = useRef<Set<string>>(new Set());
@@ -1084,13 +1084,14 @@ export default function App() {
     }
   }, [tasks, selectedTask?.id]);
 
-  const createNotification = async (targetUserId: string, taskId: string, taskTitle: string, messageText: string) => {
+  const createNotification = async (targetUserId: string, taskId: string, taskTitle: string, messageText: string, type: string = "mention") => {
     const newNotif = {
       id: "notif-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
       userId: targetUserId,
       taskId: taskId,
       taskTitle: taskTitle,
       message: messageText,
+      type,
       read: false,
       createdAt: new Date().toISOString()
     };
@@ -1263,7 +1264,7 @@ export default function App() {
         await seedInitialTasks();
         await seedInitialGolfCourses();
 
-        addToast("S'ha restablert correctament la base de dades de l'Asana Enterprise amb els 4 espais de treball actius i els camps de golf.", "success");
+        addToast("S'ha restablert correctament la base de dades de GolfSana Enterprise amb els 4 espais de treball actius i els camps de golf.", "success");
         logEnterpriseAction("Base de dades restablerta de forma integral (incloent camps de golf).");
       } catch (err) {
         addToast("Error restablint dades: " + String(err), "warning");
@@ -1882,6 +1883,11 @@ export default function App() {
     } catch (err) {
       console.warn("[Firestore Write Warning] user notes: saved in client sandbox", err);
     }
+
+    // Avisa al membre que té una nota nova per llegir (no quan s'esborra).
+    if (notes.trim() !== "" && userId !== currentUser?.id) {
+      createNotification(userId, "", "Nota interna", "Tens una nota nova al teu perfil per llegir.", "note");
+    }
   };
 
   // Elimina un usuari completament (per exemple per tornar-lo a crear net
@@ -2128,7 +2134,7 @@ export default function App() {
                 <h1 className="text-sm font-bold text-white tracking-tight leading-4">
                   GolfSana Enterprise
                 </h1>
-                <p className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">Asana & Tariff Monitor</p>
+                <p className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">GolfSana & Tariff Monitor</p>
               </div>
             </div>
             
@@ -2703,7 +2709,7 @@ export default function App() {
                   ? "bg-indigo-600 text-white border-indigo-700 shadow-inner animate-pulse"
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900"
               }`}
-              title="Canvia la densitat i espaiat de les taules i llistes d'Asana (Estàndard vs Compacte)"
+              title="Canvia la densitat i espaiat de les taules i llistes de GolfSana (Estàndard vs Compacte)"
             >
               <LayoutGrid className="w-3 h-3" />
               <span className="hidden sm:inline">{isCompactView ? "Compacte" : "Normal"}</span>
@@ -2896,7 +2902,7 @@ export default function App() {
                         })()}
                       </h2>
                       <p className="text-xs text-blue-100 opacity-90 mt-1 max-w-2xl leading-relaxed">
-                        Benvingut/da al panell de control executiu de Golfasana d'Aro. Tens visió integral de la competència, l'estat de les tasques organitzatives d'Asana i dades d'auditoria de seguretat.
+                        Benvingut/da al panell de control executiu de GolfSana d'Aro. Tens visió integral de la competència, l'estat de les tasques organitzatives de GolfSana i dades d'auditoria de seguretat.
                       </p>
                     </div>
                     <div className="text-right flex flex-col items-end gap-1 bg-blue-950/40 p-3 border border-blue-800 shrink-0 relative">
@@ -3205,7 +3211,7 @@ export default function App() {
                                 <Layers className="w-4 h-4 text-blue-600" />
                                 <span>Selecciona l'Espai de Treball / Departament on vols anar</span>
                               </h3>
-                              <p className="text-[10.5px] text-slate-500 mt-1 font-semibold">Tria un dels següents departaments per accedir a la seva gestió d'Asana de forma individual:</p>
+                              <p className="text-[10.5px] text-slate-500 mt-1 font-semibold">Tria un dels següents departaments per accedir a la seva gestió de GolfSana de forma individual:</p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
@@ -3386,7 +3392,7 @@ export default function App() {
                                   onClick={() => setActiveTab("summary")}
                                   className="w-full text-left p-2 border border-slate-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-slate-50 dark:hover:bg-slate-850 text-xs font-bold transition-all flex items-center justify-between"
                                 >
-                                  <span>Resum de Projectes Actius Asana</span>
+                                  <span>Resum de Projectes Actius</span>
                                   <span className="text-[10px] text-blue-600 dark:text-blue-400">Obrir →</span>
                                 </button>
                                 <button
@@ -3434,7 +3440,7 @@ export default function App() {
                         Tots els Espais de Treball
                       </h2>
                       <p className="text-xs text-slate-500 font-medium">
-                        Selecciona un espai corporatiu per veure el resum de KPI actius i projectes d'Asana.
+                        Selecciona un espai corporatiu per veure el resum de KPI actius i projectes de GolfSana.
                       </p>
                     </div>
                     <button
@@ -3617,7 +3623,7 @@ export default function App() {
                                   <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider font-mono">
                                     Fites i Projectes Actius - {activeWorkspaceObj ? activeWorkspaceObj.name : "Departament"}
                                   </h4>
-                                  <p className="text-[10.5px] text-slate-500 font-semibold mt-0.5">Pla de treball d'Asana segmentat</p>
+                                  <p className="text-[10.5px] text-slate-500 font-semibold mt-0.5">Pla de treball de GolfSana segmentat</p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <span className="text-[9px] bg-blue-50 text-blue-700 px-2 py-1.5 font-bold hidden sm:inline-block font-mono">Dades Sincronitzades</span>
@@ -4160,7 +4166,7 @@ export default function App() {
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider">Polítiques de Seguretat i Auditories</h3>
                     <p className="text-xs text-slate-500 mt-1">
-                      El pla Asana Enterprise garanteix auditories d'operacions, usuaris il·limitats i traçabilitat de procediments.
+                      El pla GolfSana Enterprise garanteix auditories d'operacions, usuaris il·limitats i traçabilitat de procediments.
                     </p>
                   </div>
 
@@ -4208,7 +4214,7 @@ export default function App() {
                     <div className="space-y-1">
                       <h4 className="text-xs font-extrabold text-red-650 uppercase font-mono tracking-wider">Zona d'Administració (Màster Reset)</h4>
                       <p className="text-[10px] text-slate-450 leading-relaxed">
-                        Si tens dades acumulades de proves anteriors a Firestore que utilitzin els departaments antics, pots forçar una sincronització i re-sembrat complet de dades de l'Asana Enterprise amb els 4 nous espais de treball.
+                        Si tens dades acumulades de proves anteriors a Firestore que utilitzin els departaments antics, pots forçar una sincronització i re-sembrat complet de dades de GolfSana Enterprise amb els 4 nous espais de treball.
                       </p>
                     </div>
                     <button
@@ -4280,7 +4286,7 @@ export default function App() {
                       <button
                         onClick={() => setShowActionMenu(!showActionMenu)}
                         className="p-1 px-2.5 border border-slate-200 bg-slate-50 hover:bg-slate-105 text-slate-700 rounded-sm hover:text-slate-900 transition-all flex items-center justify-center font-sans font-semibold text-xs gap-1.5"
-                        title="Més accions d'Asana"
+                        title="Més accions"
                       >
                         <MoreVertical className="w-4 h-4 text-slate-500" />
                         <span>Més accions...</span>
@@ -4297,7 +4303,7 @@ export default function App() {
                               className="absolute right-0 mt-1.5 w-64 bg-white border border-slate-250 shadow-2xl z-50 py-1 rounded-sm font-sans"
                             >
                               <div className="px-3 py-1.5 text-[9.5px] uppercase tracking-wider font-extrabold text-slate-400 border-b border-slate-100">
-                                Accions d'Asana Enterprise
+                                Accions de GolfSana Enterprise
                               </div>
                               <button
                                 type="button"
@@ -4341,7 +4347,7 @@ export default function App() {
                                 type="button"
                                 onClick={() => {
                                   setShowActionMenu(false);
-                                  const tag = prompt("Escriu una etiqueta d'Asana (Ex: Urgent, Màrqueting, Proshop):");
+                                  const tag = prompt("Escriu una etiqueta (Ex: Urgent, Màrqueting, Proshop):");
                                   if (tag && tag.trim()) {
                                     const current = selectedTask.tags || [];
                                     handleUpdateTask(selectedTask.id, { tags: [...current, tag.trim()] });
@@ -4423,7 +4429,7 @@ export default function App() {
                                   setSelectedTask(followTask);
                                   logEnterpriseAction(`Tasca de seguiment asana creada (ID: ${cloneId})`);
                                   saveDoc(doc(db, "tasks", cloneId), followTask).catch(err => console.warn(err));
-                                  alert(`S'ha creat una tasca de seguiment planificada per l'Asana.`);
+                                  alert(`S'ha creat una tasca de seguiment planificada.`);
                                 }}
                                 className="w-full text-left px-3.5 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-slate-700 border-b border-slate-50"
                               >
@@ -4791,7 +4797,7 @@ export default function App() {
                   <div className="grid grid-cols-[130px_1fr] items-center gap-2 py-2 border-b border-slate-100 font-sans text-xs">
                     <span className="text-slate-400 font-medium select-none flex items-center gap-1">
                       <Tag className="w-3.5 h-3.5 text-slate-450" />
-                      <span>Etiquetes Asana</span>
+                      <span>Etiquetes</span>
                     </span>
                     <div className="flex flex-wrap items-center gap-1">
                       {(selectedTask.tags || []).map((tag, idx) => (
@@ -4812,7 +4818,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => {
-                          const res = prompt("Afegir etiqueta d'Asana:");
+                          const res = prompt("Afegir etiqueta:");
                           if (res && res.trim()) {
                             const current = selectedTask.tags || [];
                             handleUpdateTask(selectedTask.id, { tags: [...current, res.trim()] });
@@ -4872,7 +4878,7 @@ export default function App() {
                   <RichTextEditor
                     value={selectedTask.description || ""}
                     onChange={(html) => handleUpdateTask(selectedTask.id, { description: html })}
-                    placeholder="Escriu les instruccions detallades o apunts del procediment d'Asana..."
+                    placeholder="Escriu les instruccions detallades o apunts del procediment..."
                     minHeightClass="min-h-[6rem]"
                   />
                 </div>
@@ -5336,7 +5342,7 @@ export default function App() {
                                 ) : (
                                   <button
                                     type="button"
-                                    onClick={() => alert(`[Sincronitzador Asana] Descarregant l'arxiu integral del PC local: ${att.name}`)}
+                                    onClick={() => alert(`[Sincronitzador GolfSana] Descarregant l'arxiu integral del PC local: ${att.name}`)}
                                     className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-sm transition-colors"
                                     title="Descarregar fitxer local"
                                   >
@@ -5445,7 +5451,7 @@ export default function App() {
             <div className="flex justify-between items-center border-b border-slate-200 pb-2">
               <h3 className="font-extrabold text-sm text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
                 <FolderPlus className="w-4 h-4 text-blue-600" />
-                <span>Crear Nou Projecte Asana</span>
+                <span>Crear Nou Projecte</span>
               </h3>
               <button
                 type="button"

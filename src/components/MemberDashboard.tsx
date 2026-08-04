@@ -28,6 +28,7 @@ import {
   Check,
   User,
   ChevronRight,
+  ChevronLeft,
   Plus,
   FileText
 } from "lucide-react";
@@ -43,7 +44,8 @@ interface MemberDashboardProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onAddTask?: (title: string, projectId: string, assigneeIds: string[], priority: TaskPriority, departmentIds?: string[], dueDate?: string) => Promise<string | void>;
   onSelectTask?: (task: Task) => void;
-  onUpdateUserNotes?: (userId: string, notes: string) => void;
+  onAddUserNote?: (userId: string, content: string) => void;
+  onDeleteUserNote?: (userId: string, noteId: string) => void;
 }
 
 export default function MemberDashboard({
@@ -57,21 +59,22 @@ export default function MemberDashboard({
   onUpdateTask,
   onAddTask,
   onSelectTask,
-  onUpdateUserNotes
+  onAddUserNote,
+  onDeleteUserNote
 }: MemberDashboardProps) {
   // Find member details
   const member = users.find(u => u.id === memberId);
-  const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [notesText, setNotesText] = useState(member?.notes || "");
-  const [confirmingDeleteNotes, setConfirmingDeleteNotes] = useState(false);
-  const saveNotes = () => {
-    if (member) onUpdateUserNotes?.(member.id, notesText);
-    setIsEditingNotes(false);
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [newNoteText, setNewNoteText] = useState("");
+  const [confirmingDeleteNoteId, setConfirmingDeleteNoteId] = useState<string | null>(null);
+  const saveNewNote = () => {
+    if (member && newNoteText.trim()) onAddUserNote?.(member.id, newNoteText);
+    setNewNoteText("");
+    setIsAddingNote(false);
   };
-  const deleteNotes = () => {
-    if (member) onUpdateUserNotes?.(member.id, "");
-    setNotesText("");
-    setConfirmingDeleteNotes(false);
+  const removeNote = (noteId: string) => {
+    if (member) onDeleteUserNote?.(member.id, noteId);
+    setConfirmingDeleteNoteId(null);
   };
   // Arrossegar targetes entre columnes del tauler d'aquest membre
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -157,51 +160,66 @@ export default function MemberDashboard({
   const memberProjectIds = Array.from(new Set(memberTasks.map(t => t.projectId).filter(Boolean)));
   const memberProjects = projects.filter(p => memberProjectIds.includes(p.id));
 
-  // Dates for timeline
-  const timelineDates = [
-    { label: "Juny Setmana 1", key: "06-05" },
-    { label: "Juny Setmana 2", key: "06-12" },
-    { label: "Juny Setmana 3", key: "06-19" },
-    { label: "Juny Setmana 4", key: "06-26" },
-    { label: "Juliol Setmana 1", key: "07-03" },
-    { label: "Juliol Setmana 2", key: "07-10" },
-    { label: "Juliol Setmana 3", key: "07-17" },
-    { label: "Juliol Setmana 4", key: "07-24" },
-  ];
+  // Setmanes del Gantt generades DINÀMICAMENT a partir d'avui (abans era una
+  // llista fixa de juny-juliol 2026, que deixava de mostrar res passat
+  // aquell rang). weekOffset permet navegar 8 setmanes enrere/endavant.
+  const [ganttWeekOffset, setGanttWeekOffset] = useState(0);
+  const MONTH_SHORT_GANTT = ["Gen", "Feb", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Oct", "Nov", "Des"];
+  const startOfWeekGantt = (d: Date): Date => {
+    const nd = new Date(d);
+    const day = nd.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    nd.setDate(nd.getDate() - diff);
+    nd.setHours(0, 0, 0, 0);
+    return nd;
+  };
+  const timelineDates = (() => {
+    const firstWeekStart = startOfWeekGantt(new Date());
+    firstWeekStart.setDate(firstWeekStart.getDate() + ganttWeekOffset * 7);
+    return Array.from({ length: 8 }, (_, i) => {
+      const start = new Date(firstWeekStart);
+      start.setDate(start.getDate() + i * 7);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return {
+        key: `w${i}`,
+        label: `${MONTH_SHORT_GANTT[start.getMonth()]} ${start.getDate()}-${end.getDate()}`,
+        start,
+        end,
+      };
+    });
+  })();
+  const ganttRangeLabel = `${timelineDates[0].start.getDate()} ${MONTH_SHORT_GANTT[timelineDates[0].start.getMonth()]} – ${timelineDates[7].end.getDate()} ${MONTH_SHORT_GANTT[timelineDates[7].end.getMonth()]} ${timelineDates[7].end.getFullYear()}`;
 
-  // Map task due dates to Gantt chart column indices
-  const getTimelinePosition = (dueDateStr: string): { startCol: number; span: number; color: string } => {
-    let color = "from-blue-500 to-indigo-600";
-    if (!dueDateStr) return { startCol: 1, span: 1, color };
-
-    try {
-      const parts = dueDateStr.split("-");
-      if (parts.length < 3) return { startCol: 2, span: 2, color };
-      
-      const month = parseInt(parts[1], 10);
-      const day = parseInt(parts[2], 10);
-
-      let startCol = 1;
-      
-      if (month === 6) {
-        if (day <= 7) startCol = 1;
-        else if (day <= 14) startCol = 2;
-        else if (day <= 21) startCol = 3;
-        else startCol = 4;
-      } else if (month === 7) {
-        if (day <= 7) startCol = 5;
-        else if (day <= 14) startCol = 6;
-        else if (day <= 21) startCol = 7;
-        else startCol = 8;
-      } else {
-        startCol = 4;
-      }
-
-      const span = Math.min(3, 9 - startCol);
-      return { startCol, span, color };
-    } catch {
-      return { startCol: 3, span: 2, color };
+  // Ordenació de les tasques del Gantt per data d'inici o de venciment
+  const [ganttSortField, setGanttSortField] = useState<"startDate" | "dueDate">("dueDate");
+  const [ganttSortDirection, setGanttSortDirection] = useState<"asc" | "desc">("asc");
+  const handleGanttSortClick = (field: "startDate" | "dueDate") => {
+    if (ganttSortField === field) {
+      setGanttSortDirection(prev => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setGanttSortField(field);
+      setGanttSortDirection("asc");
     }
+  };
+  const sortedGanttTasks = [...memberTasks].sort((a, b) => {
+    const rawA = ganttSortField === "dueDate" ? a.dueDate : (a.startDate || a.dueDate);
+    const rawB = ganttSortField === "dueDate" ? b.dueDate : (b.startDate || b.dueDate);
+    const cmp = (rawA || "").localeCompare(rawB || "");
+    return ganttSortDirection === "asc" ? cmp : -cmp;
+  });
+
+  // Map task due dates to Gantt chart column indices — ara busca dins de
+  // les 8 setmanes dinàmiques generades més amunt, en lloc de mesos fixos.
+  const getTimelinePosition = (dueDateStr: string): { startCol: number; span: number; color: string } | null => {
+    const color = "from-blue-500 to-indigo-600";
+    if (!dueDateStr) return null;
+    const parts = dueDateStr.split("-").map(Number);
+    if (parts.length < 3 || parts.some(isNaN)) return null;
+    const dueDate = new Date(parts[0], parts[1] - 1, parts[2]);
+    const weekIdx = timelineDates.findIndex(w => dueDate >= w.start && dueDate <= w.end);
+    if (weekIdx === -1) return null; // fora del rang de 8 setmanes visible
+    return { startCol: weekIdx + 1, span: 1, color };
   };
 
   const getPriorityBadgeClass = (priority: TaskPriority) => {
@@ -349,67 +367,75 @@ export default function MemberDashboard({
         );
       })()}
 
-      {/* Notes internes sobre aquest membre */}
+      {/* Notes internes sobre aquest membre — se'n poden afegir vàries */}
       <div className="bg-white border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
           <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
             <FileText className="w-4 h-4 text-slate-400" />
-            Notes sobre {member?.name || "aquest membre"}
+            Notes sobre {member?.name || "aquest membre"} {member?.notesList && member.notesList.length > 0 ? `(${member.notesList.length})` : ""}
           </span>
-          {!isEditingNotes && (
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => { setNotesText(member?.notes || ""); setIsEditingNotes(true); }}
-                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
-              >
-                {member?.notes ? "Editar" : "Afegir nota"}
-              </button>
-              {member?.notes && !confirmingDeleteNotes && (
-                <button
-                  onClick={() => setConfirmingDeleteNotes(true)}
-                  className="text-[11px] font-bold text-slate-400 hover:text-rose-600"
-                >
-                  Eliminar
-                </button>
-              )}
-              {confirmingDeleteNotes && (
-                <span className="flex items-center gap-1.5">
-                  <span className="text-[10.5px] text-rose-600 font-semibold">Segur?</span>
-                  <button onClick={deleteNotes} className="text-[11px] font-bold text-rose-600 hover:text-rose-800">Sí</button>
-                  <button onClick={() => setConfirmingDeleteNotes(false)} className="text-[11px] font-bold text-slate-500 hover:text-slate-700">No</button>
-                </span>
-              )}
-            </div>
+          {!isAddingNote && (
+            <button
+              onClick={() => { setNewNoteText(""); setIsAddingNote(true); }}
+              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
+            >
+              + Afegir nota
+            </button>
           )}
         </div>
-        <div className="p-4">
-          {isEditingNotes ? (
-            <div className="space-y-2">
+        <div className="p-4 space-y-3">
+          {isAddingNote && (
+            <div className="space-y-2 pb-3 border-b border-slate-100">
               <RichTextEditor
-                value={notesText}
-                onChange={setNotesText}
+                value={newNoteText}
+                onChange={setNewNoteText}
                 placeholder="Notes internes: rendiment, converses, seguiment, incidències..."
-                minHeightClass="min-h-[100px]"
+                minHeightClass="min-h-[80px]"
               />
               <div className="flex justify-end gap-1.5">
                 <button
-                  onClick={() => { setNotesText(member?.notes || ""); setIsEditingNotes(false); }}
+                  onClick={() => { setNewNoteText(""); setIsAddingNote(false); }}
                   className="px-2.5 py-1 border text-[10.5px] font-bold text-slate-600 hover:bg-slate-50"
                 >
                   Cancel·lar
                 </button>
                 <button
-                  onClick={saveNotes}
+                  onClick={saveNewNote}
                   className="px-3 py-1 bg-indigo-600 text-white text-[10.5px] font-bold hover:bg-indigo-700"
                 >
-                  Desar
+                  Desar nota
                 </button>
               </div>
             </div>
-          ) : member?.notes ? (
-            <div className="text-xs text-slate-600 leading-relaxed rte-content" dangerouslySetInnerHTML={{ __html: member.notes }} />
+          )}
+
+          {!member?.notesList || member.notesList.length === 0 ? (
+            !isAddingNote && <p className="text-xs text-slate-400 italic">Encara no hi ha cap nota per aquest membre.</p>
           ) : (
-            <p className="text-xs text-slate-400 italic">Encara no hi ha cap nota per aquest membre.</p>
+            [...member.notesList].reverse().map((note) => (
+              <div key={note.id} className="border border-slate-100 bg-slate-50/40 p-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {new Date(note.createdAt).toLocaleString('ca-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {confirmingDeleteNoteId === note.id ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-rose-600 font-semibold">Segur?</span>
+                      <button onClick={() => removeNote(note.id)} className="text-[10.5px] font-bold text-rose-600 hover:text-rose-800">Sí</button>
+                      <button onClick={() => setConfirmingDeleteNoteId(null)} className="text-[10.5px] font-bold text-slate-500 hover:text-slate-700">No</button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmingDeleteNoteId(note.id)}
+                      className="text-[10.5px] font-bold text-slate-400 hover:text-rose-600"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+                <div className="text-xs text-slate-600 leading-relaxed rte-content" dangerouslySetInnerHTML={{ __html: note.content }} />
+              </div>
+            ))
           )}
         </div>
       </div>
@@ -988,21 +1014,52 @@ export default function MemberDashboard({
                 <span>Cronograma Personal ({member.name})</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Visualització de GolfSana Gantt individual pels terminis establerts a l'agenda d'aquest col·laborador.
+                Planificació per les 8 properes setmanes: {ganttRangeLabel}.
               </p>
             </div>
-            <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
-              <div className="flex items-center gap-1.5 font-mono">
-                <div className="w-2.5 h-2.5 bg-rose-500"></div>
-                <span>Alta Prioritat</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <button onClick={() => setGanttWeekOffset(o => o - 8)} className="p-1 border border-slate-200 hover:bg-slate-50" title="8 setmanes enrere">
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setGanttWeekOffset(0)}
+                  disabled={ganttWeekOffset === 0}
+                  className="text-[10px] font-bold px-2 py-1 border border-slate-200 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Avui
+                </button>
+                <button onClick={() => setGanttWeekOffset(o => o + 8)} className="p-1 border border-slate-200 hover:bg-slate-50" title="8 setmanes endavant">
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <div className="flex items-center gap-1.5 font-mono">
-                <div className="w-2.5 h-2.5 bg-amber-500"></div>
-                <span>Mitjana</span>
+              <div className="flex items-center border border-slate-200 overflow-hidden text-[10px] font-bold">
+                <button
+                  onClick={() => handleGanttSortClick("startDate")}
+                  className={`px-2 py-1 transition-colors ${ganttSortField === "startDate" ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                >
+                  Data d'inici {ganttSortField === "startDate" ? (ganttSortDirection === "asc" ? "↑" : "↓") : "↕"}
+                </button>
+                <button
+                  onClick={() => handleGanttSortClick("dueDate")}
+                  className={`px-2 py-1 border-l border-slate-200 transition-colors ${ganttSortField === "dueDate" ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+                >
+                  Data de venciment {ganttSortField === "dueDate" ? (ganttSortDirection === "asc" ? "↑" : "↓") : "↕"}
+                </button>
               </div>
-              <div className="flex items-center gap-1.5 font-mono">
-                <div className="w-2.5 h-2.5 bg-emerald-500"></div>
-                <span>Baixa</span>
+              <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
+                <div className="flex items-center gap-1.5 font-mono">
+                  <div className="w-2.5 h-2.5 bg-rose-500"></div>
+                  <span>Alta Prioritat</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono">
+                  <div className="w-2.5 h-2.5 bg-amber-500"></div>
+                  <span>Mitjana</span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono">
+                  <div className="w-2.5 h-2.5 bg-emerald-500"></div>
+                  <span>Baixa</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1012,8 +1069,17 @@ export default function MemberDashboard({
               <AlertTriangle className="w-6 h-6 mx-auto text-slate-350 mb-2" />
               <span>No hi ha tasques assignades a aquest membre del grup per poder graficar.</span>
             </div>
-          ) : (
+          ) : (() => {
+            const visibleGanttTasks = sortedGanttTasks.filter(t => getTimelinePosition(t.dueDate) !== null);
+            const outOfRangeGanttCount = sortedGanttTasks.length - visibleGanttTasks.length;
+            return (
             <div className="overflow-x-auto">
+              {outOfRangeGanttCount > 0 && (
+                <div className="mb-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{outOfRangeGanttCount} tasca{outOfRangeGanttCount > 1 ? "ques" : ""} amb venciment fora d'aquest rang de 8 setmanes — navega amb les fletxes per veure-les.</span>
+                </div>
+              )}
               <div className="min-w-[850px]">
                 {/* Headers */}
                 <div className="grid grid-cols-12 gap-1 border-b border-slate-200 pb-3 mb-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
@@ -1027,8 +1093,10 @@ export default function MemberDashboard({
 
                 {/* List of Tasks represented as Gantt Bars */}
                 <div className="space-y-3">
-                  {memberTasks.map((task) => {
-                    const { startCol, span } = getTimelinePosition(task.dueDate);
+                  {visibleGanttTasks.map((task) => {
+                    const pos = getTimelinePosition(task.dueDate);
+                    if (!pos) return null;
+                    const { startCol, span } = pos;
                     
                     // Colors
                     const barColor = task.priority === "urgent"
@@ -1072,7 +1140,8 @@ export default function MemberDashboard({
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       )}
 

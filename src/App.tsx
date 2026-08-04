@@ -296,6 +296,10 @@ export default function App() {
     }
   });
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
+  // ID de l'acta a obrir directament quan s'arriba des d'una notificació
+  // (abans, clicar la notificació d'una acta només portava a la llista
+  // general i calia buscar-la a mà entre totes).
+  const [openMinuteId, setOpenMinuteId] = useState<string | null>(null);
 
   // Reusable React-driven confirmation state to bypass iframe popup constraints
   const [confirmModal, setConfirmModal] = useState<{
@@ -2985,15 +2989,28 @@ export default function App() {
                                         <div 
                                           key={n.id} 
                                           onClick={() => {
-                                            // Si la notificació és d'una acta de reunió,
-                                            // portar a la pestanya Acta de Reunió.
-                                            const minuteObj = meetingMinutes.find(m => m.id === n.taskId);
-                                            if (minuteObj) {
-                                              setActiveTab("minutes");
+                                            // Marquem la notificació com a llegida en clicar-la
+                                            if (!n.read) {
+                                              const updatedNotifs = notifications.map(x => x.id === n.id ? { ...x, read: true } : x);
+                                              setNotifications(updatedNotifs);
+                                              saveDoc(doc(db, "notifications", n.id), { read: true }, { merge: true }).catch(() => {});
+                                            }
+
+                                            if (n.type === "note") {
+                                              // Nota interna: obrim el propi Dashboard de membre
+                                              setFilterAssigneeId(currentUser.id);
                                             } else {
-                                              const taskObj = tasks.find(t => t.id === n.taskId);
-                                              if (taskObj) {
-                                                setSelectedTask(taskObj);
+                                              // Si la notificació és d'una acta de reunió, obrim
+                                              // directament aquella acta concreta (no només la llista).
+                                              const minuteObj = meetingMinutes.find(m => m.id === n.taskId);
+                                              if (minuteObj) {
+                                                setActiveTab("minutes");
+                                                setOpenMinuteId(n.taskId);
+                                              } else {
+                                                const taskObj = tasks.find(t => t.id === n.taskId);
+                                                if (taskObj) {
+                                                  setSelectedTask(taskObj);
+                                                }
                                               }
                                             }
                                             setShowNotificationsDropdown(false);
@@ -4179,6 +4196,7 @@ export default function App() {
                   onSaveMinute={handleSaveMinute}
                   onDeleteMinute={handleDeleteMinute}
                   onCreateTaskFromAgreement={handleCreateTaskFromAgreement}
+                  openMinuteId={openMinuteId}
                 />
               )}
 

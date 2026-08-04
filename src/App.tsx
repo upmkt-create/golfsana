@@ -4124,6 +4124,7 @@ export default function App() {
                   tasks={visibleTasks}
                   users={users}
                   projects={projects}
+                  workspaces={workspaces}
                   defaultDepartmentId="all"
                 />
               )}

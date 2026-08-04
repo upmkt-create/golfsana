@@ -223,7 +223,7 @@ const COURSE_MODELS: Record<string, CourseRateModel> = {
         { tariff: "GF 18 - All You Can Play", price: 69, originalPrice: 107, discountPct: 36 },
       ] },
       { start: "18:39", end: "19:15", rates: [
-        { tariff: "GF 9 - Twilight", price: 52, originalPrice: 107, discountPct: 51 },
+        { tariff: "GF 18 - Twilight", price: 52, originalPrice: 107, discountPct: 51 },
       ] },
     ],
   },

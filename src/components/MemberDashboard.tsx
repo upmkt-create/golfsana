@@ -190,6 +190,9 @@ export default function MemberDashboard({
     });
   })();
   const ganttRangeLabel = `${timelineDates[0].start.getDate()} ${MONTH_SHORT_GANTT[timelineDates[0].start.getMonth()]} – ${timelineDates[7].end.getDate()} ${MONTH_SHORT_GANTT[timelineDates[7].end.getMonth()]} ${timelineDates[7].end.getFullYear()}`;
+  const ganttMonthsInRangeLabel = Array.from(
+    new Set(timelineDates.map(w => `${MONTH_SHORT_GANTT[w.start.getMonth()]} ${w.start.getFullYear()}`))
+  ).join(", ");
 
   // Ordenació de les tasques del Gantt per data d'inici o de venciment
   const [ganttSortField, setGanttSortField] = useState<"startDate" | "dueDate">("dueDate");
@@ -1014,7 +1017,7 @@ export default function MemberDashboard({
                 <span>Cronograma Personal ({member.name})</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Planificació per les 8 properes setmanes: {ganttRangeLabel}.
+                Planificació per les 8 properes setmanes: {ganttRangeLabel} (inclou: {ganttMonthsInRangeLabel}).
               </p>
             </div>
             <div className="flex items-center gap-3">

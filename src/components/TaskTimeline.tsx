@@ -57,6 +57,13 @@ export default function TaskTimeline({
   }, [weekOffset]);
 
   const rangeLabel = `${timelineWeeks[0].start.getDate()} ${MONTH_SHORT[timelineWeeks[0].start.getMonth()]} – ${timelineWeeks[7].end.getDate()} ${MONTH_SHORT[timelineWeeks[7].end.getMonth()]} ${timelineWeeks[7].end.getFullYear()}`;
+  // Llista explícita de tots els mesos inclosos al rang de 8 setmanes —
+  // el resum de dalt (per exemple "28 Set – 22 Nov") pot donar la
+  // impressió que es salta algun mes pel mig, encara que les columnes de
+  // sota ja el mostrin correctament; això ho deixa clar sense ambigüitat.
+  const monthsInRangeLabel = Array.from(
+    new Set(timelineWeeks.map(w => `${MONTH_SHORT[w.start.getMonth()]} ${w.start.getFullYear()}`))
+  ).join(", ");
 
   // Filter tasks to active scope
   const scopedTasks = tasks.filter(task => {
@@ -117,7 +124,7 @@ export default function TaskTimeline({
             <span>Cronograma de Projecte (Gantt)</span>
           </h3>
           <p className="text-xs text-slate-500 mt-1">
-            Planificació visual per les 8 properes setmanes: {rangeLabel}.
+            Planificació visual per les 8 properes setmanes: {rangeLabel} (inclou: {monthsInRangeLabel}).
           </p>
         </div>
         <div className="flex items-center gap-3">

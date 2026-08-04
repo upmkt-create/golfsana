@@ -35,18 +35,30 @@ import {
   Pie,
   Cell
 } from "recharts";
-import { Task, UserProfile, Project } from "../types";
+import { Task, UserProfile, Project, Workspace } from "../types";
 import { DEPARTMENTS } from "../data";
 
 interface ReportsDashboardProps {
   tasks: Task[];
   users: UserProfile[];
   projects: Project[];
+  workspaces: Workspace[];
   defaultDepartmentId?: string;
 }
 
-export default function ReportsDashboard({ tasks, users, projects, defaultDepartmentId = "all" }: ReportsDashboardProps) {
+export default function ReportsDashboard({ tasks, users, projects, workspaces, defaultDepartmentId = "all" }: ReportsDashboardProps) {
   // 1. Interactive States
+
+  // Combina els departaments objectiu fixos (retrocompatibilitat amb
+  // tasques antigues) amb tots els espais de treball reals i dinàmics
+  // (Direcció, RRHH, Rapport...), perquè els informes no en deixin cap
+  // fora — abans només es podien filtrar els 3 departaments originals.
+  const reportDeptOptions = [
+    ...DEPARTMENTS.map((d) => ({ id: d.id, name: d.name, description: d.description })),
+    ...workspaces
+      .filter((ws) => !DEPARTMENTS.some((d) => d.id === ws.id))
+      .map((ws) => ({ id: ws.id, name: ws.name, description: ws.description || `Espai de treball ${ws.name}` })),
+  ];
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>(defaultDepartmentId);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [showBusinessTips, setShowBusinessTips] = useState<boolean>(true);
@@ -258,7 +270,7 @@ export default function ReportsDashboard({ tasks, users, projects, defaultDepart
             >
               Tots els Departaments
             </button>
-            {DEPARTMENTS.map((dept) => (
+            {reportDeptOptions.map((dept) => (
               <button
                 key={dept.id}
                 onClick={() => setSelectedDepartmentId(dept.id)}
@@ -310,12 +322,12 @@ export default function ReportsDashboard({ tasks, users, projects, defaultDepart
             <div className="text-sm font-extrabold text-slate-800 mt-1">
               {selectedDepartmentId === "all" 
                 ? "Resum Corporatiu Global" 
-                : DEPARTMENTS.find(d => d.id === selectedDepartmentId)?.name}
+                : reportDeptOptions.find(d => d.id === selectedDepartmentId)?.name}
             </div>
             <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug">
               {selectedDepartmentId === "all" 
                 ? "S'estan unint els registres de totes les divisions administratives en temps real."
-                : DEPARTMENTS.find(d => d.id === selectedDepartmentId)?.description}
+                : reportDeptOptions.find(d => d.id === selectedDepartmentId)?.description}
             </p>
           </div>
 

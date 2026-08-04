@@ -1,4 +1,5 @@
 import { GolfCourse, UserProfile, Workspace, Project, Task } from "./types";
+import { getCompetitorTeeTimes } from "./competitorRates";
 
 export const STARTER_GOLF_CORES: Omit<GolfCourse, "id">[] = [
   {
@@ -828,170 +829,71 @@ export function isAllowedTariff(courseName: string, tariffName: string): boolean
   return false;
 }
 
-export function getRealWorldCompetitorPrices(courseName: string, isWeekend: boolean) {
-  const normalized = courseName.toLowerCase().trim();
+// Claus horàries usades pels resums/gràfics del comparador (mateixos trams
+// que HOUR_RANGES a GolfAdminDashboard.tsx — es dupliquen aquí com a simples
+// strings per no crear una dependència circular entre els dos fitxers).
+const SUMMARY_HOUR_KEYS = [
+  "07:00-08:00", "08:00-12:00", "12:00-13:00", "13:00-14:00",
+  "14:00-15:00", "15:00-16:00", "16:00-21:00",
+];
 
-  if (normalized.includes("camiral") || normalized.includes("pga")) {
-    return {
-      greenFeeHigh: isWeekend ? 215 : 195,
-      greenFeeLow: isWeekend ? 139 : 125,
-      buggyRental: 55,
-      clubRental: 65,
-      hourlyRates: {
-        "07:00-08:00": isWeekend ? 191.5 : 170,
-        "08:00-12:00": isWeekend ? 215 : 195,
-        "12:00-13:00": isWeekend ? 215 : 195,
-        "13:00-14:00": isWeekend ? 215 : 195,
-        "14:00-15:00": isWeekend ? 215 : 195,
-        "15:00-16:00": isWeekend ? 191.5 : 170,
-        "16:00-21:00": isWeekend ? 139 : 125
-      },
-      hourlyTariffs: {
-        "07:00-08:00": "Stadium Course",
-        "08:00-12:00": "Stadium Course",
-        "12:00-13:00": "Stadium Course",
-        "13:00-14:00": "Stadium Course",
-        "14:00-15:00": "Stadium Course",
-        "15:00-16:00": "Stadium Course",
-        "16:00-21:00": "Stadium Course"
-      }
-    };
-  }
-
-  if (normalized.includes("pals")) {
-    return {
-      greenFeeHigh: isWeekend ? 125 : 115,
-      greenFeeLow: isWeekend ? 80 : 75,
-      buggyRental: 48,
-      clubRental: 45,
-      hourlyRates: {
-        "07:00-08:00": isWeekend ? 100 : 90,
-        "08:00-12:00": isWeekend ? 125 : 115,
-        "12:00-13:00": isWeekend ? 115 : 105,
-        "13:00-14:00": isWeekend ? 105 : 95,
-        "14:00-15:00": isWeekend ? 95 : 85,
-        "15:00-16:00": isWeekend ? 90 : 80,
-        "16:00-21:00": isWeekend ? 80 : 75
-      },
-      hourlyTariffs: {
-        "07:00-08:00": "PALS - 18 HOYOS ADULTO",
-        "08:00-12:00": "PALS - 18 HOYOS ADULTO",
-        "12:00-13:00": "PALS - 18 HOYOS ADULTO",
-        "13:00-14:00": "PALS - 18 HOYOS ADULTO",
-        "14:00-15:00": "PALS - 18 HOYOS ADULTO",
-        "15:00-16:00": "PALS - 18 HOYOS ADULTO",
-        "16:00-21:00": "PALS - 18 HOYOS ADULTO"
-      }
-    };
-  }
-
-  if (normalized.includes("empord") || normalized.includes("gualta")) {
-    return {
-      greenFeeHigh: isWeekend ? 110 : 100,
-      greenFeeLow: isWeekend ? 70 : 65,
-      buggyRental: 45,
-      clubRental: 40,
-      hourlyRates: {
-        "07:00-08:00": isWeekend ? 90 : 80,
-        "08:00-12:00": isWeekend ? 110 : 100,
-        "12:00-13:00": isWeekend ? 100 : 90,
-        "13:00-14:00": isWeekend ? 95 : 85,
-        "14:00-15:00": isWeekend ? 88 : 80,
-        "15:00-16:00": isWeekend ? 82 : 75,
-        "16:00-21:00": isWeekend ? 70 : 65
-      },
-      hourlyTariffs: {
-        "07:00-08:00": "GF 18 HOLES FOREST",
-        "08:00-12:00": "GF 18 HOLES FOREST",
-        "12:00-13:00": "GF 18 HOLES FOREST",
-        "13:00-14:00": "GF 18 HOLES FOREST",
-        "14:00-15:00": "GF 18 HOLES FOREST",
-        "15:00-16:00": "GF 18 HOLES FOREST",
-        "16:00-21:00": "GF 18 HOLES FOREST"
-      }
-    };
-  }
-
-  if (normalized.includes("costa brava")) {
-    return {
-      greenFeeHigh: isWeekend ? 105 : 95,
-      greenFeeLow: isWeekend ? 70 : 65,
-      buggyRental: 42,
-      clubRental: 40,
-      hourlyRates: {
-        "07:00-08:00": isWeekend ? 85 : 75,
-        "08:00-12:00": isWeekend ? 105 : 95,
-        "12:00-13:00": isWeekend ? 98 : 88,
-        "13:00-14:00": isWeekend ? 92 : 82,
-        "14:00-15:00": isWeekend ? 85 : 75,
-        "15:00-16:00": isWeekend ? 80 : 70,
-        "16:00-21:00": isWeekend ? 70 : 65
-      },
-      hourlyTariffs: {
-        "07:00-08:00": "18 holes",
-        "08:00-12:00": "18 holes",
-        "12:00-13:00": "18 holes",
-        "13:00-14:00": "18 holes",
-        "14:00-15:00": "18 holes",
-        "15:00-16:00": "18 holes Sun Hour",
-        "16:00-21:00": "18 holes Sun Hour"
-      }
-    };
-  }
-
-  if (normalized.includes("torremirona")) {
-    return {
-      greenFeeHigh: isWeekend ? 107 : 97,
-      greenFeeLow: isWeekend ? 82 : 75,
-      buggyRental: 42,
-      clubRental: 38,
-      hourlyRates: {
-        "07:00-08:00": isWeekend ? 83 : 75,
-        "08:00-12:00": isWeekend ? 107 : 97,
-        "12:00-13:00": isWeekend ? 81 : 75,
-        "13:00-14:00": isWeekend ? 81 : 75,
-        "14:00-15:00": isWeekend ? 81 : 75,
-        "15:00-16:00": isWeekend ? 81 : 75,
-        "16:00-21:00": isWeekend ? 81 : 75
-      },
-      hourlyTariffs: {
-        "07:00-08:00": "GF 18 Earlybird",
-        "08:00-12:00": "GF 18 Forats",
-        "12:00-13:00": "GF 18 - 4 jugadors",
-        "13:00-14:00": "GF 18 - Summer fee",
-        "14:00-15:00": "GF 18- Twilight",
-        "15:00-16:00": "GF 18 - all You can Play",
-        "16:00-21:00": "GF 18- Twilight"
-      }
-    };
-  }
-
-  if (normalized.includes("perelada")) {
-    return {
-      greenFeeHigh: isWeekend ? 120 : 110,
-      greenFeeLow: isWeekend ? 80 : 75,
-      buggyRental: 45,
-      clubRental: 40,
-      hourlyRates: {
-        "07:00-08:00": isWeekend ? 95 : 85,
-        "08:00-12:00": isWeekend ? 120 : 110,
-        "12:00-13:00": isWeekend ? 105 : 95,
-        "13:00-14:00": isWeekend ? 98 : 88,
-        "14:00-15:00": isWeekend ? 90 : 80,
-        "15:00-16:00": isWeekend ? 85 : 75,
-        "16:00-21:00": isWeekend ? 80 : 75
-      },
-      hourlyTariffs: {
-        "07:00-08:00": "GREEN FEE 18 Hoyos",
-        "08:00-12:00": "GREEN FEE 18 Hoyos",
-        "12:00-13:00": "GREEN FEE 18 Hoyos",
-        "13:00-14:00": "GREEN FEE 18 Hoyos",
-        "14:00-15:00": "GREEN FEE 18 Hoyos",
-        "15:00-16:00": "GREEN FEE 18 Hoyos",
-        "16:00-21:00": "GREEN FEE 18 Hoyos"
-      }
-    };
-  }
-
-  return null;
+// Genera una data representativa (proper dissabte o proper dimarts a partir
+// d'avui) per poder consultar el model real amb un booleà "és cap de
+// setmana", que és com ho criden encara els resums/gràfics existents.
+function representativeDate(isWeekend: boolean): string {
+  const today = new Date();
+  const targetDay = isWeekend ? 6 : 2; // dissabte : dimarts
+  const diff = (targetDay - today.getDay() + 7) % 7;
+  const d = new Date(today);
+  d.setDate(d.getDate() + diff);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
+
+/**
+ * Preus reals d'un competidor per als resums/gràfics del comparador —
+ * abans eren taules de preus fixes escrites directament aquí (que es
+ * desincronitzaven de la font real amb el temps); ara es calculen a partir
+ * del mateix model verificat que ja fa servir la vista principal, perquè
+ * hi hagi una sola font de veritat arreu de l'aplicació.
+ */
+export function getRealWorldCompetitorPrices(courseName: string, isWeekend: boolean) {
+  const dateStr = representativeDate(isWeekend);
+  const teeTimes = getCompetitorTeeTimes(courseName, dateStr);
+  if (teeTimes.length === 0) return null;
+
+  const findRateAt = (hourKey: string) => {
+    const [sh, sm] = hourKey.split("-")[0].split(":").map(Number);
+    const targetMin = sh * 60 + sm;
+    let best: (typeof teeTimes)[number] | null = null;
+    for (const tt of teeTimes) {
+      if (tt.minutes <= targetMin && (!best || tt.minutes > best.minutes)) best = tt;
+    }
+    return best;
+  };
+
+  const hourlyRates: Record<string, number> = {};
+  const hourlyTariffs: Record<string, string> = {};
+  SUMMARY_HOUR_KEYS.forEach((key) => {
+    const rate = findRateAt(key);
+    if (rate && rate.rates[0]) {
+      hourlyRates[key] = rate.rates[0].price;
+      hourlyTariffs[key] = rate.rates[0].tariff;
+    }
+  });
+
+  const allPrices = teeTimes.flatMap((tt) => tt.rates.map((r) => r.price));
+  if (allPrices.length === 0) return null;
+
+  return {
+    greenFeeHigh: Math.max(...allPrices),
+    greenFeeLow: Math.min(...allPrices),
+    buggyRental: 45,
+    clubRental: 40,
+    hourlyRates,
+    hourlyTariffs,
+  };
+}
+

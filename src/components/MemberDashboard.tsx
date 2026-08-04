@@ -27,7 +27,8 @@ import {
   Check,
   User,
   ChevronRight,
-  Plus
+  Plus,
+  FileText
 } from "lucide-react";
 
 interface MemberDashboardProps {
@@ -41,6 +42,7 @@ interface MemberDashboardProps {
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onAddTask?: (title: string, projectId: string, assigneeIds: string[], priority: TaskPriority, departmentIds?: string[], dueDate?: string) => Promise<string | void>;
   onSelectTask?: (task: Task) => void;
+  onUpdateUserNotes?: (userId: string, notes: string) => void;
 }
 
 export default function MemberDashboard({
@@ -53,10 +55,17 @@ export default function MemberDashboard({
   onUpdateTaskStatus,
   onUpdateTask,
   onAddTask,
-  onSelectTask
+  onSelectTask,
+  onUpdateUserNotes
 }: MemberDashboardProps) {
   // Find member details
   const member = users.find(u => u.id === memberId);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [notesText, setNotesText] = useState(member?.notes || "");
+  const saveNotes = () => {
+    if (member) onUpdateUserNotes?.(member.id, notesText);
+    setIsEditingNotes(false);
+  };
   
   // Tabs "tasques" | "projectes" | "cronograma" | "calendari"
   const [activeTab, setActiveTab] = useState<"tasques" | "projectes" | "cronograma" | "calendari">("tasques");
@@ -322,6 +331,55 @@ export default function MemberDashboard({
           </div>
         );
       })()}
+
+      {/* Notes internes sobre aquest membre */}
+      <div className="bg-white border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
+          <span className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+            <FileText className="w-4 h-4 text-slate-400" />
+            Notes sobre {member?.name || "aquest membre"}
+          </span>
+          {!isEditingNotes && (
+            <button
+              onClick={() => { setNotesText(member?.notes || ""); setIsEditingNotes(true); }}
+              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
+            >
+              {member?.notes ? "Editar" : "Afegir nota"}
+            </button>
+          )}
+        </div>
+        <div className="p-4">
+          {isEditingNotes ? (
+            <div className="space-y-2">
+              <textarea
+                autoFocus
+                value={notesText}
+                onChange={(e) => setNotesText(e.target.value)}
+                placeholder="Notes internes: rendiment, converses, seguiment, incidències..."
+                className="w-full min-h-[100px] text-xs border border-slate-200 rounded-none p-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              />
+              <div className="flex justify-end gap-1.5">
+                <button
+                  onClick={() => { setNotesText(member?.notes || ""); setIsEditingNotes(false); }}
+                  className="px-2.5 py-1 border text-[10.5px] font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel·lar
+                </button>
+                <button
+                  onClick={saveNotes}
+                  className="px-3 py-1 bg-indigo-600 text-white text-[10.5px] font-bold hover:bg-indigo-700"
+                >
+                  Desar
+                </button>
+              </div>
+            </div>
+          ) : member?.notes ? (
+            <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">{member.notes}</p>
+          ) : (
+            <p className="text-xs text-slate-400 italic">Encara no hi ha cap nota per aquest membre.</p>
+          )}
+        </div>
+      </div>
 
       {/* TABS SELECTOR (TASQUES | PROJECTES | CRONOGRAMA) */}
       <div className="border-b border-slate-200 bg-white p-1 flex items-center gap-1">

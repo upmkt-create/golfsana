@@ -74,8 +74,27 @@ export default function TaskTimeline({
     return timelineWeeks.findIndex(w => dueDate >= w.start && dueDate <= w.end);
   };
 
-  const visibleTasks = scopedTasks.filter(t => getWeekIndex(t.dueDate) !== -1);
-  const outOfRangeCount = scopedTasks.length - visibleTasks.length;
+  const visibleTasksUnsorted = scopedTasks.filter(t => getWeekIndex(t.dueDate) !== -1);
+  const outOfRangeCount = scopedTasks.length - visibleTasksUnsorted.length;
+
+  // Ordenació per data d'inici o de finalització — abans les tasques
+  // sortien sempre en l'ordre en què venien, sense cap control.
+  const [sortField, setSortField] = useState<"startDate" | "dueDate">("dueDate");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const handleSortClick = (field: "startDate" | "dueDate") => {
+    if (sortField === field) {
+      setSortDirection(prev => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+  const visibleTasks = [...visibleTasksUnsorted].sort((a, b) => {
+    const rawA = sortField === "dueDate" ? a.dueDate : (a.startDate || a.dueDate);
+    const rawB = sortField === "dueDate" ? b.dueDate : (b.startDate || b.dueDate);
+    const cmp = (rawA || "").localeCompare(rawB || "");
+    return sortDirection === "asc" ? cmp : -cmp;
+  });
 
   const getPriorityGradient = (p: string) => {
     switch (p) {
@@ -115,6 +134,20 @@ export default function TaskTimeline({
             </button>
             <button onClick={() => setWeekOffset(o => o + 8)} className="p-1 border border-slate-200 hover:bg-slate-50" title="8 setmanes endavant">
               <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="flex items-center border border-slate-200 overflow-hidden text-[10px] font-bold">
+            <button
+              onClick={() => handleSortClick("startDate")}
+              className={`px-2 py-1 transition-colors ${sortField === "startDate" ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+            >
+              Data d'inici {sortField === "startDate" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
+            </button>
+            <button
+              onClick={() => handleSortClick("dueDate")}
+              className={`px-2 py-1 border-l border-slate-200 transition-colors ${sortField === "dueDate" ? "bg-blue-600 text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
+            >
+              Data de venciment {sortField === "dueDate" ? (sortDirection === "asc" ? "↑" : "↓") : "↕"}
             </button>
           </div>
           <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">

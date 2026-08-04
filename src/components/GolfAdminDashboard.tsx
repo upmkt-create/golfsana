@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { GolfCourse } from "../types";
 import { STARTER_GOLF_CORES, getRealWorldCompetitorPrices, parseAndCleanPrice, isAllowedTariff } from "../data";
-import { getCompetitorTeeTimes } from "../competitorRates";
+import { fetchCourseRates } from "../rateShopperService";
 import {
   LineChart,
   Line,
@@ -206,6 +206,36 @@ export default function GolfAdminDashboard({
   const [selectedDetailCourseId, setSelectedDetailCourseId] = useState<string>("");
   const [detailFilterSearch, setDetailFilterSearch] = useState<string>("");
   const [chartMetric, setChartMetric] = useState<"avg" | "prime" | "twilight">("avg");
+
+  // Tee-times reals per a competidors, obtinguts via /api/rates (scraping en
+  // directe + fallback al model si falla) — abans es feia servir sempre el
+  // model local directament, que pot quedar desactualitzat amb el temps.
+  const [liveApiTeeTimes, setLiveApiTeeTimes] = useState<import("../competitorRates").TeeTime[] | null>(null);
+  const [isLoadingLiveRates, setIsLoadingLiveRates] = useState(false);
+  const [liveApiSource, setLiveApiSource] = useState<"live" | "model" | "closed" | null>(null);
+
+  const activeDetailCourseId = selectedDetailCourseId || golfCourses.find(c => c.isOurClub)?.id || "";
+  const activeDetailCourse = golfCourses.find(c => c.id === activeDetailCourseId);
+
+  React.useEffect(() => {
+    if (!activeDetailCourse || activeDetailCourse.isOurClub) {
+      setLiveApiTeeTimes(null);
+      setLiveApiSource(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingLiveRates(true);
+    fetchCourseRates(activeDetailCourse.name, selectedMatrixDate)
+      .then((data) => {
+        if (cancelled) return;
+        setLiveApiTeeTimes(data.teeTimes);
+        setLiveApiSource(data.source);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingLiveRates(false);
+      });
+    return () => { cancelled = true; };
+  }, [activeDetailCourse?.id, activeDetailCourse?.name, activeDetailCourse?.isOurClub, selectedMatrixDate]);
 
   const getDynamicCourseRate = (course: GolfCourse, dateStr: string, hourKey: string) => {
     const dObj = new Date(dateStr);
@@ -1878,12 +1908,9 @@ export default function GolfAdminDashboard({
 
         {/* Selected Course Quick Info Banner */}
         {(() => {
-          const activeId = selectedDetailCourseId || golfCourses.find(c => c.isOurClub)?.id || "";
-          const activeCourse = golfCourses.find(c => c.id === activeId);
+          const activeCourse = activeDetailCourse;
           if (!activeCourse) return null;
 
-          const isWeekendDay = [0, 6].includes(new Date(selectedMatrixDate).getDay());
-          
           const slots = [];
 
           if (activeCourse.isOurClub) {
@@ -1947,16 +1974,12 @@ export default function GolfAdminDashboard({
                 rates
               });
             }
-          } else {
-            // Competidor: s'usa DIRECTAMENT la llista real de tee-times del
-            // model verificat (cada 9 o 10 minuts, segons el sistema propi
-            // de cada camp, amb els canvis de tarifa reals capturats) — en
-            // lloc de la taula genèrica de 7 blocs compartida per tothom
-            // que hi havia abans, que ocultava els canvis de preu reals
-            // entre franges.
-            const realTeeTimes = getCompetitorTeeTimes(activeCourse.name, selectedMatrixDate);
-
-            realTeeTimes.forEach((tt) => {
+          } else if (liveApiTeeTimes) {
+            // Competidor: dades reals via /api/rates — scraping en directe
+            // quan és possible, i si no, el model verificat com a
+            // alternativa (mai la taula genèrica de 7 blocs d'abans, que
+            // ocultava els canvis de tarifa reals entre franges).
+            liveApiTeeTimes.forEach((tt) => {
               const timeStr = tt.time;
               if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
                 return;
@@ -2003,18 +2026,6 @@ export default function GolfAdminDashboard({
             });
           }
 
-          // Interval real mostrat a la capçalera — es calcula a partir dels
-          // dos primers slots generats, perquè funcioni igual tant pel
-          // propi club (interval configurable) com pels competidors
-          // (interval propi de cada model, no exposat directament).
-          const displayInterval = slots.length >= 2
-            ? (() => {
-                const [h1, m1] = slots[0].time.split(":").map(Number);
-                const [h2, m2] = slots[1].time.split(":").map(Number);
-                return (h2 * 60 + m2) - (h1 * 60 + m1);
-              })()
-            : (activeCourse.teeTimeInterval || 10);
-
           return (
             <div className="space-y-4">
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -2033,7 +2044,27 @@ export default function GolfAdminDashboard({
                     {activeCourse.name}
                   </h4>
                   <p className="text-xs text-slate-500">
-                    Sincronitzador actiu: <span className="font-semibold text-slate-700 dark:text-slate-300">{activeCourse.updatedBy || "Robot Headless"}</span> • Interval de sortides: <span className="font-bold text-slate-700 dark:text-slate-300">{displayInterval} minuts</span> • Total sortides visualitzades: <span className="font-extrabold text-blue-600">{slots.length} sortides</span>
+                    Sincronitzador actiu: <span className="font-semibold text-slate-700 dark:text-slate-300">{activeCourse.updatedBy || "Robot Headless"}</span> • Interval de sortides: <span className="font-bold text-slate-700 dark:text-slate-300">
+                      {(() => {
+                        if (slots.length >= 2) {
+                          const [h1, m1] = slots[0].time.split(":").map(Number);
+                          const [h2, m2] = slots[1].time.split(":").map(Number);
+                          return (h2 * 60 + m2) - (h1 * 60 + m1);
+                        }
+                        return activeCourse.teeTimeInterval || 10;
+                      })()} minuts
+                    </span> • Total sortides visualitzades: <span className="font-extrabold text-blue-600">{slots.length} sortides</span>
+                    {!activeCourse.isOurClub && (
+                      isLoadingLiveRates ? (
+                        <span className="ml-2 text-amber-600 font-bold">• Carregant dades en directe...</span>
+                      ) : liveApiSource === "live" ? (
+                        <span className="ml-2 text-emerald-600 font-bold">• Preus EN DIRECTE (avui)</span>
+                      ) : liveApiSource === "model" ? (
+                        <span className="ml-2 text-slate-450 font-bold" title="No s'ha pogut connectar en directe; es mostren les últimes tarifes verificades">• Model de referència (no en directe)</span>
+                      ) : liveApiSource === "closed" ? (
+                        <span className="ml-2 text-rose-600 font-bold">• Camp tancat aquest dia</span>
+                      ) : null
+                    )}
                   </p>
                 </div>
 

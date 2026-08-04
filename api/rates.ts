@@ -535,10 +535,26 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
   // Sense la clau configurada, es manté l'intent directe (que seguirà
   // caient al model, tal com fins ara) perquè res es trenqui mentre
   // s'acaba de configurar.
+  // Prioritat de proxy: ScrapingBee (si està configurat) permet fer servir
+  // proxies premium/residencials des del seu PLA GRATUÏT — a diferència de
+  // ScraperAPI, on el premium només és per a comptes de pagament. Per això
+  // es prova primer, si hi ha clau configurada. ScraperAPI es manté com a
+  // alternativa (per exemple si en algun moment es passa a un pla de
+  // pagament seu). Sense cap clau, es manté l'intent directe.
+  const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
   const scraperApiKey = process.env.SCRAPERAPI_KEY;
-  const url = scraperApiKey
-    ? `https://api.scraperapi.com/?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}`
-    : targetUrl;
+  const usePremium = process.env.SCRAPERAPI_PREMIUM === "true";
+
+  let url = targetUrl;
+  let proxyLabel = "";
+  if (scrapingBeeKey) {
+    url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true`;
+    proxyLabel = "via ScrapingBee (premium)";
+  } else if (scraperApiKey) {
+    url = `https://api.scraperapi.com/?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}${usePremium ? "&premium=true" : ""}`;
+    proxyLabel = `via ScraperAPI${usePremium ? " premium" : " standard"}`;
+  }
+  const usingProxy = !!(scrapingBeeKey || scraperApiKey);
 
   try {
     const resp = await fetch(url, {
@@ -556,11 +572,11 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
       },
-      signal: AbortSignal.timeout(scraperApiKey ? 45000 : 8000), // ScraperAPI pot trigar molt (proxies premium per sortejar bloquejos), aprofitem el nou marge de 60s de la funció
+      signal: AbortSignal.timeout(usingProxy ? 45000 : 8000), // Un proxy premium pot trigar molt per sortejar bloquejos, aprofitem el marge de 60s de la funció
     });
 
     if (!resp.ok) {
-      return { teeTimes: null, debug: `HTTP ${resp.status} ${resp.statusText} a ${targetUrl}${scraperApiKey ? " (via ScraperAPI)" : ""}` };
+      return { teeTimes: null, debug: `HTTP ${resp.status} ${resp.statusText} a ${targetUrl}${usingProxy ? ` (${proxyLabel})` : ""}` };
     }
 
     const ct = resp.headers.get("content-type") || "";
@@ -581,7 +597,7 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
     return { teeTimes, debug: "ok" };
   } catch (err: any) {
     const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
-    return { teeTimes: null, debug: isTimeout ? `Timeout connectant a ${targetUrl}${scraperApiKey ? " (via ScraperAPI)" : ""}` : `Error de xarxa: ${String(err?.message || err)}` };
+    return { teeTimes: null, debug: isTimeout ? `Timeout connectant a ${targetUrl}${usingProxy ? ` (${proxyLabel})` : ""}` : `Error de xarxa: ${String(err?.message || err)}` };
   }
 }
 

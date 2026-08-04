@@ -148,7 +148,7 @@ export default function WorkloadDashboard({ tasks, users, projects }: WorkloadDa
             <span>Panell Executiu de Rendiment i Càrrega de l'Empresa</span>
           </h3>
           <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">
-            Quadre de comandaments sincronitzat en temps real amb les metadades de l'Asana Enterprise.
+            Quadre de comandaments sincronitzat en temps real amb les metadades de GolfSana Enterprise.
           </p>
         </div>
 
@@ -237,7 +237,7 @@ export default function WorkloadDashboard({ tasks, users, projects }: WorkloadDa
               1. Càrrega de Treball per Departament
             </h4>
             <p className="text-[10.5px] text-slate-450 mt-0.5 font-sans">
-              Tasques actives distribuïdes entre els 5 nous departaments de gestió definits per a l'Asana Enterprise.
+              Tasques actives distribuïdes entre els 5 nous departaments de gestió definits per a GolfSana Enterprise.
             </p>
           </div>
           <div className="flex items-center gap-3.5 font-mono text-[10px]">

@@ -60,7 +60,7 @@ export default function HelpGuideModal({ isOpen, onClose }: HelpGuideModalProps)
             }`}
           >
             <Kanban className="w-4 h-4" />
-            <span>Estructura d'Asana</span>
+            <span>Estructura de GolfSana</span>
           </button>
           <button
             onClick={() => setActiveTab("pricing")}

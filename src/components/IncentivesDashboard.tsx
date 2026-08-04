@@ -237,7 +237,7 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-yellow-405 text-amber-300" />
             <span className="text-[10px] bg-blue-500/30 text-blue-200 border border-blue-700/50 px-2 py-0.5 font-bold uppercase tracking-wider font-mono">
-              Asana Business Suite
+              GolfSana Business Suite
             </span>
           </div>
           <h2 className="text-xl font-bold mt-1 tracking-tight">Panell de Control Executiu i Incentius Monetaris</h2>
@@ -259,7 +259,7 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-none text-slate-800 text-xs leading-relaxed space-y-2">
           <p className="font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
             <Info className="w-4 h-4 text-amber-700 shrink-0" />
-            Com funcionen els incentius corporatius d'Asana de GolfSana?
+            Com funcionen els incentius corporatius de GolfSana?
           </p>
           <ul className="list-disc pl-5 space-y-1.5 text-slate-750">
             <li>
@@ -576,7 +576,7 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
               Taula de Rendiment de l'Equip GolfSana
             </h3>
             <p className="text-[11px] text-slate-500">
-              Rendimient calculat individualment amb el suport del filtre d'Asana Business.
+              Rendimient calculat individualment amb el suport del filtre de GolfSana Business.
             </p>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-mono bg-white p-1.5 border border-slate-200">

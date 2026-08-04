@@ -186,7 +186,7 @@ export default function ReportsDashboard({ tasks, users, projects, defaultDepart
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-300" />
             <span className="text-[10px] bg-blue-500/30 text-blue-200 border border-blue-700/50 px-2 py-0.5 font-bold uppercase tracking-wider font-mono">
-              Asana Business Intelligence
+              GolfSana Business Intelligence
             </span>
           </div>
           <h2 className="text-xl font-bold mt-1 tracking-tight flex items-center gap-2">
@@ -215,7 +215,7 @@ export default function ReportsDashboard({ tasks, users, projects, defaultDepart
               Taxa de Termini (On-Time Rate)
             </h4>
             <p className="text-slate-550 text-[11px]">
-              El percentatge de tasques finalitzades que s'han tancat el mateix dia o abans del venciment establert. El llindar Asana Business recomanat és del <strong>75%</strong> o superior.
+              El percentatge de tasques finalitzades que s'han tancat el mateix dia o abans del venciment establert. El llindar GolfSana Business recomanat és del <strong>75%</strong> o superior.
             </p>
           </div>
           <div className="space-y-1">
@@ -581,7 +581,7 @@ export default function ReportsDashboard({ tasks, users, projects, defaultDepart
         <div className="p-4 border-b border-slate-100 bg-slate-50">
           <h3 className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
             <Target className="w-4 h-4 text-emerald-600" />
-            Metes Estratègiques i Objectius Corporatius (OKRs Asana Business)
+            Metes Estratègiques i Objectius Corporatius (OKRs GolfSana Business)
           </h3>
           <p className="text-[10px] text-slate-405 mt-0.5">
             Assegura l'alineació de l'equip amb els grans indicadors de GolfSana. Les tasques resoltes alimenten directament el progrés d'aquestes metes clau.

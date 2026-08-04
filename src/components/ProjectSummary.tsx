@@ -318,7 +318,7 @@ export default function ProjectSummary({
             />
           ) : (
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap font-medium">
-              De què es tracta el projecte? Feu clic a "Editar" per definir el propòsit, la descripció o els objectius d'aquest pla de treball d'Asana.
+              De què es tracta el projecte? Feu clic a "Editar" per definir el propòsit, la descripció o els objectius d'aquest pla de treball de GolfSana.
             </p>
           )}
         </div>
@@ -805,7 +805,7 @@ export default function ProjectSummary({
           </div>
 
           <div className="p-3 border border-slate-100 dark:border-slate-850 bg-slate-50/40 text-xs text-slate-600 space-y-2">
-            <p className="font-semibold text-slate-700 dark:text-slate-300">Aquest projecte regeix les tasques directives d'Asana de GolfSana.</p>
+            <p className="font-semibold text-slate-700 dark:text-slate-300">Aquest projecte regeix les tasques directives de GolfSana.</p>
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t">
               <span>Sincronització:</span>
               <span className="text-emerald-600 font-bold">Activa (Sandbox)</span>

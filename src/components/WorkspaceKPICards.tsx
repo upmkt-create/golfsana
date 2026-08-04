@@ -47,7 +47,7 @@ export default function WorkspaceKPICards({
           </h3>
           <p className="text-xs text-blue-105 opacity-90 mt-1 max-w-2xl leading-relaxed">
             {activeProjectObj ? (
-              <span>Hola {currentUser?.name}, aquí tens la llista i resum de control per a les tasques, l'estat i el pla d'Asana d'aquest projecte.</span>
+              <span>Hola {currentUser?.name}, aquí tens la llista i resum de control per a les tasques, l'estat i el pla de GolfSana d'aquest projecte.</span>
             ) : (
               <span>Hola {currentUser?.name}, aquí tens un resum global de l'espai de treball actual amb els projectes i tasques vinculats, i les teves mencions pendents.</span>
             )}

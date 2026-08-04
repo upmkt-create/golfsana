@@ -43,16 +43,16 @@ export default function UserManualDashboard({ currentUser }: UserManualDashboard
       title: "1. Introducció a GolfSana",
       category: "general",
       icon: BookOpen,
-      content: `GolfSana és una plataforma enterprise dissenyada específicament per a la coordinació d'operacions del Club de Golf d'Aro. Fusiona la potència de gestió de projectes d'Asana amb un potent mòdul de Monitorització i Comparació de Tarifes de Golf davant els nostres rivals directes.
+      content: `GolfSana és una plataforma enterprise dissenyada específicament per a la coordinació d'operacions del Club de Golf d'Aro. Fusiona la potència de gestió de projectes de GolfSana amb un potent mòdul de Monitorització i Comparació de Tarifes de Golf davant els nostres rivals directes.
 
 L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps real, que les tasques de manteniment, vendes, màrqueting i administració estiguin clares, i que puguem reaccionar de manera àgil als mètodes de preus dinàmics de la competència (Empordà Golf, PGA Catalunya, Real Club de Golf El Prat).`
     },
     {
       id: "workspace-asana",
-      title: "2. Com utilitzar l'Espai de Treball (Asana)",
+      title: "2. Com utilitzar l'Espai de Treball",
       category: "asana",
       icon: Sliders,
-      content: `L'espai de treball de GolfSana funciona de manera similar a Asana, però adaptat a les necessitats d'un club de golf.
+      content: `L'espai de treball de GolfSana funciona de manera similar a altres eines de gestió de projectes, però adaptat a les necessitats d'un club de golf.
       
 • Creació de Tasques: Podeu crear tasques assignant un departament específic (Màrqueting, Comercial, Escoles, Reserves, Administració), data d'inici i venciment, nivell de prioritat (Urgent, Alta, Mitjana, Baixa) i recurrència per automatitzar fluxos periòdics.
 • Vistes del Projecte:
@@ -159,7 +159,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
   const roleGuides = useMemo(() => ({
     admin: {
       title: "Pla de Treball per a Administradors (Isabel, Rocío, Direcció)",
-      brief: "Com a administrador/a, disposes d'un control transversal sobre l'operació del golf i els preus comercials d'Asana d'alt nivell.",
+      brief: "Com a administrador/a, disposes d'un control transversal sobre l'operació del golf i els preus comercials de GolfSana d'alt nivell.",
       steps: [
         "Fer seguiment individual: Crea una Acta de Reunió després de cada trobada amb un membre de l'equip, amb els acords concrets. Cada membre rep notificació i només veu les seves pròpies actes.",
         "Llançar actualitzacions de tarifes: Ves a la secció d'Anàlisi i utilitza l'Scrape manual forçat de preus competidors.",
@@ -204,7 +204,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
             Centre de Suport i Guia de GolfSana
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Manual complet de coordinació d'operacions d'Asana Enterprise i comparador de tarifes corporatives per al Club de Golf d'Aro.
+            Manual complet de coordinació d'operacions de GolfSana Enterprise i comparador de tarifes corporatives per al Club de Golf d'Aro.
           </p>
         </div>
         
@@ -345,7 +345,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
               <div className="p-12 text-center text-slate-400">
                 <AlertCircle className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                 <p className="font-bold text-sm">No s'ha trobat cap secció</p>
-                <p className="text-xs">Proveu a buscar altres termes com 'Scraping', 'Asana' o 'Mode'.</p>
+                <p className="text-xs">Proveu a buscar altres termes com 'Scraping', 'GolfSana' o 'Mode'.</p>
               </div>
             ) : (
               filteredSections.map((sec) => {

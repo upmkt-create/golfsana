@@ -11,7 +11,7 @@ import { DEPARTMENTS } from "../data";
 import ProjectCalendar from "./ProjectCalendar";
 import { stripHtmlToText } from "../lib/textUtils";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
-import UpcomingDeadlinesWidget from "./UpcomingDeadlinesWidget";
+import RichTextEditor from "./RichTextEditor";
 import { 
   CalendarDays, 
   Briefcase, 
@@ -63,9 +63,25 @@ export default function MemberDashboard({
   const member = users.find(u => u.id === memberId);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [notesText, setNotesText] = useState(member?.notes || "");
+  const [confirmingDeleteNotes, setConfirmingDeleteNotes] = useState(false);
   const saveNotes = () => {
     if (member) onUpdateUserNotes?.(member.id, notesText);
     setIsEditingNotes(false);
+  };
+  const deleteNotes = () => {
+    if (member) onUpdateUserNotes?.(member.id, "");
+    setNotesText("");
+    setConfirmingDeleteNotes(false);
+  };
+  // Arrossegar targetes entre columnes del tauler d'aquest membre
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null);
+  const handleDropOnStatus = (status: TaskStatus) => {
+    if (draggedTaskId && onUpdateTaskStatus) {
+      onUpdateTaskStatus(draggedTaskId, status);
+    }
+    setDraggedTaskId(null);
+    setDragOverStatus(null);
   };
   
   // Tabs "tasques" | "projectes" | "cronograma" | "calendari"
@@ -284,12 +300,54 @@ export default function MemberDashboard({
           vençudes — el mateix avís que hi ha a la pestanya d'Inici general,
           perquè aparegui també aquí (és el que veu un membre normal, o
           qualsevol admin que filtri per algú concret). */}
-      <UpcomingDeadlinesWidget
-        tasks={memberTasks}
-        projects={projects}
-        onSelectTask={(task) => onSelectTask?.(task)}
-        mode="personal"
-      />
+      {(() => {
+        const myUrgentTasks = memberTasks
+          .map((t) => ({ task: t, urgency: getTaskUrgency(t.dueDate, t.status) }))
+          .filter((x) => x.urgency !== "normal")
+          .sort((a, b) => (a.task.dueDate || "").localeCompare(b.task.dueDate || ""));
+
+        if (myUrgentTasks.length === 0) return null;
+
+        const overdueCount = myUrgentTasks.filter((x) => x.urgency === "overdue").length;
+
+        return (
+          <div className="bg-white border-l-4 border-rose-400 shadow-sm">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-rose-50/40">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-500" />
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tasques que vencen aviat</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-rose-600">
+                {overdueCount > 0 ? `${overdueCount} vençuda${overdueCount > 1 ? "s" : ""}` : `${myUrgentTasks.length} propera${myUrgentTasks.length > 1 ? "es" : ""}`}
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto">
+              {myUrgentTasks.map(({ task, urgency }) => {
+                const style = URGENCY_STYLES[urgency];
+                const proj = projects.find((p) => p.id === task.projectId);
+                return (
+                  <button
+                    key={task.id}
+                    onClick={() => onSelectTask?.(task)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot} ${urgency === "overdue" ? "animate-pulse" : ""}`} />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-800 truncate">{task.title}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{proj?.name || "Sense projecte"}</p>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-mono font-bold shrink-0 px-2 py-0.5 rounded-sm ${style.bg} ${style.text}`}>
+                      {urgency === "overdue" ? "Vençuda" : task.dueDate}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Notes internes sobre aquest membre */}
       <div className="bg-white border border-slate-200 shadow-sm">
@@ -299,23 +357,39 @@ export default function MemberDashboard({
             Notes sobre {member?.name || "aquest membre"}
           </span>
           {!isEditingNotes && (
-            <button
-              onClick={() => { setNotesText(member?.notes || ""); setIsEditingNotes(true); }}
-              className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
-            >
-              {member?.notes ? "Editar" : "Afegir nota"}
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { setNotesText(member?.notes || ""); setIsEditingNotes(true); }}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800"
+              >
+                {member?.notes ? "Editar" : "Afegir nota"}
+              </button>
+              {member?.notes && !confirmingDeleteNotes && (
+                <button
+                  onClick={() => setConfirmingDeleteNotes(true)}
+                  className="text-[11px] font-bold text-slate-400 hover:text-rose-600"
+                >
+                  Eliminar
+                </button>
+              )}
+              {confirmingDeleteNotes && (
+                <span className="flex items-center gap-1.5">
+                  <span className="text-[10.5px] text-rose-600 font-semibold">Segur?</span>
+                  <button onClick={deleteNotes} className="text-[11px] font-bold text-rose-600 hover:text-rose-800">Sí</button>
+                  <button onClick={() => setConfirmingDeleteNotes(false)} className="text-[11px] font-bold text-slate-500 hover:text-slate-700">No</button>
+                </span>
+              )}
+            </div>
           )}
         </div>
         <div className="p-4">
           {isEditingNotes ? (
             <div className="space-y-2">
-              <textarea
-                autoFocus
+              <RichTextEditor
                 value={notesText}
-                onChange={(e) => setNotesText(e.target.value)}
+                onChange={setNotesText}
                 placeholder="Notes internes: rendiment, converses, seguiment, incidències..."
-                className="w-full min-h-[100px] text-xs border border-slate-200 rounded-none p-2.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                minHeightClass="min-h-[100px]"
               />
               <div className="flex justify-end gap-1.5">
                 <button
@@ -333,7 +407,7 @@ export default function MemberDashboard({
               </div>
             </div>
           ) : member?.notes ? (
-            <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">{member.notes}</p>
+            <div className="text-xs text-slate-600 leading-relaxed rte-content" dangerouslySetInnerHTML={{ __html: member.notes }} />
           ) : (
             <p className="text-xs text-slate-400 italic">Encara no hi ha cap nota per aquest membre.</p>
           )}
@@ -538,7 +612,12 @@ export default function MemberDashboard({
 
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
             {/* COLUMN 1: TO DO */}
-            <div className="bg-slate-50 border border-slate-200 p-4 space-y-4">
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOverStatus("todo"); }}
+              onDragLeave={() => setDragOverStatus((s) => (s === "todo" ? null : s))}
+              onDrop={() => handleDropOnStatus("todo")}
+              className={`bg-slate-50 border p-4 space-y-4 transition-colors ${dragOverStatus === "todo" ? "border-blue-400 bg-blue-50/40" : "border-slate-200"}`}
+            >
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5 font-mono">
                   <span className="w-2 h-2 rounded-full bg-slate-400"></span>
@@ -552,7 +631,14 @@ export default function MemberDashboard({
                   <p className="text-[11px] text-slate-400 text-center py-4 italic">Cap tasca en cua</p>
                 ) : (
                   todoTasks.map(task => (
-                    <div key={task.id} onClick={() => onSelectTask && onSelectTask(task)} className="bg-white p-3 border border-slate-200 space-y-2 group shadow-sm cursor-pointer">
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={() => setDraggedTaskId(task.id)}
+                      onDragEnd={() => { setDraggedTaskId(null); setDragOverStatus(null); }}
+                      onClick={() => onSelectTask && onSelectTask(task)}
+                      className={`bg-white p-3 border border-slate-200 space-y-2 group shadow-sm cursor-grab active:cursor-grabbing ${draggedTaskId === task.id ? "opacity-40" : ""}`}
+                    >
                       <div className="flex items-center justify-between">
                         <span className={`text-[8.5px] font-mono px-1.5 py-0.5 rounded-none uppercase ${getPriorityBadgeClass(task.priority)}`}>
                           {task.priority === "urgent" ? "Urgent" : task.priority === "high" ? "Alta" : task.priority === "medium" ? "Mitjana" : "Baixa"}
@@ -589,7 +675,12 @@ export default function MemberDashboard({
             </div>
 
             {/* COLUMN 2: IN PROGRESS */}
-            <div className="bg-blue-50/10 border border-slate-200 p-4 space-y-4">
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOverStatus("in_progress"); }}
+              onDragLeave={() => setDragOverStatus((s) => (s === "in_progress" ? null : s))}
+              onDrop={() => handleDropOnStatus("in_progress")}
+              className={`bg-blue-50/10 border p-4 space-y-4 transition-colors ${dragOverStatus === "in_progress" ? "border-blue-400 bg-blue-50/40" : "border-slate-200"}`}
+            >
               <div className="flex items-center justify-between border-b border-blue-150 pb-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-blue-700 flex items-center gap-1.5 font-mono">
                   <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
@@ -602,7 +693,14 @@ export default function MemberDashboard({
                    <p className="text-[11px] text-slate-400 text-center py-4 italic">Sense tasques actives</p>
                 ) : (
                   inProgressTasks.map(task => (
-                    <div key={task.id} onClick={() => onSelectTask && onSelectTask(task)} className="bg-white p-3 border border-slate-200 space-y-2 group shadow-sm cursor-pointer">
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={() => setDraggedTaskId(task.id)}
+                      onDragEnd={() => { setDraggedTaskId(null); setDragOverStatus(null); }}
+                      onClick={() => onSelectTask && onSelectTask(task)}
+                      className={`bg-white p-3 border border-slate-200 space-y-2 group shadow-sm cursor-grab active:cursor-grabbing ${draggedTaskId === task.id ? "opacity-40" : ""}`}
+                    >
                       <div className="flex items-center justify-between">
                         <span className={`text-[8.5px] font-mono px-1.5 py-0.5 rounded-none uppercase ${getPriorityBadgeClass(task.priority)}`}>
                           {task.priority === "urgent" ? "Urgent" : task.priority === "high" ? "Alta" : task.priority === "medium" ? "Mitjana" : "Baixa"}
@@ -645,7 +743,12 @@ export default function MemberDashboard({
             </div>
 
             {/* COLUMN 3: REVIEW */}
-            <div className="bg-amber-50/10 border border-slate-200 p-4 space-y-4">
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOverStatus("review"); }}
+              onDragLeave={() => setDragOverStatus((s) => (s === "review" ? null : s))}
+              onDrop={() => handleDropOnStatus("review")}
+              className={`bg-amber-50/10 border p-4 space-y-4 transition-colors ${dragOverStatus === "review" ? "border-blue-400 bg-blue-50/40" : "border-slate-200"}`}
+            >
               <div className="flex items-center justify-between border-b border-amber-150 pb-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1.5 font-mono">
                   <span className="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -659,7 +762,14 @@ export default function MemberDashboard({
                   <p className="text-[11px] text-slate-400 text-center py-4 italic">No hi ha tasques per avaluar</p>
                 ) : (
                   reviewTasks.map(task => (
-                    <div key={task.id} onClick={() => onSelectTask && onSelectTask(task)} className="bg-white p-3 border border-slate-100/10 space-y-2 group shadow-sm cursor-pointer">
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={() => setDraggedTaskId(task.id)}
+                      onDragEnd={() => { setDraggedTaskId(null); setDragOverStatus(null); }}
+                      onClick={() => onSelectTask && onSelectTask(task)}
+                      className={`bg-white p-3 border border-slate-100/10 space-y-2 group shadow-sm cursor-grab active:cursor-grabbing ${draggedTaskId === task.id ? "opacity-40" : ""}`}
+                    >
                       <div className="flex items-center justify-between">
                         <span className={`text-[8.5px] font-mono px-1.5 py-0.5 rounded-none uppercase ${getPriorityBadgeClass(task.priority)}`}>
                           {task.priority === "urgent" ? "Urgent" : task.priority === "high" ? "Alta" : task.priority === "medium" ? "Mitjana" : "Baixa"}
@@ -702,7 +812,12 @@ export default function MemberDashboard({
             </div>
 
             {/* COLUMN 4: DONE */}
-            <div className="bg-emerald-50/15 border border-slate-200 p-4 space-y-4">
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOverStatus("done"); }}
+              onDragLeave={() => setDragOverStatus((s) => (s === "done" ? null : s))}
+              onDrop={() => handleDropOnStatus("done")}
+              className={`bg-emerald-50/15 border p-4 space-y-4 transition-colors ${dragOverStatus === "done" ? "border-blue-400 bg-blue-50/40" : "border-slate-200"}`}
+            >
               <div className="flex items-center justify-between border-b border-emerald-150 pb-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5 font-mono">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -716,7 +831,14 @@ export default function MemberDashboard({
                   <p className="text-[11px] text-slate-400 text-center py-4 italic">Encara sense lliuraments</p>
                 ) : (
                   doneTasks.map(task => (
-                    <div key={task.id} onClick={() => onSelectTask && onSelectTask(task)} className="bg-white p-3 border border-slate-200/80 opacity-85 space-y-2 group shadow-none cursor-pointer">
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={() => setDraggedTaskId(task.id)}
+                      onDragEnd={() => { setDraggedTaskId(null); setDragOverStatus(null); }}
+                      onClick={() => onSelectTask && onSelectTask(task)}
+                      className={`bg-white p-3 border border-slate-200/80 opacity-85 space-y-2 group shadow-none cursor-grab active:cursor-grabbing ${draggedTaskId === task.id ? "opacity-40" : ""}`}
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-[8.5px] bg-slate-100 border text-slate-500 font-mono px-1.5 py-0.5">ACABAT</span>
                         <div className="flex items-center gap-1 text-emerald-650">
@@ -866,7 +988,7 @@ export default function MemberDashboard({
                 <span>Cronograma Personal ({member.name})</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Visualització d'Asana Gantt individual pels terminis establerts a l'agenda d'aquest col·laborador.
+                Visualització de GolfSana Gantt individual pels terminis establerts a l'agenda d'aquest col·laborador.
               </p>
             </div>
             <div className="flex items-center gap-4 text-xs font-semibold text-slate-500">
@@ -895,7 +1017,7 @@ export default function MemberDashboard({
               <div className="min-w-[850px]">
                 {/* Headers */}
                 <div className="grid grid-cols-12 gap-1 border-b border-slate-200 pb-3 mb-4 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  <div className="col-span-4 text-left px-2">Tasca de l'Asana</div>
+                  <div className="col-span-4 text-left px-2">Tasca de GolfSana</div>
                   {timelineDates.map((date) => (
                     <div key={date.key} className="col-span-1 border-l border-slate-150 font-mono text-[10px]">
                       {date.label}

@@ -11,6 +11,7 @@ import { DEPARTMENTS } from "../data";
 import ProjectCalendar from "./ProjectCalendar";
 import { stripHtmlToText } from "../lib/textUtils";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
+import UpcomingDeadlinesWidget from "./UpcomingDeadlinesWidget";
 import { 
   CalendarDays, 
   Briefcase, 
@@ -283,54 +284,12 @@ export default function MemberDashboard({
           vençudes — el mateix avís que hi ha a la pestanya d'Inici general,
           perquè aparegui també aquí (és el que veu un membre normal, o
           qualsevol admin que filtri per algú concret). */}
-      {(() => {
-        const myUrgentTasks = memberTasks
-          .map((t) => ({ task: t, urgency: getTaskUrgency(t.dueDate, t.status) }))
-          .filter((x) => x.urgency !== "normal")
-          .sort((a, b) => (a.task.dueDate || "").localeCompare(b.task.dueDate || ""));
-
-        if (myUrgentTasks.length === 0) return null;
-
-        const overdueCount = myUrgentTasks.filter((x) => x.urgency === "overdue").length;
-
-        return (
-          <div className="bg-white border-l-4 border-rose-400 shadow-sm">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-rose-50/40">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-500" />
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Tasques que vencen aviat</span>
-              </div>
-              <span className="text-[10px] font-mono font-bold text-rose-600">
-                {overdueCount > 0 ? `${overdueCount} vençuda${overdueCount > 1 ? "s" : ""}` : `${myUrgentTasks.length} propera${myUrgentTasks.length > 1 ? "es" : ""}`}
-              </span>
-            </div>
-            <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto">
-              {myUrgentTasks.map(({ task, urgency }) => {
-                const style = URGENCY_STYLES[urgency];
-                const proj = projects.find((p) => p.id === task.projectId);
-                return (
-                  <button
-                    key={task.id}
-                    onClick={() => onSelectTask?.(task)}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot} ${urgency === "overdue" ? "animate-pulse" : ""}`} />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-slate-800 truncate">{task.title}</p>
-                        <p className="text-[10px] text-slate-400 truncate">{proj?.name || "Sense projecte"}</p>
-                      </div>
-                    </div>
-                    <span className={`text-[10px] font-mono font-bold shrink-0 px-2 py-0.5 rounded-sm ${style.bg} ${style.text}`}>
-                      {urgency === "overdue" ? "Vençuda" : task.dueDate}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })()}
+      <UpcomingDeadlinesWidget
+        tasks={memberTasks}
+        projects={projects}
+        onSelectTask={(task) => onSelectTask?.(task)}
+        mode="personal"
+      />
 
       {/* Notes internes sobre aquest membre */}
       <div className="bg-white border border-slate-200 shadow-sm">

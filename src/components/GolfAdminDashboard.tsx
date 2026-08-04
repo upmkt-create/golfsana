@@ -103,87 +103,6 @@ export function getMonthDays(year: number, month: number) {
 
 const MONTH_NAMES = ["Gener", "Febrer", "Març", "Abril", "Maig", "Juny", "Juliol", "Agost", "Setembre", "Octubre", "Novembre", "Desembre"];
 
-export function getOurClubDetailedTeeTimes(t: number) {
-  // t is minutes from 00:00 (e.g. 07:00 is 420, 20:48 is 1248)
-  
-  // 1. 07:00 to 07:59 (420 to 479 mins)
-  if (t >= 420 && t < 480) {
-    return [
-      { tariff: "GF 18 - 4 players", price: 92, discountPct: 20, originalPrice: 115 },
-      { tariff: "GF 18 Forats", price: 115, discountPct: 0, originalPrice: 115 }
-    ];
-  }
-
-  // 2. 08:00 to 12:00
-  if (t >= 480 && t < 720) {
-    const isBoth = (t === 492 || t === 501) || // 08:12, 08:21
-                   (t === 591 || t === 600 || t === 609) || // 09:51, 10:00, 10:09
-                   (t >= 681 && t <= 717); // 11:21 to 11:57
-    
-    if (isBoth) {
-      return [
-        { tariff: "GF 18 Forats", price: 115, discountPct: 0, originalPrice: 115 },
-        { tariff: "GF 18 - 4 players", price: 92, discountPct: 20, originalPrice: 115 }
-      ];
-    } else {
-      return [
-        { tariff: "GF 18 Forats", price: 115, discountPct: 0, originalPrice: 115 }
-      ];
-    }
-  }
-
-  // 3. 12:00 to 13:00 (12:06 to 13:00)
-  if (t >= 720 && t <= 780) {
-    return [
-      { tariff: "GF 18 Forats", price: 110, discountPct: 4, originalPrice: 115 },
-      { tariff: "GF 18 - 4 players", price: 92, discountPct: 20, originalPrice: 115 }
-    ];
-  }
-
-  // 4. 13:00 to 14:00 (13:09 to 13:54)
-  if (t > 780 && t <= 834) {
-    return [
-      { tariff: "GF 18 Forats", price: 104, discountPct: 10, originalPrice: 115 },
-      { tariff: "GF 18 - 4 players", price: 92, discountPct: 20, originalPrice: 115 }
-    ];
-  }
-
-  // 5. 14:00 to 15:00 (14:03 to 14:57)
-  if (t > 834 && t <= 897) {
-    return [
-      { tariff: "GF 18 Forats", price: 98, discountPct: 15, originalPrice: 115 },
-      { tariff: "GF 18 - 4 players", price: 92, discountPct: 20, originalPrice: 115 }
-    ];
-  }
-
-  // 6. 15:00 to 15:59 (15:06 to 15:51)
-  if (t >= 900 && t < 960) {
-    return [
-      { tariff: "GF 18 Forats", price: 92, discountPct: 20, originalPrice: 115 }
-    ];
-  }
-
-  // 7. 16:00 to 21:00 (16:00 to 20:48)
-  if (t >= 960 && t <= 1260) {
-    // exceptions where ONLY All You Play is available: 17:39, 17:48, or after 18:06
-    const isOnlyPlay = (t === 1059 || t === 1068) || (t >= 1086);
-    if (isOnlyPlay) {
-      return [
-        { tariff: "GF All You Can Play", price: 75, discountPct: 35, originalPrice: 115 }
-      ];
-    } else {
-      return [
-        { tariff: "GF All You Can Play", price: 75, discountPct: 35, originalPrice: 115 },
-        { tariff: "GF 18 Forats", price: 86, discountPct: 25, originalPrice: 115 }
-      ];
-    }
-  }
-
-  return [
-    { tariff: "GF 18 Forats", price: 115, discountPct: 0, originalPrice: 115 }
-  ];
-}
-
 export default function GolfAdminDashboard({
   golfCourses,
   isAdmin,
@@ -239,7 +158,7 @@ export default function GolfAdminDashboard({
   }, [golfCourses.map(c => c.name).join("|"), selectedMatrixDate]);
 
   React.useEffect(() => {
-    if (!activeDetailCourse || activeDetailCourse.isOurClub) {
+    if (!activeDetailCourse) {
       setLiveApiTeeTimes(null);
       setLiveApiSource(null);
       return;
@@ -256,7 +175,7 @@ export default function GolfAdminDashboard({
         if (!cancelled) setIsLoadingLiveRates(false);
       });
     return () => { cancelled = true; };
-  }, [activeDetailCourse?.id, activeDetailCourse?.name, activeDetailCourse?.isOurClub, selectedMatrixDate]);
+  }, [activeDetailCourse?.id, activeDetailCourse?.name, selectedMatrixDate]);
 
   const getDynamicCourseRate = (course: GolfCourse, dateStr: string, hourKey: string) => {
     const dObj = new Date(dateStr);
@@ -2038,100 +1957,43 @@ export default function GolfAdminDashboard({
 
           const slots = [];
 
-          if (activeCourse.isOurClub) {
-            // Propi club: bucle basat en l'interval configurable de la
-            // pestanya (per defecte 10 min), amb ocupació simulada.
-            const interval = activeCourse.teeTimeInterval || 10;
-            const startMins = 7 * 60; // 07:00
-            const endMins = 20 * 60 + 48; // 20:48
-
-            for (let t = startMins; t <= endMins; t += interval) {
-              const hrs = Math.floor(t / 60);
-              const mins = t % 60;
-              const timeStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-
-              if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
-                continue;
-              }
-
-              let occupancyLevel = "disponible";
-              let availablePlayers = 4;
-              let statusColor = "bg-emerald-500";
-
-              const seedValue = (t * 13 + activeCourse.name.charCodeAt(0)) % 100;
-              if (t >= 510 && t <= 750) { // prime morning slots
-                if (seedValue > 65) {
-                  occupancyLevel = "complet";
-                  availablePlayers = 0;
-                  statusColor = "bg-rose-500";
-                } else if (seedValue > 35) {
-                  occupancyLevel = "ocupat (1 sol lliure)";
-                  availablePlayers = 1;
-                  statusColor = "bg-amber-500";
-                } else {
-                  occupancyLevel = "moderat (2 lliures)";
-                  availablePlayers = 2;
-                  statusColor = "bg-blue-400";
-                }
-              } else {
-                if (seedValue > 85) {
-                  occupancyLevel = "complet";
-                  availablePlayers = 0;
-                  statusColor = "bg-rose-500";
-                } else if (seedValue > 65) {
-                  occupancyLevel = "ocupat";
-                  availablePlayers = 1;
-                  statusColor = "bg-amber-500";
-                } else {
-                  occupancyLevel = "disponible (4 lliures)";
-                  availablePlayers = 4;
-                  statusColor = "bg-emerald-500";
-                }
-              }
-
-              const rates = getOurClubDetailedTeeTimes(t);
-
-              slots.push({
-                time: timeStr,
-                occupancyLevel,
-                availablePlayers,
-                statusColor,
-                rates
-              });
-            }
-          } else if (liveApiTeeTimes) {
-            // Competidor: dades reals via /api/rates — scraping en directe
-            // quan és possible, i si no, el model verificat com a
-            // alternativa (mai la taula genèrica de 7 blocs d'abans, que
-            // ocultava els canvis de tarifa reals entre franges).
+          // Un únic camí per tots els camps (Golf d'Aro i competidors): les
+          // dades venen sempre de /api/rates (en directe quan és possible,
+          // model verificat si no). Quan és "live", la disponibilitat que
+          // mostrem és la REAL que retorna GolfManager (abans es generava
+          // amb una fórmula inventada, que mai va reflectir la realitat).
+          if (liveApiTeeTimes) {
             liveApiTeeTimes.forEach((tt) => {
               const timeStr = tt.time;
               if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
                 return;
               }
 
-              const t = tt.minutes;
-              let occupancyLevel = "disponible";
-              let availablePlayers = 4;
-              let statusColor = "bg-emerald-500";
+              let occupancyLevel: string;
+              let availablePlayers: number;
+              let statusColor: string;
 
-              const seedValue = (t * 13 + activeCourse.name.charCodeAt(0)) % 100;
-              if (seedValue > 80) {
-                occupancyLevel = "complet";
-                availablePlayers = 0;
-                statusColor = "bg-rose-500";
-              } else if (seedValue > 55) {
-                occupancyLevel = "ocupat";
-                availablePlayers = 1;
-                statusColor = "bg-amber-500";
-              } else if (seedValue > 30) {
-                occupancyLevel = "moderat";
-                availablePlayers = 2;
-                statusColor = "bg-blue-400";
+              if (liveApiSource === "live") {
+                availablePlayers = tt.availableSlots;
+                if (availablePlayers <= 0) {
+                  occupancyLevel = "complet";
+                  statusColor = "bg-rose-500";
+                } else if (availablePlayers === 1) {
+                  occupancyLevel = "ocupat (1 sol lliure)";
+                  statusColor = "bg-amber-500";
+                } else if (availablePlayers === 2) {
+                  occupancyLevel = "moderat (2 lliures)";
+                  statusColor = "bg-blue-400";
+                } else {
+                  occupancyLevel = `disponible (${availablePlayers} lliures)`;
+                  statusColor = "bg-emerald-500";
+                }
               } else {
-                occupancyLevel = "disponible";
-                availablePlayers = 4;
-                statusColor = "bg-emerald-500";
+                // El model de referència només té preus, no disponibilitat
+                // real — ho indiquem clarament en lloc d'inventar un número.
+                occupancyLevel = "sense dades de disponibilitat";
+                availablePlayers = -1;
+                statusColor = "bg-slate-300";
               }
 
               const rates = tt.rates.map((r) => ({
@@ -2150,6 +2012,10 @@ export default function GolfAdminDashboard({
               });
             });
           }
+          // Si liveApiTeeTimes és null (encara carregant, o l'API no ha
+          // pogut respondre ni amb el model), slots es queda buit — la
+          // interfície ja mostra l'indicador de càrrega corresponent, en
+          // lloc de generar files amb dades inventades.
 
           return (
             <div className="space-y-4">

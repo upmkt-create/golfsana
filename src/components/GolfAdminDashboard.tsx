@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { GolfCourse } from "../types";
 import { STARTER_GOLF_CORES, getRealWorldCompetitorPrices, parseAndCleanPrice, isAllowedTariff } from "../data";
-import { fetchCourseRates } from "../rateShopperService";
+import { fetchCourseRates, fetchAllRates } from "../rateShopperService";
 import {
   LineChart,
   Line,
@@ -216,6 +216,27 @@ export default function GolfAdminDashboard({
 
   const activeDetailCourseId = selectedDetailCourseId || golfCourses.find(c => c.isOurClub)?.id || "";
   const activeDetailCourse = golfCourses.find(c => c.id === activeDetailCourseId);
+
+  // Taula matriu del comparador: tots els camps carregats alhora (columnes),
+  // amb les franges horàries comunes com a files — així es pot veure d'un
+  // cop d'ull qui té el millor preu a cada hora, en lloc d'haver d'anar
+  // camp per camp.
+  const [allCoursesRates, setAllCoursesRates] = useState<import("../rateShopperService").RatesResponse | null>(null);
+  const [isLoadingAllRates, setIsLoadingAllRates] = useState(false);
+
+  React.useEffect(() => {
+    if (golfCourses.length === 0) return;
+    let cancelled = false;
+    setIsLoadingAllRates(true);
+    fetchAllRates(golfCourses.map(c => c.name), selectedMatrixDate)
+      .then((data) => {
+        if (!cancelled) setAllCoursesRates(data);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingAllRates(false);
+      });
+    return () => { cancelled = true; };
+  }, [golfCourses.map(c => c.name).join("|"), selectedMatrixDate]);
 
   React.useEffect(() => {
     if (!activeDetailCourse || activeDetailCourse.isOurClub) {
@@ -1904,6 +1925,110 @@ export default function GolfAdminDashboard({
               className="text-xs bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 px-3 py-1.5 focus:outline-none focus:border-blue-600 font-medium placeholder-slate-400 w-44"
             />
           </div>
+        </div>
+
+        {/* Taula Matriu Comparativa: files = franges horàries, columnes =
+            cada camp (Golf d'Aro + competidors), cada cel·la mostra el preu
+            vigent en aquell moment — permet veure d'un cop d'ull qui té el
+            millor preu a cada hora. */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+              <Layers className="w-3.5 h-3.5" />
+              Comparativa de tots els camps — {selectedMatrixDate}
+            </h4>
+            {isLoadingAllRates && (
+              <span className="text-[11px] font-bold text-amber-600 flex items-center gap-1.5">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                Actualitzant preus...
+              </span>
+            )}
+          </div>
+
+          {!allCoursesRates ? (
+            <div className="p-6 text-center text-xs text-slate-400">Carregant comparativa...</div>
+          ) : (() => {
+            // Eix comú de files: cada 10 minuts, de 07:00 a 20:50 — un eix
+            // fix independent de l'interval propi de cada camp, perquè
+            // totes les columnes es puguin llegir a la mateixa alçada.
+            const rowMinutes: number[] = [];
+            for (let t = 7 * 60; t <= 20 * 60 + 50; t += 10) rowMinutes.push(t);
+
+            const findRateAtTime = (teeTimes: import("../competitorRates").TeeTime[], targetMin: number) => {
+              let best: import("../competitorRates").TeeTime | null = null;
+              for (const tt of teeTimes) {
+                if (tt.minutes <= targetMin && (!best || tt.minutes > best.minutes)) best = tt;
+              }
+              return best;
+            };
+
+            // Golf d'Aro primer, després la resta en l'ordre de golfCourses
+            const orderedCourses = [...golfCourses].sort((a, b) => (b.isOurClub ? 1 : 0) - (a.isOurClub ? 1 : 0));
+
+            return (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+                      <th className="py-2 px-3 font-bold text-slate-500 sticky left-0 bg-slate-50 dark:bg-slate-800/40 z-10">Hora</th>
+                      {orderedCourses.map((c) => {
+                        const courseData = allCoursesRates.courses.find(cd => cd.course === c.name);
+                        return (
+                          <th key={c.id} className="py-2 px-3 font-bold text-slate-700 dark:text-slate-200 min-w-[140px]">
+                            <div className="flex items-center gap-1.5">
+                              {c.isOurClub && <span className="text-amber-500">★</span>}
+                              <span className="truncate">{c.name}</span>
+                            </div>
+                            {courseData?.source && (
+                              <span className={`block text-[9px] font-bold normal-case mt-0.5 ${
+                                courseData.source === "live" ? "text-emerald-600" :
+                                courseData.source === "closed" ? "text-rose-500" : "text-slate-400"
+                              }`}>
+                                {courseData.source === "live" ? "● en directe" : courseData.source === "closed" ? "● tancat" : "● referència"}
+                              </span>
+                            )}
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rowMinutes.map((rowMin) => {
+                      const hrs = Math.floor(rowMin / 60);
+                      const mins = rowMin % 60;
+                      const timeStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+                      if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) return null;
+
+                      return (
+                        <tr key={rowMin} className="border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/60 dark:hover:bg-slate-800/20">
+                          <td className="py-1.5 px-3 font-mono font-bold text-slate-600 dark:text-slate-300 sticky left-0 bg-white dark:bg-slate-900 z-10">{timeStr}</td>
+                          {orderedCourses.map((c) => {
+                            const courseData = allCoursesRates.courses.find(cd => cd.course === c.name);
+                            if (!courseData || courseData.source === "closed") {
+                              return <td key={c.id} className="py-1.5 px-3 text-slate-300 italic">—</td>;
+                            }
+                            const rate = findRateAtTime(courseData.teeTimes, rowMin);
+                            if (!rate || rate.rates.length === 0) {
+                              return <td key={c.id} className="py-1.5 px-3 text-slate-300 italic">—</td>;
+                            }
+                            const bestRate = rate.rates[0];
+                            return (
+                              <td key={c.id} className="py-1.5 px-3">
+                                <span className="font-bold text-slate-800 dark:text-slate-100">{bestRate.price}€</span>
+                                {bestRate.discountPct ? (
+                                  <span className="ml-1 text-[10px] text-emerald-600 font-semibold">-{bestRate.discountPct}%</span>
+                                ) : null}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Selected Course Quick Info Banner */}

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { GolfCourse } from "../types";
 import { STARTER_GOLF_CORES, getRealWorldCompetitorPrices, parseAndCleanPrice, isAllowedTariff } from "../data";
-import { fetchCourseRates, fetchAllRates } from "../rateShopperService";
+import { fetchCourseRates } from "../rateShopperService";
 import {
   LineChart,
   Line,
@@ -51,12 +51,18 @@ export interface HourRange {
 
 export const HOUR_RANGES: HourRange[] = [
   { key: "07:00-08:00", label: "07:00 - 08:00", tariff: "GF 18F Earlybird", defaultDiscount: 20 },
-  { key: "08:00-12:00", label: "08:00 - 12:00", tariff: "GF 18 Forats", defaultDiscount: 0 },
+  { key: "08:00-09:00", label: "08:00 - 09:00", tariff: "GF 18 Forats", defaultDiscount: 0 },
+  { key: "09:00-10:00", label: "09:00 - 10:00", tariff: "GF 18 Forats", defaultDiscount: 0 },
+  { key: "10:00-11:00", label: "10:00 - 11:00", tariff: "GF 18 Forats", defaultDiscount: 0 },
+  { key: "11:00-12:00", label: "11:00 - 12:00", tariff: "GF 18 Forats", defaultDiscount: 0 },
   { key: "12:00-13:00", label: "12:00 - 13:00", tariff: "GF 18 Forats (-4%)", defaultDiscount: 4 },
   { key: "13:00-14:00", label: "13:00 - 14:00", tariff: "GF 18 Forats (-10%)", defaultDiscount: 10 },
   { key: "14:00-15:00", label: "14:00 - 15:00", tariff: "GF 18 Forats (-15%)", defaultDiscount: 15 },
   { key: "15:00-16:00", label: "15:00 - 16:00", tariff: "GF 18 Forats (-20%)", defaultDiscount: 20 },
-  { key: "16:00-21:00", label: "16:00 - 21:00", tariff: "GF All You Can Play", defaultDiscount: 35 },
+  { key: "16:00-17:00", label: "16:00 - 17:00", tariff: "GF All You Can Play", defaultDiscount: 35 },
+  { key: "17:00-18:00", label: "17:00 - 18:00", tariff: "GF All You Can Play", defaultDiscount: 35 },
+  { key: "18:00-19:00", label: "18:00 - 19:00", tariff: "GF Twilight", defaultDiscount: 40 },
+  { key: "19:00-21:00", label: "19:00 - 21:00", tariff: "GF Twilight", defaultDiscount: 40 },
 ];
 
 export function getConsecutiveDays(startDateStr: string, count: number) {
@@ -217,68 +223,8 @@ export default function GolfAdminDashboard({
   const activeDetailCourseId = selectedDetailCourseId || golfCourses.find(c => c.isOurClub)?.id || "";
   const activeDetailCourse = golfCourses.find(c => c.id === activeDetailCourseId);
 
-  // Taula matriu del comparador: tots els camps carregats alhora (columnes),
-  // amb les franges horàries comunes com a files — així es pot veure d'un
-  // cop d'ull qui té el millor preu a cada hora, en lloc d'haver d'anar
-  // camp per camp.
-  //
-  // IMPORTANT sobre el consum de crèdits del proxy (ScrapingBee): abans
-  // aquesta consulta es feia AUTOMÀTICAMENT cada vegada que s'obria la
-  // pestanya, per als 7 camps alhora — amb el pla gratuït (1.000 crèdits,
-  // 25 per petició amb proxy premium) això s'esgota en poques obertures.
-  // Ara es guarda en cache al navegador (20 minuts) i només es torna a
-  // consultar quan l'usuari prem "Sincronitzar ara" explícitament.
-  const RATES_CACHE_MINUTES = 20;
-  const [allCoursesRates, setAllCoursesRates] = useState<import("../rateShopperService").RatesResponse | null>(null);
-  const [isLoadingAllRates, setIsLoadingAllRates] = useState(false);
-  const [ratesLastSyncedAt, setRatesLastSyncedAt] = useState<number | null>(null);
-
-  const cacheKeyForDate = (dateStr: string) => `golfsana_rates_cache_${dateStr}`;
-
-  const loadRatesFromCache = (dateStr: string): boolean => {
-    try {
-      const raw = localStorage.getItem(cacheKeyForDate(dateStr));
-      if (!raw) return false;
-      const { data, timestamp } = JSON.parse(raw);
-      const ageMinutes = (Date.now() - timestamp) / 60000;
-      if (ageMinutes > RATES_CACHE_MINUTES) return false;
-      setAllCoursesRates(data);
-      setRatesLastSyncedAt(timestamp);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const syncRatesNow = () => {
-    if (golfCourses.length === 0) return;
-    setIsLoadingAllRates(true);
-    fetchAllRates(golfCourses.map(c => c.name), selectedMatrixDate)
-      .then((data) => {
-        setAllCoursesRates(data);
-        const now = Date.now();
-        setRatesLastSyncedAt(now);
-        try {
-          localStorage.setItem(cacheKeyForDate(selectedMatrixDate), JSON.stringify({ data, timestamp: now }));
-        } catch { /* localStorage ple o no disponible — no crític */ }
-      })
-      .finally(() => {
-        setIsLoadingAllRates(false);
-      });
-  };
-
-  // En canviar de dia, mirem primer si ja tenim una consulta recent en
-  // cache per aquella data — si no, NO consultem automàticament (per no
-  // gastar crèdits sense que l'usuari ho hagi demanat); es queda a l'espera
-  // que premi "Sincronitzar ara".
   React.useEffect(() => {
-    setAllCoursesRates(null);
-    setRatesLastSyncedAt(null);
-    loadRatesFromCache(selectedMatrixDate);
-  }, [selectedMatrixDate]);
-
-  React.useEffect(() => {
-    if (!activeDetailCourse || activeDetailCourse.isOurClub) {
+    if (!activeDetailCourse) {
       setLiveApiTeeTimes(null);
       setLiveApiSource(null);
       return;
@@ -1964,123 +1910,6 @@ export default function GolfAdminDashboard({
               className="text-xs bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 px-3 py-1.5 focus:outline-none focus:border-blue-600 font-medium placeholder-slate-400 w-44"
             />
           </div>
-        </div>
-
-        {/* Taula Matriu Comparativa: files = franges horàries, columnes =
-            cada camp (Golf d'Aro + competidors), cada cel·la mostra el preu
-            vigent en aquell moment — permet veure d'un cop d'ull qui té el
-            millor preu a cada hora. */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-            <div>
-              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
-                <Layers className="w-3.5 h-3.5" />
-                Comparativa de tots els camps — {selectedMatrixDate}
-              </h4>
-              <p className="text-[10.5px] text-slate-400 mt-0.5">
-                {ratesLastSyncedAt
-                  ? `Actualitzat fa ${Math.max(0, Math.round((Date.now() - ratesLastSyncedAt) / 60000))} min`
-                  : "Encara no s'ha sincronitzat per aquesta data"}
-              </p>
-            </div>
-            <button
-              onClick={syncRatesNow}
-              disabled={isLoadingAllRates}
-              className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-3 py-1.5 transition-colors"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAllRates ? "animate-spin" : ""}`} />
-              {isLoadingAllRates ? "Sincronitzant..." : "Sincronitzar ara"}
-            </button>
-          </div>
-
-          {!allCoursesRates ? (
-            <div className="p-8 text-center text-xs text-slate-400 space-y-2">
-              <p>Encara no hi ha dades carregades per aquesta data.</p>
-              <p className="text-[10.5px]">Prem "Sincronitzar ara" per consultar els preus actuals.</p>
-            </div>
-          ) : (() => {
-            // Eix comú de files: cada 30 minuts (abans cada 10, generava
-            // ~85 files gairebé totes repetides — massa informació per
-            // llegir d'un cop d'ull). Amb 30 min en tenim ~28, i el preu
-            // real de cada franja segueix sent el vigent en aquell moment.
-            const rowMinutes: number[] = [];
-            for (let t = 7 * 60; t <= 20 * 60 + 50; t += 30) rowMinutes.push(t);
-
-            const findRateAtTime = (teeTimes: import("../competitorRates").TeeTime[], targetMin: number) => {
-              let best: import("../competitorRates").TeeTime | null = null;
-              for (const tt of teeTimes) {
-                if (tt.minutes <= targetMin && (!best || tt.minutes > best.minutes)) best = tt;
-              }
-              return best;
-            };
-
-            // Golf d'Aro primer, després la resta en l'ordre de golfCourses
-            const orderedCourses = [...golfCourses].sort((a, b) => (b.isOurClub ? 1 : 0) - (a.isOurClub ? 1 : 0));
-
-            return (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-                      <th className="py-2 px-3 font-bold text-slate-500 sticky left-0 bg-slate-50 dark:bg-slate-800/40 z-10">Hora</th>
-                      {orderedCourses.map((c) => {
-                        const courseData = allCoursesRates.courses.find(cd => cd.course === c.name);
-                        return (
-                          <th key={c.id} className="py-2 px-3 font-bold text-slate-700 dark:text-slate-200 min-w-[130px]">
-                            <div className="flex items-center gap-1.5">
-                              {c.isOurClub && <span className="text-amber-500">★</span>}
-                              <span className="truncate">{c.name}</span>
-                            </div>
-                            {courseData?.source && (
-                              <span className={`block text-[9px] font-bold normal-case mt-0.5 ${
-                                courseData.source === "live" ? "text-emerald-600" :
-                                courseData.source === "closed" ? "text-rose-500" : "text-slate-400"
-                              }`}>
-                                {courseData.source === "live" ? "● en directe" : courseData.source === "closed" ? "● tancat" : "● referència"}
-                              </span>
-                            )}
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rowMinutes.map((rowMin) => {
-                      const hrs = Math.floor(rowMin / 60);
-                      const mins = rowMin % 60;
-                      const timeStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-                      if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) return null;
-
-                      return (
-                        <tr key={rowMin} className="border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/60 dark:hover:bg-slate-800/20">
-                          <td className="py-1.5 px-3 font-mono font-bold text-slate-600 dark:text-slate-300 sticky left-0 bg-white dark:bg-slate-900 z-10">{timeStr}</td>
-                          {orderedCourses.map((c) => {
-                            const courseData = allCoursesRates.courses.find(cd => cd.course === c.name);
-                            if (!courseData || courseData.source === "closed") {
-                              return <td key={c.id} className="py-1.5 px-3 text-slate-300 italic">—</td>;
-                            }
-                            const rate = findRateAtTime(courseData.teeTimes, rowMin);
-                            if (!rate || rate.rates.length === 0) {
-                              return <td key={c.id} className="py-1.5 px-3 text-slate-300 italic">—</td>;
-                            }
-                            const bestRate = rate.rates[0];
-                            return (
-                              <td key={c.id} className="py-1.5 px-3">
-                                <span className="font-bold text-slate-800 dark:text-slate-100">{bestRate.price}€</span>
-                                {bestRate.discountPct ? (
-                                  <span className="ml-1 text-[10px] text-emerald-600 font-semibold">-{bestRate.discountPct}%</span>
-                                ) : null}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })()}
         </div>
 
         {/* Selected Course Quick Info Banner */}

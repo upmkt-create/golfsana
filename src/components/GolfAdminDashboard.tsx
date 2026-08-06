@@ -1791,22 +1791,6 @@ export default function GolfAdminDashboard({
                       <span>Sortides cada <strong className="text-blue-700 dark:text-blue-400 font-medium">{course.teeTimeInterval ?? 10} min</strong></span>
                     </span>
 
-                    {/* Real-time Occupancy Indicator */}
-                    {course.occupancyToday !== undefined && (
-                      <div className="mt-1 flex items-center gap-1.5 flex-wrap font-sans">
-                        <span className={`px-1 py-0.5 text-[8.5px] font-medium uppercase tracking-wider rounded-none ${
-                           course.occupancyToday >= 85 ? "bg-rose-50 text-rose-700 border border-rose-200" :
-                           course.occupancyToday >= 70 ? "bg-amber-50 text-amber-700 border border-amber-200" :
-                           "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        }`}>
-                          {course.reservationsToday !== undefined ? `${course.reservationsToday} reserves (${course.occupancyToday}%)` : `${course.occupancyToday}% Ocupat`}
-                        </span>
-                        <span className="text-[9.5px] text-slate-400 font-medium">
-                          ({course.availableSlotsToday ?? 12} t. lliures)
-                        </span>
-                      </div>
-                    )}
-
                     {course.url ? (
                       <a 
                         href={course.url} 

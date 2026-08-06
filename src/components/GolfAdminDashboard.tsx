@@ -1816,7 +1816,7 @@ export default function GolfAdminDashboard({
                       if (courseData.source === "closed") {
                         return (
                           <span className="text-xs text-rose-600 font-semibold">
-                            Camp tancat aquest dia{(courseData as any).closedReason ? ` — ${(courseData as any).closedReason}` : ""}.
+                            Camp tancat aquest dia{courseData.closedReason ? ` — ${courseData.closedReason}` : ""}.
                           </span>
                         );
                       }
@@ -1825,19 +1825,31 @@ export default function GolfAdminDashboard({
                         return <span className="text-xs text-slate-400 italic">Sense dades disponibles per aquest dia.</span>;
                       }
                       return (
-                        <div className="flex flex-wrap gap-2">
-                          {blocks.map((block, idx) => (
-                            <div key={idx} className="border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 min-w-[105px] bg-slate-50/60 dark:bg-slate-800/40">
-                              <div className="text-[9.5px] font-mono text-slate-400">
-                                {block.startTime}{block.endTime !== block.startTime ? `–${block.endTime}` : ""}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[9px] font-bold uppercase ${courseData.source === "live" ? "text-emerald-600" : "text-slate-400"}`}>
+                              {courseData.source === "live" ? "● en directe" : "● referència"}
+                            </span>
+                            {courseData.source !== "live" && courseData.scrapeDebug && (
+                              <span className="text-[9px] text-slate-400 truncate max-w-[420px]" title={courseData.scrapeDebug}>
+                                — {courseData.scrapeDebug}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {blocks.map((block, idx) => (
+                              <div key={idx} className="border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 min-w-[105px] bg-slate-50/60 dark:bg-slate-800/40">
+                                <div className="text-[9.5px] font-mono text-slate-400">
+                                  {block.startTime}{block.endTime !== block.startTime ? `–${block.endTime}` : ""}
+                                </div>
+                                <div className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                  {block.price}€
+                                  {block.discountPct ? <span className="ml-1 text-[10px] text-emerald-600 font-semibold">-{block.discountPct}%</span> : null}
+                                </div>
+                                <div className="text-[9px] text-slate-500 uppercase truncate max-w-[100px]" title={block.tariff}>{block.tariff}</div>
                               </div>
-                              <div className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                                {block.price}€
-                                {block.discountPct ? <span className="ml-1 text-[10px] text-emerald-600 font-semibold">-{block.discountPct}%</span> : null}
-                              </div>
-                              <div className="text-[9px] text-slate-500 uppercase truncate max-w-[100px]" title={block.tariff}>{block.tariff}</div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       );
                     })()}

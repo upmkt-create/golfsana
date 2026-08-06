@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { GolfCourse } from "../types";
 import { STARTER_GOLF_CORES, getRealWorldCompetitorPrices, parseAndCleanPrice, isAllowedTariff } from "../data";
-import { fetchCourseRates } from "../rateShopperService";
+import { fetchCourseRates, fetchAllRates } from "../rateShopperService";
 import {
   LineChart,
   Line,
@@ -222,6 +222,75 @@ export default function GolfAdminDashboard({
 
   const activeDetailCourseId = selectedDetailCourseId || golfCourses.find(c => c.isOurClub)?.id || "";
   const activeDetailCourse = golfCourses.find(c => c.id === activeDetailCourseId);
+
+  // Dades reals per a la taula "Camps Analitzats": tots els camps carregats
+  // alhora, amb cache al navegador (20 min) i sincronització NOMÉS sota
+  // demanda — abans no hi havia cap connexió amb l'scraping en directe, i
+  // un disseny que consultés tot automàticament gastaria crèdits del
+  // proxy (ScrapingBee) cada vegada que s'obrís la pestanya.
+  const RATES_CACHE_MINUTES = 20;
+  const [allCoursesRates, setAllCoursesRates] = useState<import("../rateShopperService").RatesResponse | null>(null);
+  const [isLoadingAllRates, setIsLoadingAllRates] = useState(false);
+  const [ratesLastSyncedAt, setRatesLastSyncedAt] = useState<number | null>(null);
+
+  const cacheKeyForDate = (dateStr: string) => `golfsana_rates_cache_${dateStr}`;
+
+  const loadRatesFromCache = (dateStr: string): boolean => {
+    try {
+      const raw = localStorage.getItem(cacheKeyForDate(dateStr));
+      if (!raw) return false;
+      const { data, timestamp } = JSON.parse(raw);
+      const ageMinutes = (Date.now() - timestamp) / 60000;
+      if (ageMinutes > RATES_CACHE_MINUTES) return false;
+      setAllCoursesRates(data);
+      setRatesLastSyncedAt(timestamp);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const syncRatesNow = () => {
+    if (golfCourses.length === 0) return;
+    setIsLoadingAllRates(true);
+    fetchAllRates(golfCourses.map(c => c.name), selectedMatrixDate)
+      .then((data) => {
+        setAllCoursesRates(data);
+        const now = Date.now();
+        setRatesLastSyncedAt(now);
+        try {
+          localStorage.setItem(cacheKeyForDate(selectedMatrixDate), JSON.stringify({ data, timestamp: now }));
+        } catch { /* localStorage ple o no disponible — no crític */ }
+      })
+      .finally(() => {
+        setIsLoadingAllRates(false);
+      });
+  };
+
+  React.useEffect(() => {
+    setAllCoursesRates(null);
+    setRatesLastSyncedAt(null);
+    loadRatesFromCache(selectedMatrixDate);
+  }, [selectedMatrixDate]);
+
+  // Agrupa els tee-times consecutius que tenen el mateix preu principal en
+  // un sol "tram visual" — així cada camp mostra només els canvis REALS de
+  // tarifa (uns 4-8 per dia), en lloc d'una fila per cada sortida cada 9/10
+  // minuts (que serien desenes de columnes gairebé totes repetides).
+  const groupTeeTimesIntoBlocks = (teeTimes: import("../competitorRates").TeeTime[]) => {
+    const blocks: { startTime: string; endTime: string; price: number; tariff: string; discountPct?: number }[] = [];
+    teeTimes.forEach((tt) => {
+      const rate = tt.rates[0];
+      if (!rate) return;
+      const last = blocks[blocks.length - 1];
+      if (last && last.price === rate.price && last.tariff === rate.tariff) {
+        last.endTime = tt.time;
+      } else {
+        blocks.push({ startTime: tt.time, endTime: tt.time, price: rate.price, tariff: rate.tariff, discountPct: rate.discountPct });
+      }
+    });
+    return blocks;
+  };
 
   React.useEffect(() => {
     if (!activeDetailCourse) {
@@ -1675,16 +1744,30 @@ export default function GolfAdminDashboard({
           </div>
         </div>
 
-        <div className="mt-4 min-w-[900px] overflow-x-auto">
+        <div className="mt-4 flex items-center justify-between px-1">
+          <p className="text-[10.5px] text-slate-400">
+            {ratesLastSyncedAt
+              ? `Preus actualitzats fa ${Math.max(0, Math.round((Date.now() - ratesLastSyncedAt) / 60000))} min`
+              : "Encara no s'ha sincronitzat per aquesta data"}
+          </p>
+          <button
+            onClick={syncRatesNow}
+            disabled={isLoadingAllRates}
+            className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-3 py-1.5 transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAllRates ? "animate-spin" : ""}`} />
+            {isLoadingAllRates ? "Sincronitzant..." : "Sincronitzar ara"}
+          </button>
+        </div>
+
+        <div className="mt-2 min-w-[900px] overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-100 dark:bg-slate-800 border-b border-slate-2050 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
                 <th className="py-2.5 px-3 w-[260px] border-r border-slate-200 dark:border-slate-800">Camps Analitzats</th>
-                {HOUR_RANGES.map(range => (
-                  <th key={range.key} className="py-3 px-2 text-center border-r border-slate-200 dark:border-slate-800 min-w-[135px]">
-                    <div className="text-[11px] font-semibold text-slate-800 dark:text-slate-100 font-sans tracking-tight">{range.label}</div>
-                  </th>
-                ))}
+                <th className="py-2.5 px-3 text-left">
+                  Trams de tarifa reals del dia (cada targeta = un canvi de preu real, no una hora fixa)
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1740,129 +1823,41 @@ export default function GolfAdminDashboard({
                     )}
                   </td>
 
-                  {HOUR_RANGES.map(range => {
-                    const { price, tariff, options } = getDynamicCourseRate(course, selectedMatrixDate, range.key);
-                    const isCellEditing = editingCell?.courseId === course.id && editingCell?.hour === range.key;
-
-                    // High-contrast discrete heat-mapping mapping (User Request: "colors han de ser més diferents, no es veu molt clar d'un cop d'ull. Els números han de ser blancs")
-                    const ratio = maxPrice !== minPrice ? (price - minPrice) / (maxPrice - minPrice) : 0.5;
-                    
-                    let cellBg = "";
-                    let cellText = "#ffffff"; // strictly white numbers as requested
-                    let cellBorder = "";
-
-                    if (price <= 0) {
-                      cellBg = "rgb(71, 85, 105)"; // Custom slate color for restricted / filtered out tariffs
-                      cellBorder = "border-slate-600";
-                    } else if (ratio < 0.15) {
-                      cellBg = "rgb(34, 197, 94)"; // vibrant green (Econòmic)
-                      cellBorder = "border-green-550";
-                    } else if (ratio < 0.45) {
-                      cellBg = "rgb(21, 128, 61)"; // darker forest green (Moderat)
-                      cellBorder = "border-green-755";
-                    } else if (ratio < 0.70) {
-                      cellBg = "rgb(245, 158, 11)"; // solid amber
-                      cellBorder = "border-amber-600";
-                    } else if (ratio < 0.88) {
-                      cellBg = "rgb(249, 115, 22)"; // solid orange
-                      cellBorder = "border-orange-600";
-                    } else {
-                      cellBg = "rgb(239, 68, 68)"; // solid red
-                      cellBorder = "border-red-600";
-                    }
-
-                    const cellStyle = {
-                      backgroundColor: cellBg,
-                      color: cellText,
-                    };
-
-                    return (
-                      <td 
-                        key={range.key} 
-                        className={`p-2 text-center font-sans border-r border-slate-205 dark:border-slate-800 font-normal transition-all hover:brightness-110 border-b ${cellBorder} min-w-[145px]`}
-                        style={cellStyle}
-                        title={isAdmin ? `Clica per canviar preu o tarifa (${range.label})` : undefined}
-                      >
-                        {isCellEditing && isAdmin ? (
-                          <div className="flex flex-col gap-1 items-center justify-center p-1 bg-slate-900 text-slate-100 rounded-md max-w-[135px] mx-auto relative z-20 shadow-lg border border-slate-700 font-sans">
-                            <input 
-                              type="number"
-                              className="w-full px-1.5 py-0.5 bg-white border border-slate-300 text-slate-900 text-center text-xs font-black rounded font-sans focus:outline-none"
-                              value={tempCellVal}
-                              onChange={(e) => setTempCellVal(Number(e.target.value) || 0)}
-                              placeholder="Preu €"
-                              autoFocus
-                            />
-                            <input 
-                              type="text"
-                              className="w-full px-1.5 py-0.5 bg-white border border-slate-300 text-slate-900 text-center text-[10px] font-bold rounded font-sans focus:outline-none"
-                              value={tempTariffVal}
-                              onChange={(e) => setTempTariffVal(e.target.value)}
-                              placeholder="Nom Tarifa"
-                            />
-                            <div className="flex w-full gap-1 mt-0.5">
-                              <button
-                                onMouseDown={() => handleSaveHourlyRateAndTariff(course, range.key, tempCellVal, tempTariffVal)}
-                                className="flex-1 py-0.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-[10px] font-bold flex items-center justify-center font-sans"
-                                title="Guardar"
-                              >
-                                <Check className="w-3 h-3" />
-                              </button>
-                              <button
-                                onMouseDown={() => setEditingCell(null)}
-                                className="px-1.5 py-0.5 bg-rose-600 text-white rounded hover:bg-rose-700 text-[10px] font-bold flex items-center justify-center font-sans"
-                                title="Cancel·lar"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div 
-                            onClick={() => {
-                              if (isAdmin) {
-                                setEditingCell({ courseId: course.id, hour: range.key });
-                                setTempCellVal(price);
-                                setTempTariffVal(tariff);
-                              }
-                            }}
-                            className={`cursor-pointer h-full py-1 font-sans tracking-tight leading-tight select-none ${isAdmin ? "hover:scale-105 active:scale-95 transition-transform" : ""} space-y-1`}
-                          >
-                            {options && options.length > 0 ? (
-                              <div className="flex flex-col gap-1 w-full text-left">
-                                {options.map((opt, oIdx) => (
-                                  <div key={oIdx} className="bg-black/20 p-1 text-[10.5px] leading-tight flex flex-col font-sans hover:bg-black/35 transition-colors border-l-2 border-white/40">
-                                    <div className="flex items-center justify-between gap-1.5 font-sans">
-                                      <span className="font-extrabold text-white uppercase text-[8.5px] tracking-tight truncate max-w-[85px] leading-none">
-                                        {opt.tariff}
-                                      </span>
-                                      <span className="font-black text-white text-[11px] leading-none shrink-0">
-                                        {opt.price}€
-                                      </span>
-                                    </div>
-                                    {opt.discountPct !== undefined && opt.discountPct > 0 && (
-                                      <span className="text-[8px] font-medium text-white/80 tracking-tight leading-none mt-0.5">
-                                        -{opt.discountPct}% (de {opt.originalPrice ?? 115}€)
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
+                  <td className="p-3 align-top">
+                    {(() => {
+                      const courseData = allCoursesRates?.courses.find(cd => cd.course === course.name);
+                      if (!courseData) {
+                        return <span className="text-xs text-slate-400 italic">Prem "Sincronitzar ara" per veure els preus d'avui.</span>;
+                      }
+                      if (courseData.source === "closed") {
+                        return (
+                          <span className="text-xs text-rose-600 font-semibold">
+                            Camp tancat aquest dia{(courseData as any).closedReason ? ` — ${(courseData as any).closedReason}` : ""}.
+                          </span>
+                        );
+                      }
+                      const blocks = groupTeeTimesIntoBlocks(courseData.teeTimes);
+                      if (blocks.length === 0) {
+                        return <span className="text-xs text-slate-400 italic">Sense dades disponibles per aquest dia.</span>;
+                      }
+                      return (
+                        <div className="flex flex-wrap gap-2">
+                          {blocks.map((block, idx) => (
+                            <div key={idx} className="border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 min-w-[105px] bg-slate-50/60 dark:bg-slate-800/40">
+                              <div className="text-[9.5px] font-mono text-slate-400">
+                                {block.startTime}{block.endTime !== block.startTime ? `–${block.endTime}` : ""}
                               </div>
-                            ) : (
-                              <>
-                                <div className="text-[12.5px] font-semibold text-white drop-shadow-sm">
-                                  {price > 0 ? `${price}€` : "Restringit"}
-                                </div>
-                                <div className="text-[9px] font-black text-white/95 mt-0.5 leading-tight tracking-tight uppercase whitespace-normal break-words max-w-[125px] mx-auto drop-shadow-sm">
-                                  {price > 0 ? tariff : "Filtre Actiu"}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
+                              <div className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                {block.price}€
+                                {block.discountPct ? <span className="ml-1 text-[10px] text-emerald-600 font-semibold">-{block.discountPct}%</span> : null}
+                              </div>
+                              <div className="text-[9px] text-slate-500 uppercase truncate max-w-[100px]" title={block.tariff}>{block.tariff}</div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </td>
                 </tr>
               ))}
             </tbody>

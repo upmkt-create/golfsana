@@ -1913,6 +1913,24 @@ export default function App() {
     }
   };
 
+  const handleEditUserNote = async (userId: string, noteId: string, content: string) => {
+    if (!content.trim()) return;
+    const target = users.find((u) => u.id === userId);
+    const nextList = (target?.notesList || []).map((n) =>
+      n.id === noteId ? { ...n, content, updatedAt: new Date().toISOString() } : n
+    );
+    const updated = users.map((u) => (u.id === userId ? { ...u, notesList: nextList } : u));
+    setUsers(updated);
+    localStorage.setItem("golfsana_users", JSON.stringify(updated));
+    addToast("Nota actualitzada", "success");
+
+    try {
+      await saveDoc(doc(db, "users", userId), { notesList: nextList }, { merge: true });
+    } catch (err) {
+      console.warn("[Firestore Write Warning] user notes: saved in client sandbox", err);
+    }
+  };
+
   // Elimina un usuari completament (per exemple per tornar-lo a crear net
   // quan les credencials donen problemes que no es resolen editant-les).
   const handleDeleteUserProfile = async (userId: string) => {
@@ -2904,6 +2922,7 @@ export default function App() {
                   onAddTask={handleAddTask}
                   onSelectTask={(task) => setSelectedTask(task)}
                   onAddUserNote={handleAddUserNote}
+                  onEditUserNote={handleEditUserNote}
                   onDeleteUserNote={handleDeleteUserNote}
                 />
               ) : (

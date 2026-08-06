@@ -11,6 +11,7 @@ export interface MemberNote {
   id: string;
   content: string; // Contingut amb format (HTML de RichTextEditor)
   createdAt: string; // ISO
+  updatedAt?: string; // ISO — present només si la nota s'ha editat
 }
 
 export interface UserProfile {

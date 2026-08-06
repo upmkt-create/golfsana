@@ -25,6 +25,7 @@ export interface CourseRateData {
   slug: string;
   source: "live" | "model" | "closed";
   closedReason?: string;
+  scrapeDebug?: string; // motiu exacte quan no s'ha pogut connectar en directe
   teeTimes: TeeTime[];
   summary: DaySummary;
 }

@@ -221,22 +221,61 @@ export default function GolfAdminDashboard({
   // amb les franges horàries comunes com a files — així es pot veure d'un
   // cop d'ull qui té el millor preu a cada hora, en lloc d'haver d'anar
   // camp per camp.
+  //
+  // IMPORTANT sobre el consum de crèdits del proxy (ScrapingBee): abans
+  // aquesta consulta es feia AUTOMÀTICAMENT cada vegada que s'obria la
+  // pestanya, per als 7 camps alhora — amb el pla gratuït (1.000 crèdits,
+  // 25 per petició amb proxy premium) això s'esgota en poques obertures.
+  // Ara es guarda en cache al navegador (20 minuts) i només es torna a
+  // consultar quan l'usuari prem "Sincronitzar ara" explícitament.
+  const RATES_CACHE_MINUTES = 20;
   const [allCoursesRates, setAllCoursesRates] = useState<import("../rateShopperService").RatesResponse | null>(null);
   const [isLoadingAllRates, setIsLoadingAllRates] = useState(false);
+  const [ratesLastSyncedAt, setRatesLastSyncedAt] = useState<number | null>(null);
 
-  React.useEffect(() => {
+  const cacheKeyForDate = (dateStr: string) => `golfsana_rates_cache_${dateStr}`;
+
+  const loadRatesFromCache = (dateStr: string): boolean => {
+    try {
+      const raw = localStorage.getItem(cacheKeyForDate(dateStr));
+      if (!raw) return false;
+      const { data, timestamp } = JSON.parse(raw);
+      const ageMinutes = (Date.now() - timestamp) / 60000;
+      if (ageMinutes > RATES_CACHE_MINUTES) return false;
+      setAllCoursesRates(data);
+      setRatesLastSyncedAt(timestamp);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const syncRatesNow = () => {
     if (golfCourses.length === 0) return;
-    let cancelled = false;
     setIsLoadingAllRates(true);
     fetchAllRates(golfCourses.map(c => c.name), selectedMatrixDate)
       .then((data) => {
-        if (!cancelled) setAllCoursesRates(data);
+        setAllCoursesRates(data);
+        const now = Date.now();
+        setRatesLastSyncedAt(now);
+        try {
+          localStorage.setItem(cacheKeyForDate(selectedMatrixDate), JSON.stringify({ data, timestamp: now }));
+        } catch { /* localStorage ple o no disponible — no crític */ }
       })
       .finally(() => {
-        if (!cancelled) setIsLoadingAllRates(false);
+        setIsLoadingAllRates(false);
       });
-    return () => { cancelled = true; };
-  }, [golfCourses.map(c => c.name).join("|"), selectedMatrixDate]);
+  };
+
+  // En canviar de dia, mirem primer si ja tenim una consulta recent en
+  // cache per aquella data — si no, NO consultem automàticament (per no
+  // gastar crèdits sense que l'usuari ho hagi demanat); es queda a l'espera
+  // que premi "Sincronitzar ara".
+  React.useEffect(() => {
+    setAllCoursesRates(null);
+    setRatesLastSyncedAt(null);
+    loadRatesFromCache(selectedMatrixDate);
+  }, [selectedMatrixDate]);
 
   React.useEffect(() => {
     if (!activeDetailCourse || activeDetailCourse.isOurClub) {
@@ -1933,26 +1972,39 @@ export default function GolfAdminDashboard({
             millor preu a cada hora. */}
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 mb-6 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-            <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
-              <Layers className="w-3.5 h-3.5" />
-              Comparativa de tots els camps — {selectedMatrixDate}
-            </h4>
-            {isLoadingAllRates && (
-              <span className="text-[11px] font-bold text-amber-600 flex items-center gap-1.5">
-                <RefreshCw className="w-3 h-3 animate-spin" />
-                Actualitzant preus...
-              </span>
-            )}
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                <Layers className="w-3.5 h-3.5" />
+                Comparativa de tots els camps — {selectedMatrixDate}
+              </h4>
+              <p className="text-[10.5px] text-slate-400 mt-0.5">
+                {ratesLastSyncedAt
+                  ? `Actualitzat fa ${Math.max(0, Math.round((Date.now() - ratesLastSyncedAt) / 60000))} min`
+                  : "Encara no s'ha sincronitzat per aquesta data"}
+              </p>
+            </div>
+            <button
+              onClick={syncRatesNow}
+              disabled={isLoadingAllRates}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-3 py-1.5 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAllRates ? "animate-spin" : ""}`} />
+              {isLoadingAllRates ? "Sincronitzant..." : "Sincronitzar ara"}
+            </button>
           </div>
 
           {!allCoursesRates ? (
-            <div className="p-6 text-center text-xs text-slate-400">Carregant comparativa...</div>
+            <div className="p-8 text-center text-xs text-slate-400 space-y-2">
+              <p>Encara no hi ha dades carregades per aquesta data.</p>
+              <p className="text-[10.5px]">Prem "Sincronitzar ara" per consultar els preus actuals.</p>
+            </div>
           ) : (() => {
-            // Eix comú de files: cada 10 minuts, de 07:00 a 20:50 — un eix
-            // fix independent de l'interval propi de cada camp, perquè
-            // totes les columnes es puguin llegir a la mateixa alçada.
+            // Eix comú de files: cada 30 minuts (abans cada 10, generava
+            // ~85 files gairebé totes repetides — massa informació per
+            // llegir d'un cop d'ull). Amb 30 min en tenim ~28, i el preu
+            // real de cada franja segueix sent el vigent en aquell moment.
             const rowMinutes: number[] = [];
-            for (let t = 7 * 60; t <= 20 * 60 + 50; t += 10) rowMinutes.push(t);
+            for (let t = 7 * 60; t <= 20 * 60 + 50; t += 30) rowMinutes.push(t);
 
             const findRateAtTime = (teeTimes: import("../competitorRates").TeeTime[], targetMin: number) => {
               let best: import("../competitorRates").TeeTime | null = null;
@@ -1974,7 +2026,7 @@ export default function GolfAdminDashboard({
                       {orderedCourses.map((c) => {
                         const courseData = allCoursesRates.courses.find(cd => cd.course === c.name);
                         return (
-                          <th key={c.id} className="py-2 px-3 font-bold text-slate-700 dark:text-slate-200 min-w-[140px]">
+                          <th key={c.id} className="py-2 px-3 font-bold text-slate-700 dark:text-slate-200 min-w-[130px]">
                             <div className="flex items-center gap-1.5">
                               {c.isOurClub && <span className="text-amber-500">★</span>}
                               <span className="truncate">{c.name}</span>

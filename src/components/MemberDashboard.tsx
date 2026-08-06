@@ -46,6 +46,7 @@ interface MemberDashboardProps {
   onSelectTask?: (task: Task) => void;
   onAddUserNote?: (userId: string, content: string) => void;
   onDeleteUserNote?: (userId: string, noteId: string) => void;
+  onEditUserNote?: (userId: string, noteId: string, content: string) => void;
 }
 
 export default function MemberDashboard({
@@ -60,13 +61,16 @@ export default function MemberDashboard({
   onAddTask,
   onSelectTask,
   onAddUserNote,
-  onDeleteUserNote
+  onDeleteUserNote,
+  onEditUserNote
 }: MemberDashboardProps) {
   // Find member details
   const member = users.find(u => u.id === memberId);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
   const [confirmingDeleteNoteId, setConfirmingDeleteNoteId] = useState<string | null>(null);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState("");
   const saveNewNote = () => {
     if (member && newNoteText.trim()) onAddUserNote?.(member.id, newNoteText);
     setNewNoteText("");
@@ -75,6 +79,17 @@ export default function MemberDashboard({
   const removeNote = (noteId: string) => {
     if (member) onDeleteUserNote?.(member.id, noteId);
     setConfirmingDeleteNoteId(null);
+  };
+  const startEditingNote = (noteId: string, currentContent: string) => {
+    setEditingNoteId(noteId);
+    setEditingNoteText(currentContent);
+  };
+  const saveEditedNote = () => {
+    if (member && editingNoteId && editingNoteText.trim()) {
+      onEditUserNote?.(member.id, editingNoteId, editingNoteText);
+    }
+    setEditingNoteId(null);
+    setEditingNoteText("");
   };
   // Arrossegar targetes entre columnes del tauler d'aquest membre
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -420,23 +435,57 @@ export default function MemberDashboard({
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] text-slate-400 font-mono">
                     {new Date(note.createdAt).toLocaleString('ca-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    {note.updatedAt && <span className="italic text-slate-350"> (editada)</span>}
                   </span>
-                  {confirmingDeleteNoteId === note.id ? (
+                  {editingNoteId === note.id ? null : confirmingDeleteNoteId === note.id ? (
                     <span className="flex items-center gap-1.5">
                       <span className="text-[10px] text-rose-600 font-semibold">Segur?</span>
                       <button onClick={() => removeNote(note.id)} className="text-[10.5px] font-bold text-rose-600 hover:text-rose-800">Sí</button>
                       <button onClick={() => setConfirmingDeleteNoteId(null)} className="text-[10.5px] font-bold text-slate-500 hover:text-slate-700">No</button>
                     </span>
                   ) : (
-                    <button
-                      onClick={() => setConfirmingDeleteNoteId(note.id)}
-                      className="text-[10.5px] font-bold text-slate-400 hover:text-rose-600"
-                    >
-                      Eliminar
-                    </button>
+                    <span className="flex items-center gap-3">
+                      <button
+                        onClick={() => startEditingNote(note.id, note.content)}
+                        className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => setConfirmingDeleteNoteId(note.id)}
+                        className="text-[10.5px] font-bold text-slate-400 hover:text-rose-600"
+                      >
+                        Eliminar
+                      </button>
+                    </span>
                   )}
                 </div>
-                <div className="text-xs text-slate-600 leading-relaxed rte-content" dangerouslySetInnerHTML={{ __html: note.content }} />
+                {editingNoteId === note.id ? (
+                  <div className="space-y-2">
+                    <RichTextEditor
+                      value={editingNoteText}
+                      onChange={setEditingNoteText}
+                      placeholder="Notes internes: rendiment, converses, seguiment, incidències..."
+                      minHeightClass="min-h-[80px]"
+                    />
+                    <div className="flex justify-end gap-1.5">
+                      <button
+                        onClick={() => { setEditingNoteId(null); setEditingNoteText(""); }}
+                        className="px-2.5 py-1 border text-[10.5px] font-bold text-slate-600 hover:bg-slate-50"
+                      >
+                        Cancel·lar
+                      </button>
+                      <button
+                        onClick={saveEditedNote}
+                        className="px-3 py-1 bg-indigo-600 text-white text-[10.5px] font-bold hover:bg-indigo-700"
+                      >
+                        Desar canvis
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-600 leading-relaxed rte-content" dangerouslySetInnerHTML={{ __html: note.content }} />
+                )}
               </div>
             ))
           )}

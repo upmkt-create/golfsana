@@ -10,8 +10,11 @@ import {
   ChevronDown,
   ChevronUp,
   Pencil,
+  CalendarClock,
+  FileEdit,
 } from "lucide-react";
-import { InfoNote, UserProfile } from "../types";
+import { InfoNote, InfoNoteStatus, UserProfile } from "../types";
+import { isInfoNoteLive } from "../lib/infoNotes";
 import RichTextEditor from "./RichTextEditor";
 
 interface InfoNotesDashboardProps {
@@ -21,6 +24,7 @@ interface InfoNotesDashboardProps {
   isAdmin: boolean;
   onSaveNote: (note: InfoNote, isNew: boolean) => Promise<void> | void;
   onDeleteNote: (id: string) => Promise<void> | void;
+  now?: Date;
 }
 
 const NAVY = "#033b7a";
@@ -36,6 +40,14 @@ function formatDate(iso?: string) {
   });
 }
 
+// Converteix un ISO a format "YYYY-MM-DDTHH:mm" per l'input datetime-local
+function toDatetimeLocalValue(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function InfoNotesDashboard({
   notes,
   users,
@@ -43,16 +55,40 @@ export default function InfoNotesDashboard({
   isAdmin,
   onSaveNote,
   onDeleteNote,
+  now = new Date(),
 }: InfoNotesDashboardProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
   const [expandedReaders, setExpandedReaders] = useState<string | null>(null);
 
-  const sortedNotes = useMemo(
-    () => [...notes].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")),
-    [notes]
+  // Notes que aquest usuari pot veure a la llista: totes les publicades/ja en
+  // hora (per a tothom), més els esborranys i programacions propis, més
+  // absolutament tot per als admins (per poder-hi fer seguiment/edició).
+  const visibleNotes = useMemo(
+    () =>
+      notes.filter(
+        (n) => isAdmin || isInfoNoteLive(n, now) || n.createdBy === currentUser.id
+      ),
+    [notes, isAdmin, currentUser.id, now]
+  );
+
+  const inPreparation = useMemo(
+    () =>
+      visibleNotes
+        .filter((n) => !isInfoNoteLive(n, now))
+        .sort((a, b) => (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || "")),
+    [visibleNotes, now]
+  );
+
+  const published = useMemo(
+    () =>
+      visibleNotes
+        .filter((n) => isInfoNoteLive(n, now))
+        .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || "")),
+    [visibleNotes, now]
   );
 
   const resetForm = () => {
@@ -60,6 +96,7 @@ export default function InfoNotesDashboard({
     setEditingId(null);
     setTitle("");
     setContent("");
+    setScheduledFor("");
   };
 
   const startEdit = (note: InfoNote) => {
@@ -67,18 +104,32 @@ export default function InfoNotesDashboard({
     setIsCreating(true);
     setTitle(note.title);
     setContent(note.content);
+    setScheduledFor(toDatetimeLocalValue(note.scheduledFor));
   };
 
-  const handleSubmit = async () => {
+  // Qui pot editar/gestionar una nota concreta: l'autor mentre no s'hagi
+  // publicat encara, o un admin en qualsevol moment.
+  const canManage = (note: InfoNote) =>
+    isAdmin || (note.createdBy === currentUser.id && !isInfoNoteLive(note, now));
+
+  const submit = async (status: InfoNoteStatus) => {
     const cleanTitle = title.trim();
     const cleanContent = content.trim();
     if (!cleanTitle || !cleanContent || cleanContent === "<br>") return;
+    if (status === "scheduled" && !scheduledFor) return;
 
-    if (editingId) {
-      const existing = notes.find((n) => n.id === editingId);
-      if (!existing) return;
+    const existing = editingId ? notes.find((n) => n.id === editingId) : null;
+
+    if (existing) {
       await onSaveNote(
-        { ...existing, title: cleanTitle, content, updatedAt: new Date().toISOString() },
+        {
+          ...existing,
+          title: cleanTitle,
+          content,
+          status,
+          scheduledFor: status === "scheduled" ? new Date(scheduledFor).toISOString() : undefined,
+          updatedAt: new Date().toISOString(),
+        },
         false
       );
     } else {
@@ -89,6 +140,8 @@ export default function InfoNotesDashboard({
         createdBy: currentUser.id,
         createdByName: currentUser.name,
         createdAt: new Date().toISOString(),
+        status,
+        scheduledFor: status === "scheduled" ? new Date(scheduledFor).toISOString() : undefined,
         acknowledgedBy: [],
       };
       await onSaveNote(newNote, true);
@@ -96,8 +149,24 @@ export default function InfoNotesDashboard({
     resetForm();
   };
 
+  const renderStatusBadge = (note: InfoNote) => {
+    if (isInfoNoteLive(note, now)) return null; // ja publicada, no cal etiqueta d'estat
+    if (note.status === "draft") {
+      return (
+        <span className="text-[9px] flex items-center gap-1 bg-slate-100 text-slate-600 px-1.5 py-0.5 font-bold uppercase tracking-wide">
+          <FileEdit className="w-3 h-3" /> Esborrany
+        </span>
+      );
+    }
+    return (
+      <span className="text-[9px] flex items-center gap-1 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 font-bold uppercase tracking-wide">
+        <CalendarClock className="w-3 h-3" /> Programada · {formatDate(note.scheduledFor)}
+      </span>
+    );
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">
@@ -132,10 +201,24 @@ export default function InfoNotesDashboard({
           <RichTextEditor
             value={content}
             onChange={setContent}
-            placeholder="Escriu aquí el comunicat per a tot l'equip..."
+            placeholder="Escriu aquí el comunicat. Pots desar-ho com a esborrany i tornar-hi més tard per afegir-hi més temes abans d'enviar-ho."
             minHeightClass="min-h-[10rem]"
           />
-          <div className="flex items-center justify-end gap-2">
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+              <CalendarClock className="w-3.5 h-3.5" />
+              Programar per a:
+            </label>
+            <input
+              type="datetime-local"
+              value={scheduledFor}
+              onChange={(e) => setScheduledFor(e.target.value)}
+              className="border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 flex-wrap pt-1">
             <button
               onClick={resetForm}
               className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100"
@@ -143,29 +226,97 @@ export default function InfoNotesDashboard({
               Cancel·lar
             </button>
             <button
-              onClick={handleSubmit}
+              onClick={() => submit("draft")}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-slate-700 border border-slate-300 hover:bg-slate-50"
+            >
+              <FileEdit className="w-3.5 h-3.5" />
+              Desar esborrany
+            </button>
+            <button
+              onClick={() => submit("scheduled")}
+              disabled={!scheduledFor}
+              title={!scheduledFor ? "Tria primer data i hora" : ""}
+              className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white ${
+                scheduledFor ? "bg-indigo-600 hover:bg-indigo-700" : "bg-indigo-200 cursor-not-allowed"
+              }`}
+            >
+              <CalendarClock className="w-3.5 h-3.5" />
+              Programar enviament
+            </button>
+            <button
+              onClick={() => submit("published")}
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white"
               style={{ backgroundColor: NAVY }}
             >
               <Send className="w-3.5 h-3.5" />
-              {editingId ? "Desar canvis" : "Publicar a tot l'equip"}
+              Publicar ara
             </button>
           </div>
-          {!editingId && (
-            <p className="text-[10px] text-slate-400">
-              En publicar-se, apareixerà com a pop-up obligatori a tots els membres fins que l'acceptin.
-            </p>
-          )}
+          <p className="text-[10px] text-slate-400">
+            "Desar esborrany" no notifica ningú — el pots reobrir i seguir-hi afegint temes quan vulguis. "Programar" el publicarà sol al moment exacte que triïs. "Publicar ara" surt a l'instant com a pop-up obligatori a tot l'equip.
+          </p>
+        </div>
+      )}
+
+      {inPreparation.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+            En preparació ({inPreparation.length})
+          </p>
+          {inPreparation.map((note) => (
+            <div key={note.id} className="bg-white border border-dashed border-slate-300">
+              <div className="p-4 flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-slate-900 text-sm">{note.title || "(sense títol)"}</h4>
+                    {renderStatusBadge(note)}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {note.createdByName} · {formatDate(note.updatedAt || note.createdAt)}
+                  </p>
+                  <div
+                    className="text-xs text-slate-500 mt-2 leading-relaxed line-clamp-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-bold"
+                    dangerouslySetInnerHTML={{ __html: note.content }}
+                  />
+                </div>
+                {canManage(note) && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => startEdit(note)}
+                      title="Editar / continuar"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Segur que vols eliminar "${note.title}"?`)) {
+                          onDeleteNote(note.id);
+                        }
+                      }}
+                      title="Eliminar"
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                    >
+                      <Trash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
       <div className="space-y-2">
-        {sortedNotes.length === 0 && !isCreating && (
+        <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400">
+          Publicades ({published.length})
+        </p>
+        {published.length === 0 && (
           <div className="text-center py-10 text-sm text-slate-400 border border-dashed border-slate-200">
             Encara no hi ha cap nota informativa publicada.
           </div>
         )}
-        {sortedNotes.map((note) => {
+        {published.map((note) => {
           const totalUsers = users.length;
           const readers = note.acknowledgedBy || [];
           const readerIds = new Set(readers.map((r) => r.userId));

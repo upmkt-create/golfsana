@@ -1,0 +1,18 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Adjunts de Novetats (imatges/PDF). Mateix nivell d'obertura que la
+    // resta de l'app (sense Auth real, login per codi d'accés) — coherent
+    // amb firestore.rules. Límit de 15 MB per fitxer.
+    match /infoNotes/{noteId}/{fileName} {
+      allow read: if true;
+      allow write: if request.resource.size < 15 * 1024 * 1024;
+      allow delete: if true;
+    }
+
+    // Safety net: la resta del bucket queda tancat per defecte.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

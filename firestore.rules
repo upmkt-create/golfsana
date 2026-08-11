@@ -62,6 +62,10 @@ service cloud.firestore {
       return data.userId is string && data.userId.size() <= 128;
     }
 
+    function isValidInfoNote(data) {
+      return data.id is string && data.id.size() <= 128;
+    }
+
     // --- Collections Routing Rules ---
 
     // USERS COLLECTION
@@ -110,6 +114,13 @@ service cloud.firestore {
     match /notifications/{notificationId} {
       allow list, get: if true;
       allow create, update: if isValidNotification(incoming());
+      allow delete: if true;
+    }
+
+    // INFO NOTES COLLECTION (comunicats de l'equip amb confirmació de lectura)
+    match /infoNotes/{noteId} {
+      allow list, get: if true;
+      allow create, update: if isValidInfoNote(incoming());
       allow delete: if true;
     }
 

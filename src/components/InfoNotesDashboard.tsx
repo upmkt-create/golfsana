@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   Megaphone,
   Plus,
@@ -12,9 +12,20 @@ import {
   Pencil,
   CalendarClock,
   FileEdit,
+  Paperclip,
+  X,
+  Copy,
+  Ban,
+  FileDown,
+  Image as ImageIcon,
+  FileText,
+  Building2,
 } from "lucide-react";
-import { InfoNote, InfoNoteStatus, UserProfile } from "../types";
-import { isInfoNoteLive } from "../lib/infoNotes";
+import { InfoNote, InfoNoteAttachment, InfoNoteStatus, UserProfile } from "../types";
+import { isInfoNoteLive, isInfoNoteForUser } from "../lib/infoNotes";
+import { DEPARTMENTS } from "../data";
+import { storage } from "../firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import RichTextEditor from "./RichTextEditor";
 
 interface InfoNotesDashboardProps {
@@ -40,12 +51,73 @@ function formatDate(iso?: string) {
   });
 }
 
-// Converteix un ISO a format "YYYY-MM-DDTHH:mm" per l'input datetime-local
 function toDatetimeLocalValue(iso?: string) {
   if (!iso) return "";
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function genId() {
+  return "infonote-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+}
+
+// Exporta a PDF, per a una nota concreta, qui l'ha acceptada i qui no —
+// càrrega dinàmica de jsPDF perquè només s'utilitza quan un admin ho demana.
+async function exportReadersPdf(note: InfoNote, users: UserProfile[]) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF();
+  const readers = note.acknowledgedBy || [];
+  const readerIds = new Set(readers.map((r) => r.userId));
+  const pending = users.filter((u) => !readerIds.has(u.id));
+
+  doc.setFontSize(14);
+  doc.text(note.title, 14, 18);
+  doc.setFontSize(9);
+  doc.setTextColor(120);
+  doc.text(`Registre de lectura · Exportat ${new Date().toLocaleString("ca-ES")}`, 14, 25);
+
+  let y = 36;
+  doc.setTextColor(0);
+  doc.setFontSize(11);
+  doc.text(`Acceptada (${readers.length})`, 14, y);
+  y += 7;
+  doc.setFontSize(9);
+  if (readers.length === 0) {
+    doc.text("Ningú encara.", 16, y);
+    y += 6;
+  }
+  readers
+    .slice()
+    .sort((a, b) => a.userName.localeCompare(b.userName))
+    .forEach((r) => {
+      doc.text(`• ${r.userName} — ${formatDate(r.acknowledgedAt)}`, 16, y);
+      y += 6;
+    });
+
+  y += 6;
+  doc.setFontSize(11);
+  doc.text(`Pendents (${pending.length})`, 14, y);
+  y += 7;
+  doc.setFontSize(9);
+  if (pending.length === 0) {
+    doc.text("Tothom l'ha acceptada.", 16, y);
+  }
+  pending
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((u) => {
+      doc.text(`• ${u.name}`, 16, y);
+      y += 6;
+    });
+
+  doc.save(`novetat-${note.title.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}.pdf`);
 }
 
 export default function InfoNotesDashboard({
@@ -59,20 +131,25 @@ export default function InfoNotesDashboard({
 }: InfoNotesDashboardProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formNoteId, setFormNoteId] = useState<string>("");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
+  const [attachments, setAttachments] = useState<InfoNoteAttachment[]>([]);
+  const [targetDepartmentIds, setTargetDepartmentIds] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [expandedReaders, setExpandedReaders] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Notes que aquest usuari pot veure a la llista: totes les publicades/ja en
-  // hora (per a tothom), més els esborranys i programacions propis, més
-  // absolutament tot per als admins (per poder-hi fer seguiment/edició).
   const visibleNotes = useMemo(
     () =>
       notes.filter(
-        (n) => isAdmin || isInfoNoteLive(n, now) || n.createdBy === currentUser.id
+        (n) =>
+          isAdmin ||
+          (isInfoNoteLive(n, now) && isInfoNoteForUser(n, currentUser)) ||
+          n.createdBy === currentUser.id
       ),
-    [notes, isAdmin, currentUser.id, now]
+    [notes, isAdmin, currentUser, now]
   );
 
   const inPreparation = useMemo(
@@ -94,23 +171,81 @@ export default function InfoNotesDashboard({
   const resetForm = () => {
     setIsCreating(false);
     setEditingId(null);
+    setFormNoteId("");
     setTitle("");
     setContent("");
     setScheduledFor("");
+    setAttachments([]);
+    setTargetDepartmentIds([]);
+  };
+
+  const startCreate = () => {
+    setFormNoteId(genId());
+    setIsCreating(true);
   };
 
   const startEdit = (note: InfoNote) => {
     setEditingId(note.id);
+    setFormNoteId(note.id);
     setIsCreating(true);
     setTitle(note.title);
     setContent(note.content);
     setScheduledFor(toDatetimeLocalValue(note.scheduledFor));
+    setAttachments(note.attachments || []);
+    setTargetDepartmentIds(note.targetDepartmentIds || []);
   };
 
   // Qui pot editar/gestionar una nota concreta: l'autor mentre no s'hagi
   // publicat encara, o un admin en qualsevol moment.
   const canManage = (note: InfoNote) =>
     isAdmin || (note.createdBy === currentUser.id && !isInfoNoteLive(note, now));
+
+  const toggleDepartment = (depId: string) => {
+    setTargetDepartmentIds((prev) =>
+      prev.includes(depId) ? prev.filter((d) => d !== depId) : [...prev, depId]
+    );
+  };
+
+  const handleFilesSelected = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !formNoteId) return;
+    setIsUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        if (file.size > 15 * 1024 * 1024) {
+          alert(`"${file.name}" supera els 15 MB i no s'ha pujat.`);
+          continue;
+        }
+        const storagePath = `infoNotes/${formNoteId}/${Date.now()}-${file.name}`;
+        const fileRef = ref(storage, storagePath);
+        await uploadBytes(fileRef, file);
+        const url = await getDownloadURL(fileRef);
+        const newAttachment: InfoNoteAttachment = {
+          id: "att-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+          name: file.name,
+          url,
+          contentType: file.type,
+          size: file.size,
+          storagePath,
+        };
+        setAttachments((prev) => [...prev, newAttachment]);
+      }
+    } catch (err) {
+      console.warn("[InfoNote Attachment Upload Warning]", err);
+      alert("No s'ha pogut pujar l'arxiu. Comprova la connexió i torna-ho a provar.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const removeAttachment = async (att: InfoNoteAttachment) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== att.id));
+    try {
+      await deleteObject(ref(storage, att.storagePath));
+    } catch (err) {
+      console.warn("[InfoNote Attachment Delete Warning]", err);
+    }
+  };
 
   const submit = async (status: InfoNoteStatus) => {
     const cleanTitle = title.trim();
@@ -119,38 +254,53 @@ export default function InfoNotesDashboard({
     if (status === "scheduled" && !scheduledFor) return;
 
     const existing = editingId ? notes.find((n) => n.id === editingId) : null;
+    const commonFields = {
+      title: cleanTitle,
+      content,
+      status,
+      scheduledFor: status === "scheduled" ? new Date(scheduledFor).toISOString() : undefined,
+      attachments,
+      targetDepartmentIds: targetDepartmentIds.length > 0 ? targetDepartmentIds : undefined,
+    };
 
     if (existing) {
-      await onSaveNote(
-        {
-          ...existing,
-          title: cleanTitle,
-          content,
-          status,
-          scheduledFor: status === "scheduled" ? new Date(scheduledFor).toISOString() : undefined,
-          updatedAt: new Date().toISOString(),
-        },
-        false
-      );
+      await onSaveNote({ ...existing, ...commonFields, updatedAt: new Date().toISOString() }, false);
     } else {
       const newNote: InfoNote = {
-        id: "infonote-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
-        title: cleanTitle,
-        content,
+        id: formNoteId || genId(),
         createdBy: currentUser.id,
         createdByName: currentUser.name,
         createdAt: new Date().toISOString(),
-        status,
-        scheduledFor: status === "scheduled" ? new Date(scheduledFor).toISOString() : undefined,
         acknowledgedBy: [],
+        ...commonFields,
       };
       await onSaveNote(newNote, true);
     }
     resetForm();
   };
 
+  const duplicateNote = (note: InfoNote) => {
+    // Es duplica com a nou esborrany: mateix títol/contingut/destinataris,
+    // però SENSE adjunts (per no compartir el mateix fitxer de Storage entre
+    // dues notes — si un dia s'esborra l'adjunt d'una, no ha de trencar
+    // l'altra) ni programació ni lectures anteriors.
+    setFormNoteId(genId());
+    setEditingId(null);
+    setIsCreating(true);
+    setTitle(`${note.title} (còpia)`);
+    setContent(note.content);
+    setScheduledFor("");
+    setAttachments([]);
+    setTargetDepartmentIds(note.targetDepartmentIds || []);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cancelSchedule = (note: InfoNote) => {
+    onSaveNote({ ...note, status: "draft", scheduledFor: undefined }, false);
+  };
+
   const renderStatusBadge = (note: InfoNote) => {
-    if (isInfoNoteLive(note, now)) return null; // ja publicada, no cal etiqueta d'estat
+    if (isInfoNoteLive(note, now)) return null;
     if (note.status === "draft") {
       return (
         <span className="text-[9px] flex items-center gap-1 bg-slate-100 text-slate-600 px-1.5 py-0.5 font-bold uppercase tracking-wide">
@@ -162,6 +312,39 @@ export default function InfoNotesDashboard({
       <span className="text-[9px] flex items-center gap-1 bg-indigo-50 text-indigo-700 px-1.5 py-0.5 font-bold uppercase tracking-wide">
         <CalendarClock className="w-3 h-3" /> Programada · {formatDate(note.scheduledFor)}
       </span>
+    );
+  };
+
+  const renderTargetBadge = (note: InfoNote) => {
+    if (!note.targetDepartmentIds || note.targetDepartmentIds.length === 0) return null;
+    const names = note.targetDepartmentIds
+      .map((id) => DEPARTMENTS.find((d) => d.id === id)?.name || id)
+      .join(", ");
+    return (
+      <span className="text-[9px] flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 font-bold uppercase tracking-wide">
+        <Building2 className="w-3 h-3" /> Només {names}
+      </span>
+    );
+  };
+
+  const renderAttachmentChip = (att: InfoNoteAttachment, onRemove?: () => void) => {
+    const isImage = att.contentType?.startsWith("image/");
+    return (
+      <div
+        key={att.id}
+        className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2 py-1 text-[11px] text-slate-600"
+      >
+        {isImage ? <ImageIcon className="w-3.5 h-3.5 text-blue-500" /> : <FileText className="w-3.5 h-3.5 text-rose-500" />}
+        <a href={att.url} target="_blank" rel="noreferrer" className="hover:underline truncate max-w-[10rem]">
+          {att.name}
+        </a>
+        <span className="text-slate-400">({formatBytes(att.size)})</span>
+        {onRemove && (
+          <button onClick={onRemove} className="text-slate-400 hover:text-rose-600 ml-1">
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
     );
   };
 
@@ -179,7 +362,7 @@ export default function InfoNotesDashboard({
         </div>
         {!isCreating && (
           <button
-            onClick={() => setIsCreating(true)}
+            onClick={startCreate}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white transition-all"
             style={{ backgroundColor: NAVY }}
           >
@@ -204,6 +387,57 @@ export default function InfoNotesDashboard({
             placeholder="Escriu aquí el comunicat. Pots desar-ho com a esborrany i tornar-hi més tard per afegir-hi més temes abans d'enviar-ho."
             minHeightClass="min-h-[10rem]"
           />
+
+          {/* Adjunts */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {attachments.map((att) => renderAttachmentChip(att, () => removeAttachment(att)))}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 border border-dashed border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <Paperclip className="w-3.5 h-3.5" />
+                {isUploading ? "Pujant..." : "Adjuntar imatge o PDF"}
+              </button>
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFilesSelected(e.target.files)}
+            />
+          </div>
+
+          {/* Destinataris per departament */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5" />
+              Destinataris — deixa-ho buit per enviar-la a tot l'equip
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {DEPARTMENTS.map((dep) => {
+                const active = targetDepartmentIds.includes(dep.id);
+                return (
+                  <button
+                    key={dep.id}
+                    type="button"
+                    onClick={() => toggleDepartment(dep.id)}
+                    className={`px-2.5 py-1 text-[11px] font-semibold border transition-all ${
+                      active
+                        ? "text-white border-transparent"
+                        : "text-slate-600 border-slate-300 hover:bg-slate-50"
+                    }`}
+                    style={active ? { backgroundColor: dep.color } : {}}
+                  >
+                    {dep.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
@@ -253,7 +487,7 @@ export default function InfoNotesDashboard({
             </button>
           </div>
           <p className="text-[10px] text-slate-400">
-            "Desar esborrany" no notifica ningú — el pots reobrir i seguir-hi afegint temes quan vulguis. "Programar" el publicarà sol al moment exacte que triïs. "Publicar ara" surt a l'instant com a pop-up obligatori a tot l'equip.
+            "Desar esborrany" no notifica ningú. "Programar" el publicarà sol al moment exacte que triïs. "Publicar ara" surt a l'instant com a pop-up obligatori als destinataris.
           </p>
         </div>
       )}
@@ -270,6 +504,7 @@ export default function InfoNotesDashboard({
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="font-bold text-slate-900 text-sm">{note.title || "(sense títol)"}</h4>
                     {renderStatusBadge(note)}
+                    {renderTargetBadge(note)}
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">
                     {note.createdByName} · {formatDate(note.updatedAt || note.createdAt)}
@@ -278,9 +513,30 @@ export default function InfoNotesDashboard({
                     className="text-xs text-slate-500 mt-2 leading-relaxed line-clamp-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-bold"
                     dangerouslySetInnerHTML={{ __html: note.content }}
                   />
+                  {note.attachments && note.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {note.attachments.map((att) => renderAttachmentChip(att))}
+                    </div>
+                  )}
                 </div>
                 {canManage(note) && (
                   <div className="flex items-center gap-1 shrink-0">
+                    {note.status === "scheduled" && (
+                      <button
+                        onClick={() => cancelSchedule(note)}
+                        title="Aturar la programació (torna a esborrany)"
+                        className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => duplicateNote(note)}
+                      title="Duplicar com a plantilla"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={() => startEdit(note)}
                       title="Editar / continuar"
@@ -317,10 +573,17 @@ export default function InfoNotesDashboard({
           </div>
         )}
         {published.map((note) => {
-          const totalUsers = users.length;
+          // Els destinataris reals (per calcular % de lectura) són només els
+          // membres del(s) departament(s) triats, o tothom si no n'hi ha.
+          const targetUsers = note.targetDepartmentIds && note.targetDepartmentIds.length > 0
+            ? users.filter((u) => {
+                const uDeps = new Set([...(u.departmentIds || []), ...(u.departmentId ? [u.departmentId] : [])]);
+                return note.targetDepartmentIds!.some((d) => uDeps.has(d));
+              })
+            : users;
           const readers = note.acknowledgedBy || [];
           const readerIds = new Set(readers.map((r) => r.userId));
-          const pending = users.filter((u) => !readerIds.has(u.id));
+          const pending = targetUsers.filter((u) => !readerIds.has(u.id));
           const isExpanded = expandedReaders === note.id;
           const iRead = readerIds.has(currentUser.id);
 
@@ -330,6 +593,7 @@ export default function InfoNotesDashboard({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="font-bold text-slate-900 text-sm">{note.title}</h4>
+                    {renderTargetBadge(note)}
                     {iRead ? (
                       <span className="text-[9px] flex items-center gap-1 bg-emerald-50 text-emerald-700 px-1.5 py-0.5 font-bold uppercase tracking-wide">
                         <CheckCircle2 className="w-3 h-3" /> Llegida
@@ -348,9 +612,28 @@ export default function InfoNotesDashboard({
                     className="text-xs text-slate-600 mt-2 leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-bold"
                     dangerouslySetInnerHTML={{ __html: note.content }}
                   />
+                  {note.attachments && note.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {note.attachments.map((att) => renderAttachmentChip(att))}
+                    </div>
+                  )}
                 </div>
                 {isAdmin && (
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => exportReadersPdf(note, targetUsers)}
+                      title="Exportar registre de lectura (PDF)"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    >
+                      <FileDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => duplicateNote(note)}
+                      title="Duplicar com a plantilla"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
                     <button
                       onClick={() => startEdit(note)}
                       title="Editar"
@@ -381,7 +664,7 @@ export default function InfoNotesDashboard({
                   >
                     <span className="flex items-center gap-1.5">
                       <UsersIcon className="w-3.5 h-3.5" />
-                      {readers.length} de {totalUsers} han acceptat
+                      {readers.length} de {targetUsers.length} han acceptat
                     </span>
                     {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>

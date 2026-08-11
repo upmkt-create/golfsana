@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDocFromServer, setDoc, type DocumentReference } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 import firebaseConfig from "../firebase-applet-config.json";
 
 // Initialize Firebase SDK
@@ -13,7 +12,10 @@ export const db = (!_dbId || _dbId === "(default)")
   ? getFirestore(app)
   : getFirestore(app, _dbId);
 export const auth = getAuth(app);
-export const storage = getStorage(app);
+// NOTA: NO fem servir Firebase Storage — el pla Spark (gratuït) del projecte
+// no el permet activar sense passar a Blaze. Els adjunts de Novetats es
+// gestionen com a enllaços externs (Google Drive, etc.), no com a pujada
+// real de fitxers. Si mai es passa a Blaze, es podria reintroduir.
 
 // ----------------------------------------------------------------------------
 // cleanUndefined: Firestore REBUTJA qualsevol valor `undefined`. Aquesta funció

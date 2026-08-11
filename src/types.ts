@@ -211,10 +211,9 @@ export type InfoNoteStatus = "draft" | "scheduled" | "published";
 export interface InfoNoteAttachment {
   id: string;
   name: string;
-  url: string;
-  contentType: string; // ex: "image/png", "application/pdf"
-  size: number; // bytes
-  storagePath: string; // ruta a Firebase Storage, per poder-la eliminar
+  url: string;          // enllaç extern (Google Drive, etc.) — no és una pujada real
+  contentType?: string; // opcional, no sempre el sabem d'un enllaç extern
+  size?: number;         // bytes — opcional, normalment desconegut per a enllaços externs
 }
 
 export interface InfoNoteReminder {
@@ -233,7 +232,7 @@ export interface InfoNote {
   status: InfoNoteStatus;   // "draft" = nomes visible per l'autor/admins; "scheduled" = es publicara sola a scheduledFor; "published" = ja visible per tothom
   scheduledFor?: string;    // ISO amb data i hora — moment en que una nota "scheduled" passa a ser visible per tothom
   acknowledgedBy: InfoNoteAck[]; // Qui l'ha llegida i acceptada (nomes te sentit un cop publicada)
-  attachments?: InfoNoteAttachment[]; // Imatges o PDFs adjunts (pujats a Firebase Storage)
+  attachments?: InfoNoteAttachment[]; // Enllaços externs (Google Drive, etc.) — el pla gratuït no permet pujar fitxers directament
   targetDepartmentIds?: string[]; // Si buit/absent = tothom. Si té valors, només membres d'aquests departaments la veuen.
   reminders?: InfoNoteReminder[]; // Recordatoris ja enviats (per no repetir-los cada dia)
 }

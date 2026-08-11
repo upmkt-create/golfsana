@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, getDocFromServer, setDoc, type DocumentReference } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import firebaseConfig from "../firebase-applet-config.json";
 
 // Initialize Firebase SDK
@@ -12,6 +13,7 @@ export const db = (!_dbId || _dbId === "(default)")
   ? getFirestore(app)
   : getFirestore(app, _dbId);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 // ----------------------------------------------------------------------------
 // cleanUndefined: Firestore REBUTJA qualsevol valor `undefined`. Aquesta funció

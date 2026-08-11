@@ -208,6 +208,20 @@ export interface InfoNoteAck {
 
 export type InfoNoteStatus = "draft" | "scheduled" | "published";
 
+export interface InfoNoteAttachment {
+  id: string;
+  name: string;
+  url: string;
+  contentType: string; // ex: "image/png", "application/pdf"
+  size: number; // bytes
+  storagePath: string; // ruta a Firebase Storage, per poder-la eliminar
+}
+
+export interface InfoNoteReminder {
+  userId: string;
+  remindedAt: string; // ISO — últim cop que se li ha enviat un recordatori per aquesta nota
+}
+
 export interface InfoNote {
   id: string;
   title: string;
@@ -219,4 +233,8 @@ export interface InfoNote {
   status: InfoNoteStatus;   // "draft" = nomes visible per l'autor/admins; "scheduled" = es publicara sola a scheduledFor; "published" = ja visible per tothom
   scheduledFor?: string;    // ISO amb data i hora — moment en que una nota "scheduled" passa a ser visible per tothom
   acknowledgedBy: InfoNoteAck[]; // Qui l'ha llegida i acceptada (nomes te sentit un cop publicada)
+  attachments?: InfoNoteAttachment[]; // Imatges o PDFs adjunts (pujats a Firebase Storage)
+  targetDepartmentIds?: string[]; // Si buit/absent = tothom. Si té valors, només membres d'aquests departaments la veuen.
+  reminders?: InfoNoteReminder[]; // Recordatoris ja enviats (per no repetir-los cada dia)
 }
+

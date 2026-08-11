@@ -56,7 +56,7 @@ import {
   MeetingAgreement,
   InfoNote
 } from "./types";
-import { isInfoNoteLive } from "./lib/infoNotes";
+import { isInfoNoteLive, isInfoNoteVisibleTo, daysSinceLive } from "./lib/infoNotes";
 import {
   Layers,
   LayoutGrid,
@@ -1138,7 +1138,7 @@ export default function App() {
     }
     const nextPending = infoNotes.find(
       (n) =>
-        isInfoNoteLive(n, infoNotesNow) &&
+        isInfoNoteVisibleTo(n, currentUser, infoNotesNow) &&
         !(n.acknowledgedBy || []).some((a) => a.userId === currentUser.id)
     );
     setActiveInfoNoteId(nextPending ? nextPending.id : null);
@@ -1150,9 +1150,44 @@ export default function App() {
     !!currentUser &&
     infoNotes.some(
       (n) =>
-        isInfoNoteLive(n, infoNotesNow) &&
+        isInfoNoteVisibleTo(n, currentUser, infoNotesNow) &&
         !(n.acknowledgedBy || []).some((a) => a.userId === currentUser.id)
     );
+
+  // Recordatori automàtic (campaneta): si un membre porta 3 dies o més sense
+  // acceptar una nota que li pertoca, se li crea UNA notificació de
+  // recordatori (no una cada dia) — es guarda a `reminders` dins la pròpia
+  // nota per no repetir-la. Cada usuari només gestiona el seu propi
+  // recordatori (el seu client és qui l'escriu), no fa falta cap procés
+  // central ni cron — coherent amb la resta de l'app (tot client-side).
+  const REMINDER_THRESHOLD_DAYS = 3;
+  const infoNoteReminderGuard = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!currentUser) return;
+    infoNotes.forEach((note) => {
+      if (!isInfoNoteVisibleTo(note, currentUser, infoNotesNow)) return;
+      if ((note.acknowledgedBy || []).some((a) => a.userId === currentUser.id)) return;
+      if (daysSinceLive(note, infoNotesNow) < REMINDER_THRESHOLD_DAYS) return;
+      const alreadyReminded = (note.reminders || []).some((r) => r.userId === currentUser.id);
+      if (alreadyReminded) return;
+      const guardKey = `${note.id}-${currentUser.id}`;
+      if (infoNoteReminderGuard.current.has(guardKey)) return; // evita duplicats mentre arriba l'eco de Firestore
+      infoNoteReminderGuard.current.add(guardKey);
+
+      createNotification(
+        currentUser.id,
+        note.id,
+        note.title,
+        `Encara no has acceptat la nota informativa "${note.title}". Fes-hi un cop d'ull quan puguis.`,
+        "infonote_reminder"
+      );
+      const updatedReminders = [...(note.reminders || []), { userId: currentUser.id, remindedAt: new Date().toISOString() }];
+      saveDoc(doc(db, "infoNotes", note.id), { reminders: updatedReminders }, { merge: true }).catch((err) =>
+        console.warn("[InfoNote Reminder Warning]", err)
+      );
+    });
+  }, [infoNotes, currentUser, infoNotesNow]);
+
 
   // Sync selectedTask with any background or status updates in the global tasks array
   useEffect(() => {

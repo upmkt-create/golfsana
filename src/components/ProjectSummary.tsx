@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Project, UserProfile, ProjectRole, KeyResource } from "../types";
 import { Plus, Users, BookOpen, Link, Calendar, Check, Trash2, FileText, AlertTriangle, CheckCircle2, X, Edit3, MessageSquare, Clock, GripVertical } from "lucide-react";
-import { DEPARTMENTS } from "../data";
 import RichTextEditor from "./RichTextEditor";
 
 interface ProjectSummaryProps {

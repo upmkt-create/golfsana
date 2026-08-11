@@ -21,9 +21,9 @@ import {
   FileText,
   Building2,
 } from "lucide-react";
-import { InfoNote, InfoNoteAttachment, InfoNoteStatus, UserProfile } from "../types";
+import { InfoNote, InfoNoteAttachment, InfoNoteStatus, UserProfile, Workspace } from "../types";
 import { isInfoNoteLive, isInfoNoteForUser } from "../lib/infoNotes";
-import { DEPARTMENTS } from "../data";
+import { getDepartmentOptions } from "../lib/departments";
 import RichTextEditor from "./RichTextEditor";
 
 interface InfoNotesDashboardProps {
@@ -34,6 +34,7 @@ interface InfoNotesDashboardProps {
   onSaveNote: (note: InfoNote, isNew: boolean) => Promise<void> | void;
   onDeleteNote: (id: string) => Promise<void> | void;
   now?: Date;
+  workspaces: Workspace[]; // Departaments = espais de treball reals (Firestore), no una llista fixa
 }
 
 const NAVY = "#033b7a";
@@ -126,6 +127,7 @@ export default function InfoNotesDashboard({
   onSaveNote,
   onDeleteNote,
   now = new Date(),
+  workspaces,
 }: InfoNotesDashboardProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -138,6 +140,10 @@ export default function InfoNotesDashboard({
   const [linkUrlInput, setLinkUrlInput] = useState("");
   const [targetDepartmentIds, setTargetDepartmentIds] = useState<string[]>([]);
   const [expandedReaders, setExpandedReaders] = useState<string | null>(null);
+
+  // Departaments = espais de treball reals que existeixen ara mateix a
+  // Firestore — mai una llista fixa al codi (vegeu src/lib/departments.ts).
+  const targetOptions = useMemo(() => getDepartmentOptions(workspaces), [workspaces]);
 
   const visibleNotes = useMemo(
     () =>
@@ -301,7 +307,7 @@ export default function InfoNotesDashboard({
   const renderTargetBadge = (note: InfoNote) => {
     if (!note.targetDepartmentIds || note.targetDepartmentIds.length === 0) return null;
     const names = note.targetDepartmentIds
-      .map((id) => DEPARTMENTS.find((d) => d.id === id)?.name || id)
+      .map((id) => targetOptions.find((d) => d.id === id)?.name || id)
       .join(", ");
     return (
       <span className="text-[9px] flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 font-bold uppercase tracking-wide">
@@ -413,7 +419,7 @@ export default function InfoNotesDashboard({
               Destinataris — deixa-ho buit per enviar-la a tot l'equip
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {DEPARTMENTS.map((dep) => {
+              {targetOptions.map((dep) => {
                 const active = targetDepartmentIds.includes(dep.id);
                 return (
                   <button

@@ -4,7 +4,7 @@
 import React, { useState } from "react";
 import { Task, Project, UserProfile, Workspace } from "../types";
 import { ChevronLeft, ChevronRight, Plus, Filter, X } from "lucide-react";
-import { DEPARTMENTS } from "../data";
+import { getDepartmentOptions } from "../lib/departments";
 import { getTaskUrgency } from "../lib/taskUrgency";
 
 interface ProjectCalendarProps {
@@ -113,6 +113,7 @@ export default function ProjectCalendar({
   const [newTitle, setNewTitle] = useState("");
   const [newProjId, setNewProjId] = useState("");
   const [newDepartmentIds, setNewDepartmentIds] = useState<string[]>(["dep-reserves"]);
+  const departmentOptions = getDepartmentOptions(workspaces);
   const [newAssignees, setNewAssignees] = useState<string[]>([]);
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
@@ -453,7 +454,7 @@ export default function ProjectCalendar({
                 <span>{newDepartmentIds.length} sel.</span>
               </button>
               <div className="hidden group-hover:block absolute z-10 w-48 mt-1 p-2 bg-white border border-slate-200 shadow-lg max-h-48 overflow-y-auto">
-                {DEPARTMENTS.map(d => (
+                {departmentOptions.map(d => (
                   <label key={d.id} className="flex items-center space-x-2 py-1 cursor-pointer hover:bg-slate-50">
                     <input type="checkbox" checked={newDepartmentIds.includes(d.id)} onChange={() => toggleDepartment(d.id)} className="rounded-none border-slate-300" />
                     <span className="text-xs text-slate-700">{d.name.replace("Departament de ", "").replace("Departament ", "")}</span>

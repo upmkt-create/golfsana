@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Task, UserProfile, Project } from "../types";
-import { DEPARTMENTS } from "../data";
+import { Task, UserProfile, Project, Workspace } from "../types";
+import { getDepartmentOptions } from "../lib/departments";
 import {
   BarChart,
   Bar,
@@ -34,9 +34,13 @@ interface WorkloadDashboardProps {
   tasks: Task[];
   users: UserProfile[];
   projects: Project[];
+  workspaces: Workspace[];
 }
 
-export default function WorkloadDashboard({ tasks, users, projects }: WorkloadDashboardProps) {
+export default function WorkloadDashboard({ tasks, users, projects, workspaces }: WorkloadDashboardProps) {
+  // Departaments = espais de treball reals que existeixen ara mateix a
+  // Firestore — mai una llista fixa al codi (vegeu src/lib/departments.ts).
+  const departmentOptions = getDepartmentOptions(workspaces);
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>("all");
 
   // Filter tasks based on selected department filter
@@ -63,7 +67,7 @@ export default function WorkloadDashboard({ tasks, users, projects }: WorkloadDa
   }).length;
 
   // 2. Prepare Data for Chart 1: Workload (Pending vs Completed) per Department
-  const departmentChartData = DEPARTMENTS.map(dept => {
+  const departmentChartData = departmentOptions.map(dept => {
     const deptTasks = tasks.filter(t => t.departmentId === dept.id);
     const completed = deptTasks.filter(t => t.status === "done").length;
     const pending = deptTasks.length - completed;
@@ -105,7 +109,7 @@ export default function WorkloadDashboard({ tasks, users, projects }: WorkloadDa
     const uTasks = tasks.filter(t => (t.assigneeIds?.includes(u.id) || t.assigneeId === u.id));
     const completed = uTasks.filter(t => t.status === "done").length;
     const pending = uTasks.length - completed;
-    const deptName = u.departmentId ? (DEPARTMENTS.find(d => d.id === u.departmentId)?.name.split(" ")[0] || "Direcció") : "General";
+    const deptName = u.departmentId ? (departmentOptions.find(d => d.id === u.departmentId)?.name.split(" ")[0] || "Direcció") : "General";
 
     return {
       name: `${u.name} (${deptName})`,
@@ -160,8 +164,8 @@ export default function WorkloadDashboard({ tasks, users, projects }: WorkloadDa
             onChange={(e) => setSelectedDeptFilter(e.target.value)}
             className="bg-white text-slate-800 border border-slate-250 py-1 px-2 text-xs font-bold rounded-none focus:ring-1 focus:ring-indigo-500 focus:outline-none"
           >
-            <option value="all">Sota tots els 5 Departaments</option>
-            {DEPARTMENTS.map(d => (
+            <option value="all">Sota tots els {departmentOptions.length} Departaments</option>
+            {departmentOptions.map(d => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>

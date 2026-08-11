@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus, Workspace } from "../types";
 import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Kanban, LayoutGrid, Star } from "lucide-react";
 import { motion } from "motion/react";
-import { DEPARTMENTS } from "../data";
+import { getDepartmentOptions } from "../lib/departments";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
 
 interface TaskBoardProps {
@@ -35,25 +35,9 @@ export default function TaskBoard({
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverColId, setDragOverColId] = useState<string | null>(null);
 
-  // Paleta per als espais de treball reals, que no tenen un camp "color"
-  // propi (a diferència de DEPARTMENTS) — es tria de manera determinista
-  // segons l'id, perquè cada espai sempre tingui el mateix color.
-  const WORKSPACE_COLOR_PALETTE = ["#0ea5e9", "#8b5cf6", "#f97316", "#14b8a6", "#ec4899", "#84cc16", "#6366f1", "#eab308"];
-  const colorForWorkspace = (id: string) => {
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) hash = (hash << 5) - hash + id.charCodeAt(i);
-    return WORKSPACE_COLOR_PALETTE[Math.abs(hash) % WORKSPACE_COLOR_PALETTE.length];
-  };
-
-  // Combina els departaments objectiu fixos (retrocompatibilitat amb
-  // tasques antigues) amb tots els espais de treball reals i dinàmics
-  // (Direcció, RRHH, Rapport...), perquè el Kanban no en deixi cap fora.
-  const boardDeptOptions = [
-    ...DEPARTMENTS.map((d) => ({ id: d.id, name: d.name, color: d.color })),
-    ...workspaces
-      .filter((ws) => !DEPARTMENTS.some((d) => d.id === ws.id))
-      .map((ws) => ({ id: ws.id, name: ws.name, color: colorForWorkspace(ws.id) })),
-  ];
+  // Departaments = espais de treball reals que existeixen ara mateix a
+  // Firestore — mai una llista fixa al codi (vegeu src/lib/departments.ts).
+  const boardDeptOptions = getDepartmentOptions(workspaces);
 
   interface BoardColumn {
     id: string;

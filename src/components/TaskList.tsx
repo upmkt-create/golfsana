@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Task, UserProfile, Project, TaskStatus, TaskPriority, Department, Workspace } from "../types";
+import { Task, UserProfile, Project, TaskStatus, TaskPriority, Workspace } from "../types";
 import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle, Star, FileText } from "lucide-react";
-import { DEPARTMENTS } from "../data";
+import { getDepartmentOptions } from "../lib/departments";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
 import RichTextEditor from "./RichTextEditor";
 
@@ -228,16 +228,9 @@ export default function TaskList({
     }
   };
 
-  // El filtre "Espai de treball" combina els departaments objectiu fixos
-  // (Esportiu, Comercial, Màrqueting — usats històricament a les tasques)
-  // amb els espais de treball reals i dinàmics (Direcció, RRHH, Rapport,
-  // etc.), perquè no en falti cap dels creats des de la interfície.
-  const filterOptions = [
-    ...DEPARTMENTS.map((d) => ({ id: d.id, name: d.name })),
-    ...workspaces
-      .filter((ws) => !DEPARTMENTS.some((d) => d.id === ws.id))
-      .map((ws) => ({ id: ws.id, name: ws.name })),
-  ];
+  // El filtre "Espai de treball" = els espais de treball reals que
+  // existeixen ara mateix a Firestore — mai una llista fixa al codi.
+  const filterOptions = getDepartmentOptions(workspaces);
 
   // Capçalera de columna amb el seu propi mini-filtre desplegable — reutilitza
   // exactament els mateixos estats que el panell "Filtres" general, així que

@@ -36,7 +36,7 @@ import {
   Cell
 } from "recharts";
 import { Task, UserProfile, Project, Workspace } from "../types";
-import { DEPARTMENTS } from "../data";
+import { getDepartmentOptions } from "../lib/departments";
 
 interface ReportsDashboardProps {
   tasks: Task[];
@@ -49,16 +49,10 @@ interface ReportsDashboardProps {
 export default function ReportsDashboard({ tasks, users, projects, workspaces, defaultDepartmentId = "all" }: ReportsDashboardProps) {
   // 1. Interactive States
 
-  // Combina els departaments objectiu fixos (retrocompatibilitat amb
-  // tasques antigues) amb tots els espais de treball reals i dinàmics
-  // (Direcció, RRHH, Rapport...), perquè els informes no en deixin cap
-  // fora — abans només es podien filtrar els 3 departaments originals.
-  const reportDeptOptions = [
-    ...DEPARTMENTS.map((d) => ({ id: d.id, name: d.name, description: d.description })),
-    ...workspaces
-      .filter((ws) => !DEPARTMENTS.some((d) => d.id === ws.id))
-      .map((ws) => ({ id: ws.id, name: ws.name, description: ws.description || `Espai de treball ${ws.name}` })),
-  ];
+  // Departaments = espais de treball reals que existeixen ara mateix a
+  // Firestore (Direcció, Pitch and Putt, o qualsevol que es creï més
+  // endavant) — mai una llista fixa al codi.
+  const reportDeptOptions = getDepartmentOptions(workspaces);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>(defaultDepartmentId);
   const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [showBusinessTips, setShowBusinessTips] = useState<boolean>(true);

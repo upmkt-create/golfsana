@@ -7,7 +7,7 @@ import {
   TaskStatus,
   TaskPriority
 } from "../types";
-import { DEPARTMENTS } from "../data";
+import { getDepartmentOptions } from "../lib/departments";
 import ProjectCalendar from "./ProjectCalendar";
 import { stripHtmlToText } from "../lib/textUtils";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
@@ -66,6 +66,7 @@ export default function MemberDashboard({
 }: MemberDashboardProps) {
   // Find member details
   const member = users.find(u => u.id === memberId);
+  const departmentOptions = getDepartmentOptions(workspaces);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [newNoteText, setNewNoteText] = useState("");
   const [confirmingDeleteNoteId, setConfirmingDeleteNoteId] = useState<string | null>(null);
@@ -589,7 +590,7 @@ export default function MemberDashboard({
                           <span>{newDepartmentIds.length} sel.</span>
                         </button>
                         <div className="hidden group-hover:block absolute z-10 w-48 mt-1 p-2 bg-white border border-slate-200 shadow-lg max-h-48 overflow-y-auto">
-                          {DEPARTMENTS.map((d: any) => (
+                          {departmentOptions.map((d) => (
                             <label key={d.id} className="flex items-center space-x-2 py-1 cursor-pointer hover:bg-slate-50">
                               <input
                                 type="checkbox"

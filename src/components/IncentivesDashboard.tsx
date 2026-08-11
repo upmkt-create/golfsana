@@ -15,16 +15,18 @@ import {
   HelpCircle,
   Calendar
 } from "lucide-react";
-import { Task, UserProfile, Project } from "../types";
-import { DEPARTMENTS } from "../data";
+import { Task, UserProfile, Project, Workspace } from "../types";
+import { getDepartmentOptions } from "../lib/departments";
 
 interface IncentivesDashboardProps {
   tasks: Task[];
   users: UserProfile[];
   projects: Project[];
+  workspaces: Workspace[];
 }
 
-export default function IncentivesDashboard({ tasks, users, projects }: IncentivesDashboardProps) {
+export default function IncentivesDashboard({ tasks, users, projects, workspaces }: IncentivesDashboardProps) {
+  const departmentOptions = getDepartmentOptions(workspaces);
   // Configurable incentive multipliers
   const [calculationModel, setCalculationModel] = useState<"task" | "quarterly">("quarterly"); // Default to quarterly as requested
   const [quarterlyMaxIncentive, setQuarterlyMaxIncentive] = useState<number>(150); // Max quarterly bonus is €150 by default
@@ -778,7 +780,7 @@ export default function IncentivesDashboard({ tasks, users, projects }: Incentiv
               <tbody className="divide-y divide-slate-100">
                 {[...completedTasks].reverse().map((task) => {
                   const assignee = users.find(u => (task.assigneeIds?.includes(u.id) || u.id === task.assigneeId));
-                  const deptObj = DEPARTMENTS.find(d => d.id === task.departmentId);
+                  const deptObj = departmentOptions.find(d => d.id === task.departmentId);
                   const projectObj = projects.find(p => p.id === task.projectId);
 
                   return (

@@ -601,20 +601,250 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
   }
 }
 
-async function scrapeTeeOne(ep: CourseEndpoint, dateStr: string): Promise<ScrapeResult> {
+// ============================================================================
+// TEEONE (Pals, Costa Brava, Perelada) — FORMAT CONFIRMAT per captura real
+// via DevTools l'11/08/2026:
+//
+//   1r) GET  {base}/disponibilidad  → pàgina HTML amb camps ocults de sessió:
+//         <input type="hidden" id="HidTokenAPI" value="...">
+//         <input type="hidden" id="HidVendedor" value="...">
+//         <input type="hidden" id="HidVendedorProveedor" value="...">
+//         <input type="hidden" id="HidVendedorTourOperador" value="...">
+//       (l'"idRecorrido" NO ve en un camp ocult amb valor — cal demanar-lo)
+//
+//   2n) POST https://api.teeone.golf/InternalBookingEngine/v1/Api/Vendedor/ObtenerRecorridosVendedor
+//       amb { culture, token, idInicioSesion:"-1", idVendedor, idVendedorProveedor, idVendedorTourOperador }
+//       → { datos: { listaRecorridos: [ { idRec, nom, NumHoyos, ... }, ... ] } }
+//
+//   3r) POST https://api.teeone.golf/InternalBookingEngine/v1/Api/Disponibilidad/ObtenerDisponibilidadDia
+//       amb { culture, token, idInicioSesion:"-1", idVendedor, idVendedorProveedor,
+//             idVendedorTourOperador, idRecorrido, fecha:"YYYY/MM/DD", horaInicio:"6:00",
+//             horaFin:"22:00", jugadores:"-1", precioInicio:"1", precioFin:"2000",
+//             promoCode:"", pageSize:9, pageNum:-1, idTarifaTipoUso:1 }
+//       → { cod:1, horasDisponibles: [ { hora, jugadoresDisponibles, tarifas: [ { nombre, precio, precioRack, ... } ] }, ... ] }
+//
+// IMPORTANT: cap d'aquestes 3 crides porta cookies — l'autenticació és
+// només amb el "token" del pas 1, vàlid durant tota la sessió.
+// ============================================================================
+
+interface TeeOneSessionInfo {
+  token: string;
+  idVendedor: string;
+  idVendedorProveedor: string;
+  idVendedorTourOperador: string;
+}
+
+// Extreu value="..." d'un <input type="hidden" id="..."> sense assumir
+// l'ordre dels atributs dins del tag.
+function extractHiddenValue(html: string, id: string): string | null {
+  const re = new RegExp(`<input[^>]*id=["']${id}["'][^>]*value=["']([^"']*)["']`, "i");
+  const m = html.match(re);
+  return m && m[1] ? m[1] : null;
+}
+
+async function fetchTeeOnePage(ep: CourseEndpoint): Promise<{ html: string | null; debug: string }> {
+  const targetUrl = `${ep.base}/disponibilidad`;
+  // Mateixa estratègia de proxy que GolfManager: ScrapingBee premium si hi
+  // ha clau configurada, si no intent directe.
+  const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
+  const url = scrapingBeeKey
+    ? `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true`
+    : targetUrl;
+
   try {
-    const url = `${ep.base}/disponibilidad?date=${dateStr}`;
     const resp = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/html, */*",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
       },
+      signal: AbortSignal.timeout(scrapingBeeKey ? 45000 : 8000),
+    });
+    if (!resp.ok) return { html: null, debug: `HTTP ${resp.status} ${resp.statusText} carregant ${targetUrl}` };
+    const html = await resp.text();
+    return { html, debug: "ok" };
+  } catch (err: any) {
+    const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+    return { html: null, debug: isTimeout ? `Timeout carregant ${targetUrl}` : `Error de xarxa carregant la pàgina: ${String(err?.message || err)}` };
+  }
+}
+
+function extractTeeOneSession(html: string): TeeOneSessionInfo | null {
+  const token = extractHiddenValue(html, "HidTokenAPI");
+  const idVendedor = extractHiddenValue(html, "HidVendedor");
+  const idVendedorProveedor = extractHiddenValue(html, "HidVendedorProveedor");
+  const idVendedorTourOperador = extractHiddenValue(html, "HidVendedorTourOperador");
+  if (!token || !idVendedor || !idVendedorProveedor) return null;
+  return { token, idVendedor, idVendedorProveedor, idVendedorTourOperador: idVendedorTourOperador || "-1" };
+}
+
+async function fetchTeeOneRecorrido(session: TeeOneSessionInfo): Promise<{ idRecorrido: string | null; debug: string }> {
+  try {
+    const resp = await fetch("https://api.teeone.golf/InternalBookingEngine/v1/Api/Vendedor/ObtenerRecorridosVendedor", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "Origin": "https://open.teeone.golf",
+        "Referer": "https://open.teeone.golf/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+      },
+      body: JSON.stringify({
+        culture: "es-ES",
+        token: session.token,
+        idInicioSesion: "-1",
+        idVendedor: session.idVendedor,
+        idVendedorProveedor: session.idVendedorProveedor,
+        idVendedorTourOperador: session.idVendedorTourOperador,
+      }),
       signal: AbortSignal.timeout(8000),
     });
-    if (!resp.ok) return { teeTimes: null, debug: `HTTP ${resp.status} ${resp.statusText} a ${url}` };
-    return { teeTimes: null, debug: "Format TeeOne encara no confirmat (pendent de captura real des de DevTools)" };
+    if (!resp.ok) return { idRecorrido: null, debug: `HTTP ${resp.status} demanant recorreguts (ObtenerRecorridosVendedor)` };
+
+    const data: any = await resp.json();
+    const lista: any[] = data?.datos?.listaRecorridos || [];
+    if (lista.length === 0) return { idRecorrido: null, debug: `Resposta de ObtenerRecorridosVendedor sense "listaRecorridos"` };
+
+    // Prioritza recorreguts de 18 forats, evitant variants secundàries del
+    // mateix club (ex: "SERRES" és un segon camp dins de Golf de Pals).
+    const candidates18 = lista.filter((r) => r.NumHoyos === 18);
+    const best =
+      candidates18.find((r) => !String(r.nom || "").toUpperCase().includes("SERRES")) ||
+      candidates18[0] ||
+      lista[0];
+
+    return { idRecorrido: String(best.idRec), debug: "ok" };
   } catch (err: any) {
-    return { teeTimes: null, debug: `Error de xarxa: ${String(err?.message || err)}` };
+    return { idRecorrido: null, debug: `Error de xarxa demanant recorreguts: ${String(err?.message || err)}` };
+  }
+}
+
+interface TeeOneAvailabilityItem {
+  hora: string;
+  jugadoresDisponibles: number;
+  tarifas: { nombre: string; precio: number; precioNeto?: number; precioRack?: number; idTarifa?: number }[];
+}
+
+interface TeeOneAvailabilityResponse {
+  cod: number;
+  msg?: string;
+  horasDisponibles: TeeOneAvailabilityItem[];
+}
+
+function parseTeeOneItems(items: TeeOneAvailabilityItem[], allowedTariffs: string[]): TeeTime[] {
+  const teeTimes: TeeTime[] = [];
+  for (const item of items || []) {
+    const rates: TeeTimeRate[] = (item.tarifas || [])
+      .filter((t) => allowedTariffs.length === 0 || allowedTariffs.includes(t.nombre))
+      .map((t) => ({
+        tariff: t.nombre,
+        price: t.precio,
+        originalPrice: t.precioRack || undefined,
+        discountPct:
+          t.precioRack && t.precioRack > 0
+            ? Math.round(((t.precioRack - t.precio) / t.precioRack) * 100)
+            : undefined,
+      }));
+    if (rates.length === 0) continue;
+
+    const timeMatch = (item.hora || "").match(/^(\d{1,2}):(\d{2})/);
+    if (!timeMatch) continue;
+    const hh = timeMatch[1].padStart(2, "0");
+    const mm = timeMatch[2];
+
+    teeTimes.push({
+      time: `${hh}:${mm}`,
+      minutes: parseInt(timeMatch[1], 10) * 60 + parseInt(mm, 10),
+      rates,
+      availableSlots: item.jugadoresDisponibles || 0,
+    });
+  }
+  return teeTimes.sort((a, b) => a.minutes - b.minutes);
+}
+
+async function scrapeTeeOne(ep: CourseEndpoint, dateStr: string): Promise<ScrapeResult> {
+  // 1r) Pàgina de disponibilitat → token + IDs de venedor (camps ocults)
+  const page = await fetchTeeOnePage(ep);
+  if (!page.html) {
+    return { teeTimes: null, debug: `No s'ha pogut carregar la pàgina de TeeOne: ${page.debug}` };
+  }
+
+  const session = extractTeeOneSession(page.html);
+  if (!session) {
+    return {
+      teeTimes: null,
+      debug: `No s'han trobat els camps ocults de sessió (HidTokenAPI/HidVendedor/HidVendedorProveedor) a la pàgina — potser TeeOne ha canviat l'estructura HTML i cal recapturar-la.`,
+    };
+  }
+
+  // 2n) idRecorrido vàlid per a aquest venedor
+  const recorrido = await fetchTeeOneRecorrido(session);
+  const idRecorrido = recorrido.idRecorrido || "2"; // "2" com a últim recurs (confirmat vàlid per Golf de Pals)
+
+  // 3r) Disponibilitat real del dia
+  const dateForApi = dateStr.replace(/-/g, "/"); // TeeOne espera "YYYY/MM/DD"
+
+  try {
+    const resp = await fetch("https://api.teeone.golf/InternalBookingEngine/v1/Api/Disponibilidad/ObtenerDisponibilidadDia", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "*/*",
+        "Origin": "https://open.teeone.golf",
+        "Referer": "https://open.teeone.golf/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+      },
+      body: JSON.stringify({
+        culture: "es-ES",
+        token: session.token,
+        idInicioSesion: "-1",
+        idVendedor: session.idVendedor,
+        idVendedorProveedor: session.idVendedorProveedor,
+        idVendedorTourOperador: session.idVendedorTourOperador,
+        idRecorrido,
+        fecha: dateForApi,
+        horaInicio: "6:00",
+        horaFin: "22:00",
+        jugadores: "-1",
+        precioInicio: "1",
+        precioFin: "2000",
+        promoCode: "",
+        pageSize: 9,
+        pageNum: -1,
+        idTarifaTipoUso: 1,
+      }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!resp.ok) {
+      return {
+        teeTimes: null,
+        debug: `HTTP ${resp.status} ${resp.statusText} demanant disponibilitat a TeeOne (recorregut ${idRecorrido}${recorrido.debug !== "ok" ? `, avís recorregut: ${recorrido.debug}` : ""})`,
+      };
+    }
+
+    const data = (await resp.json()) as TeeOneAvailabilityResponse;
+    if (data.cod !== 1) {
+      return { teeTimes: null, debug: `Resposta amb cod=${data.cod}: ${data.msg || "sense missatge"}` };
+    }
+    if (!Array.isArray(data.horasDisponibles)) {
+      return { teeTimes: null, debug: `Resposta JSON sense "horasDisponibles". Claus rebudes: ${Object.keys(data || {}).join(", ")}` };
+    }
+
+    const teeTimes = parseTeeOneItems(data.horasDisponibles, ep.allowedTariffs);
+    if (teeTimes.length === 0) {
+      return {
+        teeTimes: null,
+        debug: `Resposta correcta amb ${data.horasDisponibles.length} hores, però cap coincideix amb les tarifes permeses (${ep.allowedTariffs.join(", ")}).`,
+      };
+    }
+    return { teeTimes, debug: "ok" };
+  } catch (err: any) {
+    const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
+    return {
+      teeTimes: null,
+      debug: isTimeout ? `Timeout demanant disponibilitat a TeeOne` : `Error de xarxa demanant disponibilitat: ${String(err?.message || err)}`,
+    };
   }
 }
 

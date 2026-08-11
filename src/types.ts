@@ -196,3 +196,23 @@ export interface MeetingMinute {
   createdAt: string;
   updatedAt?: string;
 }
+
+// ----------------------------------------------------------------------------
+// NOTES INFORMATIVES — comunicats a tot l'equip (substitueix el WhatsApp)
+// ----------------------------------------------------------------------------
+export interface InfoNoteAck {
+  userId: string;
+  userName: string;
+  acknowledgedAt: string; // ISO
+}
+
+export interface InfoNote {
+  id: string;
+  title: string;
+  content: string;          // HTML (RichTextEditor)
+  createdBy: string;        // uid de qui l'ha creada (qualsevol usuari)
+  createdByName: string;
+  createdAt: string;        // ISO
+  updatedAt?: string;       // ISO — present si s'ha editat
+  acknowledgedBy: InfoNoteAck[]; // Qui l'ha llegida i acceptada
+}

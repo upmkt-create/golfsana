@@ -53,7 +53,8 @@ import {
   TaskPriority,
   UserRole,
   MeetingMinute,
-  MeetingAgreement
+  MeetingAgreement,
+  InfoNote
 } from "./types";
 import {
   Layers,
@@ -102,7 +103,8 @@ import {
   Play,
   Square,
   Star,
-  Pencil
+  Pencil,
+  Megaphone,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import UserSessionSelector from "./components/UserSessionSelector";
@@ -119,6 +121,8 @@ import ReportsDashboard from "./components/ReportsDashboard";
 import { PriceNotificationBubble } from "./components/PriceNotificationBubble";
 import MemberDashboard from "./components/MemberDashboard";
 import HelpGuideModal from "./components/HelpGuideModal";
+import InfoNotesDashboard from "./components/InfoNotesDashboard";
+import InfoNotePopup from "./components/InfoNotePopup";
 import ConfirmationModal from "./components/ConfirmationModal";
 import ProductivityEvolutionChart from "./components/ProductivityEvolutionChart";
 import AdminMonitoringDashboard from "./components/AdminMonitoringDashboard";
@@ -249,7 +253,7 @@ export default function App() {
   }, [deletedItemIds]);
   
   // Interactive / detailed UI State
-  const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "base_tasks" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes">("inici");
+  const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "base_tasks" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes" | "novetats">("inici");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   // Quina subtasca té l'editor de descripció desplegat, dins del drawer de
   // detall de tasca (una alhora, per no allargar excessivament la llista)
@@ -300,6 +304,17 @@ export default function App() {
   // (abans, clicar la notificació d'una acta només portava a la llista
   // general i calia buscar-la a mà entre totes).
   const [openMinuteId, setOpenMinuteId] = useState<string | null>(null);
+  const [infoNotes, setInfoNotes] = useState<InfoNote[]>(() => {
+    try {
+      const saved = localStorage.getItem("golfsana_infonotes");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  // Nota informativa mostrada en pop-up en aquest moment (una a la vegada,
+  // encara que hi hagi vàries pendents d'acceptar per l'usuari actual).
+  const [activeInfoNoteId, setActiveInfoNoteId] = useState<string | null>(null);
 
   // Reusable React-driven confirmation state to bypass iframe popup constraints
   const [confirmModal, setConfirmModal] = useState<{
@@ -1074,6 +1089,45 @@ export default function App() {
     return () => unsubMinutes();
   }, [currentUser]);
 
+  // Sincronització de Notes Informatives (comunicats de tot l'equip)
+  useEffect(() => {
+    if (!currentUser) return;
+    const unsubInfoNotes = onSnapshot(collection(db, "infoNotes"), (snapshot) => {
+      const list: InfoNote[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as any;
+        list.push({ id: docSnap.id, acknowledgedBy: [], ...data } as InfoNote);
+      });
+      list.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
+      setInfoNotes(list);
+      localStorage.setItem("golfsana_infonotes", JSON.stringify(list));
+    }, (error) => {
+      console.warn("[Firestore InfoNotes Sync Warning] loading offline fallbacks:", error);
+      try {
+        const saved = JSON.parse(localStorage.getItem("golfsana_infonotes") || "[]");
+        setInfoNotes(saved);
+      } catch {
+        setInfoNotes([]);
+      }
+    });
+    return () => unsubInfoNotes();
+  }, [currentUser]);
+
+  // Determina quina nota informativa (si n'hi ha) s'ha de mostrar com a
+  // pop-up obligatori a l'usuari actual: la més antiga que encara no hagi
+  // acceptat. Un cop accepti aquesta, la següent pendent apareixerà sola
+  // (reactiu via infoNotes), sense necessitat de gestionar cap índex.
+  useEffect(() => {
+    if (!currentUser) {
+      setActiveInfoNoteId(null);
+      return;
+    }
+    const nextPending = infoNotes.find(
+      (n) => !(n.acknowledgedBy || []).some((a) => a.userId === currentUser.id)
+    );
+    setActiveInfoNoteId(nextPending ? nextPending.id : null);
+  }, [infoNotes, currentUser]);
+
   // Sync selectedTask with any background or status updates in the global tasks array
   useEffect(() => {
     if (selectedTask) {
@@ -1153,6 +1207,63 @@ export default function App() {
       console.warn("[Minutes Delete Warning] eliminat localment:", err);
     }
     addToast("Acta eliminada", "info");
+  };
+
+  // ---- NOTES INFORMATIVES (comunicats a tot l'equip) ----
+  const handleSaveInfoNote = async (note: InfoNote, isNew: boolean) => {
+    setInfoNotes((prev) => {
+      const next = isNew ? [note, ...prev] : prev.map((n) => (n.id === note.id ? note : n));
+      localStorage.setItem("golfsana_infonotes", JSON.stringify(next));
+      return next;
+    });
+    try {
+      await saveDoc(doc(db, "infoNotes", note.id), note);
+    } catch (err) {
+      console.warn("[InfoNote Write Warning] desat localment:", err);
+    }
+    addToast(isNew ? "Nota informativa publicada a tot l'equip" : "Nota informativa actualitzada", "success");
+    logEnterpriseAction(`Nota informativa ${isNew ? "creada" : "editada"}: "${note.title}"`);
+  };
+
+  const handleDeleteInfoNote = async (id: string) => {
+    const note = infoNotes.find((n) => n.id === id);
+    setInfoNotes((prev) => {
+      const next = prev.filter((n) => n.id !== id);
+      localStorage.setItem("golfsana_infonotes", JSON.stringify(next));
+      return next;
+    });
+    try {
+      await deleteDoc(doc(db, "infoNotes", id));
+    } catch (err) {
+      console.warn("[InfoNote Delete Warning] eliminat localment:", err);
+    }
+    addToast("Nota informativa eliminada", "info");
+    if (note) logEnterpriseAction(`Nota informativa eliminada: "${note.title}"`);
+  };
+
+  // Marca la nota com a acceptada per l'usuari actual (clic a "Ho he llegit i ho accepto")
+  const handleAcknowledgeInfoNote = async (noteId: string) => {
+    if (!currentUser) return;
+    const note = infoNotes.find((n) => n.id === noteId);
+    if (!note) return;
+    if ((note.acknowledgedBy || []).some((a) => a.userId === currentUser.id)) return;
+    const updatedNote: InfoNote = {
+      ...note,
+      acknowledgedBy: [
+        ...(note.acknowledgedBy || []),
+        { userId: currentUser.id, userName: currentUser.name, acknowledgedAt: new Date().toISOString() },
+      ],
+    };
+    setInfoNotes((prev) => {
+      const next = prev.map((n) => (n.id === noteId ? updatedNote : n));
+      localStorage.setItem("golfsana_infonotes", JSON.stringify(next));
+      return next;
+    });
+    try {
+      await saveDoc(doc(db, "infoNotes", noteId), updatedNote);
+    } catch (err) {
+      console.warn("[InfoNote Ack Warning] desat localment:", err);
+    }
   };
 
   const handleCreateTaskFromAgreement = async (minute: MeetingMinute, agreement: MeetingAgreement, projectId: string) => {
@@ -2252,6 +2363,33 @@ export default function App() {
               </div>
               <span className="text-[8px] bg-emerald-600 text-white px-1.5 py-0.5 font-black uppercase font-mono tracking-wider">GUIA</span>
             </button>
+
+            {/* Novetats i comunicats */}
+            <button
+              onClick={() => {
+                setActiveTab("novetats");
+                setFilterAssigneeId(null);
+                setActiveProjectId(null);
+                setIsMobileSidebarOpen(false);
+              }}
+              className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
+                activeTab === "novetats" && filterAssigneeId === null
+                  ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
+                  : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Megaphone className="w-3.5 h-3.5 text-blue-300" />
+                <span>Novetats</span>
+              </div>
+              {currentUser && infoNotes.some(
+                (n) => !(n.acknowledgedBy || []).some((a) => a.userId === currentUser.id)
+              ) && (
+                <span className="text-[8px] bg-amber-500 text-white px-1.5 py-0.5 font-black uppercase font-mono tracking-wider">
+                  NOU
+                </span>
+              )}
+            </button>
           </div>
 
           {/* Active Workspace Selector */}
@@ -2652,6 +2790,11 @@ export default function App() {
           onCancel={() => setIsLogoutConfirmationOpen(false)}
           title="Tancar sessió"
           message="Segur que vols tancar la sessió? Assegura't que tots els canvis estiguin desats."
+        />
+        <InfoNotePopup
+          note={infoNotes.find((n) => n.id === activeInfoNoteId) || null}
+          authorName={infoNotes.find((n) => n.id === activeInfoNoteId)?.createdByName}
+          onAccept={handleAcknowledgeInfoNote}
         />
         {/* HEADER BAR */}
         <header className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 sm:px-6 z-10 shrink-0">
@@ -4163,6 +4306,19 @@ export default function App() {
                   workspaces={workspaces}
                   defaultDepartmentId="all"
                 />
+              )}
+
+              {activeTab === "novetats" && (
+                <div className="p-6">
+                  <InfoNotesDashboard
+                    notes={infoNotes}
+                    users={users}
+                    currentUser={currentUser}
+                    isAdmin={isAdmin}
+                    onSaveNote={handleSaveInfoNote}
+                    onDeleteNote={handleDeleteInfoNote}
+                  />
+                </div>
               )}
 
               {activeTab === "monitoring" && (

@@ -56,6 +56,7 @@ import {
   MeetingAgreement,
   InfoNote
 } from "./types";
+import { isInfoNoteLive } from "./lib/infoNotes";
 import {
   Layers,
   LayoutGrid,
@@ -1096,7 +1097,7 @@ export default function App() {
       const list: InfoNote[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data() as any;
-        list.push({ id: docSnap.id, acknowledgedBy: [], ...data } as InfoNote);
+        list.push({ id: docSnap.id, acknowledgedBy: [], status: "published", ...data } as InfoNote);
       });
       list.sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || ""));
       setInfoNotes(list);
@@ -1114,19 +1115,44 @@ export default function App() {
   }, [currentUser]);
 
   // Determina quina nota informativa (si n'hi ha) s'ha de mostrar com a
-  // pop-up obligatori a l'usuari actual: la més antiga que encara no hagi
+  // pop-up obligatori a l'usuari actual: la més antiga, ja en directe
+  // (publicada, o programada i ja ha arribat l'hora), que encara no hagi
   // acceptat. Un cop accepti aquesta, la següent pendent apareixerà sola
   // (reactiu via infoNotes), sense necessitat de gestionar cap índex.
+  //
+  // `infoNotesNow` es refresca cada 30s perquè una nota "programada" passi a
+  // ser visible sola en arribar l'hora, sense necessitat de recarregar la
+  // pàgina — és l'única font de "l'hora actual" per a tota la funcionalitat
+  // de Novetats (pop-up, avís intermitent i llista), per evitar el mateix
+  // problema de desincronització que ja vam patir amb HOUR_RANGES.
+  const [infoNotesNow, setInfoNotesNow] = useState(() => new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setInfoNotesNow(new Date()), 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (!currentUser) {
       setActiveInfoNoteId(null);
       return;
     }
     const nextPending = infoNotes.find(
-      (n) => !(n.acknowledgedBy || []).some((a) => a.userId === currentUser.id)
+      (n) =>
+        isInfoNoteLive(n, infoNotesNow) &&
+        !(n.acknowledgedBy || []).some((a) => a.userId === currentUser.id)
     );
     setActiveInfoNoteId(nextPending ? nextPending.id : null);
-  }, [infoNotes, currentUser]);
+  }, [infoNotes, currentUser, infoNotesNow]);
+
+  // Hi ha alguna nota en directe pendent d'acceptar per l'usuari actual? —
+  // es fa servir per fer intermitent l'entrada "Novetats" del menú lateral.
+  const hasPendingInfoNote =
+    !!currentUser &&
+    infoNotes.some(
+      (n) =>
+        isInfoNoteLive(n, infoNotesNow) &&
+        !(n.acknowledgedBy || []).some((a) => a.userId === currentUser.id)
+    );
 
   // Sync selectedTask with any background or status updates in the global tasks array
   useEffect(() => {
@@ -1221,8 +1247,14 @@ export default function App() {
     } catch (err) {
       console.warn("[InfoNote Write Warning] desat localment:", err);
     }
-    addToast(isNew ? "Nota informativa publicada a tot l'equip" : "Nota informativa actualitzada", "success");
-    logEnterpriseAction(`Nota informativa ${isNew ? "creada" : "editada"}: "${note.title}"`);
+    const toastMessage =
+      note.status === "draft"
+        ? "Esborrany desat"
+        : note.status === "scheduled"
+        ? `Nota programada per ${new Date(note.scheduledFor || "").toLocaleString("ca-ES")}`
+        : "Nota informativa publicada a tot l'equip";
+    addToast(toastMessage, "success");
+    logEnterpriseAction(`Nota informativa ${isNew ? "creada" : "editada"} (${note.status}): "${note.title}"`);
   };
 
   const handleDeleteInfoNote = async (id: string) => {
@@ -2379,13 +2411,11 @@ export default function App() {
               }`}
             >
               <div className="flex items-center gap-2">
-                <Megaphone className="w-3.5 h-3.5 text-blue-300" />
+                <Megaphone className={`w-3.5 h-3.5 text-blue-300 ${hasPendingInfoNote ? "animate-pulse" : ""}`} />
                 <span>Novetats</span>
               </div>
-              {currentUser && infoNotes.some(
-                (n) => !(n.acknowledgedBy || []).some((a) => a.userId === currentUser.id)
-              ) && (
-                <span className="text-[8px] bg-amber-500 text-white px-1.5 py-0.5 font-black uppercase font-mono tracking-wider">
+              {hasPendingInfoNote && (
+                <span className="text-[8px] bg-amber-500 text-white px-1.5 py-0.5 font-black uppercase font-mono tracking-wider animate-pulse">
                   NOU
                 </span>
               )}
@@ -4317,6 +4347,7 @@ export default function App() {
                     isAdmin={isAdmin}
                     onSaveNote={handleSaveInfoNote}
                     onDeleteNote={handleDeleteInfoNote}
+                    now={infoNotesNow}
                   />
                 </div>
               )}

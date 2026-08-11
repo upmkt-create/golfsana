@@ -206,6 +206,8 @@ export interface InfoNoteAck {
   acknowledgedAt: string; // ISO
 }
 
+export type InfoNoteStatus = "draft" | "scheduled" | "published";
+
 export interface InfoNote {
   id: string;
   title: string;
@@ -214,5 +216,7 @@ export interface InfoNote {
   createdByName: string;
   createdAt: string;        // ISO
   updatedAt?: string;       // ISO — present si s'ha editat
-  acknowledgedBy: InfoNoteAck[]; // Qui l'ha llegida i acceptada
+  status: InfoNoteStatus;   // "draft" = nomes visible per l'autor/admins; "scheduled" = es publicara sola a scheduledFor; "published" = ja visible per tothom
+  scheduledFor?: string;    // ISO amb data i hora — moment en que una nota "scheduled" passa a ser visible per tothom
+  acknowledgedBy: InfoNoteAck[]; // Qui l'ha llegida i acceptada (nomes te sentit un cop publicada)
 }

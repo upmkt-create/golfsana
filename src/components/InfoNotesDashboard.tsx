@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Megaphone,
   Plus,
@@ -12,7 +12,7 @@ import {
   Pencil,
   CalendarClock,
   FileEdit,
-  Paperclip,
+  Link as LinkIcon,
   X,
   Copy,
   Ban,
@@ -24,8 +24,6 @@ import {
 import { InfoNote, InfoNoteAttachment, InfoNoteStatus, UserProfile } from "../types";
 import { isInfoNoteLive, isInfoNoteForUser } from "../lib/infoNotes";
 import { DEPARTMENTS } from "../data";
-import { storage } from "../firebase";
-import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import RichTextEditor from "./RichTextEditor";
 
 interface InfoNotesDashboardProps {
@@ -58,14 +56,14 @@ function toDatetimeLocalValue(iso?: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function genId() {
   return "infonote-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+}
+
+// Adivinem si l'enllaç és una imatge per la seva extensió, ja que no venim
+// d'una pujada real (no tenim el content-type real del navegador).
+function looksLikeImageUrl(url: string) {
+  return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url);
 }
 
 // Exporta a PDF, per a una nota concreta, qui l'ha acceptada i qui no —
@@ -136,10 +134,10 @@ export default function InfoNotesDashboard({
   const [content, setContent] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
   const [attachments, setAttachments] = useState<InfoNoteAttachment[]>([]);
+  const [linkNameInput, setLinkNameInput] = useState("");
+  const [linkUrlInput, setLinkUrlInput] = useState("");
   const [targetDepartmentIds, setTargetDepartmentIds] = useState<string[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
   const [expandedReaders, setExpandedReaders] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const visibleNotes = useMemo(
     () =>
@@ -176,6 +174,8 @@ export default function InfoNotesDashboard({
     setContent("");
     setScheduledFor("");
     setAttachments([]);
+    setLinkNameInput("");
+    setLinkUrlInput("");
     setTargetDepartmentIds([]);
   };
 
@@ -206,45 +206,29 @@ export default function InfoNotesDashboard({
     );
   };
 
-  const handleFilesSelected = async (files: FileList | null) => {
-    if (!files || files.length === 0 || !formNoteId) return;
-    setIsUploading(true);
-    try {
-      for (const file of Array.from(files)) {
-        if (file.size > 15 * 1024 * 1024) {
-          alert(`"${file.name}" supera els 15 MB i no s'ha pujat.`);
-          continue;
-        }
-        const storagePath = `infoNotes/${formNoteId}/${Date.now()}-${file.name}`;
-        const fileRef = ref(storage, storagePath);
-        await uploadBytes(fileRef, file);
-        const url = await getDownloadURL(fileRef);
-        const newAttachment: InfoNoteAttachment = {
-          id: "att-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
-          name: file.name,
-          url,
-          contentType: file.type,
-          size: file.size,
-          storagePath,
-        };
-        setAttachments((prev) => [...prev, newAttachment]);
-      }
-    } catch (err) {
-      console.warn("[InfoNote Attachment Upload Warning]", err);
-      alert("No s'ha pogut pujar l'arxiu. Comprova la connexió i torna-ho a provar.");
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+  // Els adjunts són enllaços externs (Google Drive, etc.) — el pla gratuït
+  // de Firebase no permet pujar fitxers directament (caldria Blaze).
+  const addLink = () => {
+    const name = linkNameInput.trim();
+    const url = linkUrlInput.trim();
+    if (!name || !url) return;
+    if (!/^https?:\/\//i.test(url)) {
+      alert("L'enllaç ha de començar per http:// o https:// (per exemple, un enllaç de compartir de Google Drive).");
+      return;
     }
+    const newAttachment: InfoNoteAttachment = {
+      id: "att-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+      name,
+      url,
+      contentType: looksLikeImageUrl(url) ? "image" : undefined,
+    };
+    setAttachments((prev) => [...prev, newAttachment]);
+    setLinkNameInput("");
+    setLinkUrlInput("");
   };
 
-  const removeAttachment = async (att: InfoNoteAttachment) => {
+  const removeAttachment = (att: InfoNoteAttachment) => {
     setAttachments((prev) => prev.filter((a) => a.id !== att.id));
-    try {
-      await deleteObject(ref(storage, att.storagePath));
-    } catch (err) {
-      console.warn("[InfoNote Attachment Delete Warning]", err);
-    }
   };
 
   const submit = async (status: InfoNoteStatus) => {
@@ -280,17 +264,16 @@ export default function InfoNotesDashboard({
   };
 
   const duplicateNote = (note: InfoNote) => {
-    // Es duplica com a nou esborrany: mateix títol/contingut/destinataris,
-    // però SENSE adjunts (per no compartir el mateix fitxer de Storage entre
-    // dues notes — si un dia s'esborra l'adjunt d'una, no ha de trencar
-    // l'altra) ni programació ni lectures anteriors.
+    // Es duplica com a nou esborrany: mateix títol/contingut/destinataris/
+    // enllaços (ara que són enllaços externs, no cal preocupar-se de compartir
+    // cap fitxer), però sense programació ni lectures anteriors.
     setFormNoteId(genId());
     setEditingId(null);
     setIsCreating(true);
     setTitle(`${note.title} (còpia)`);
     setContent(note.content);
     setScheduledFor("");
-    setAttachments([]);
+    setAttachments(note.attachments || []);
     setTargetDepartmentIds(note.targetDepartmentIds || []);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -328,7 +311,7 @@ export default function InfoNotesDashboard({
   };
 
   const renderAttachmentChip = (att: InfoNoteAttachment, onRemove?: () => void) => {
-    const isImage = att.contentType?.startsWith("image/");
+    const isImage = att.contentType === "image" || att.contentType?.startsWith("image/") || looksLikeImageUrl(att.url);
     return (
       <div
         key={att.id}
@@ -338,7 +321,6 @@ export default function InfoNotesDashboard({
         <a href={att.url} target="_blank" rel="noreferrer" className="hover:underline truncate max-w-[10rem]">
           {att.name}
         </a>
-        <span className="text-slate-400">({formatBytes(att.size)})</span>
         {onRemove && (
           <button onClick={onRemove} className="text-slate-400 hover:text-rose-600 ml-1">
             <X className="w-3 h-3" />
@@ -388,27 +370,40 @@ export default function InfoNotesDashboard({
             minHeightClass="min-h-[10rem]"
           />
 
-          {/* Adjunts */}
+          {/* Adjunts (enllaços externs — Drive, etc.) */}
           <div className="space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              {attachments.map((att) => renderAttachmentChip(att, () => removeAttachment(att)))}
+            {attachments.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {attachments.map((att) => renderAttachmentChip(att, () => removeAttachment(att)))}
+              </div>
+            )}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <LinkIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <input
+                type="text"
+                value={linkNameInput}
+                onChange={(e) => setLinkNameInput(e.target.value)}
+                placeholder="Nom del document (ex: Cartell nou horari)"
+                className="flex-1 min-w-[10rem] border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+              />
+              <input
+                type="text"
+                value={linkUrlInput}
+                onChange={(e) => setLinkUrlInput(e.target.value)}
+                placeholder="Enllaç (https://drive.google.com/...)"
+                className="flex-1 min-w-[14rem] border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+              />
               <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 border border-dashed border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+                onClick={addLink}
+                disabled={!linkNameInput.trim() || !linkUrlInput.trim()}
+                className="px-3 py-1.5 text-[11px] font-bold text-white bg-slate-600 hover:bg-slate-700 disabled:bg-slate-300 disabled:cursor-not-allowed"
               >
-                <Paperclip className="w-3.5 h-3.5" />
-                {isUploading ? "Pujant..." : "Adjuntar imatge o PDF"}
+                Afegir enllaç
               </button>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              multiple
-              className="hidden"
-              onChange={(e) => handleFilesSelected(e.target.files)}
-            />
+            <p className="text-[10px] text-slate-400">
+              Puja primer la imatge o el PDF a Google Drive, comparteix-lo com a "Qualsevol persona amb l'enllaç" i enganxa aquí l'enllaç.
+            </p>
           </div>
 
           {/* Destinataris per departament */}

@@ -263,11 +263,14 @@ export const STARTER_GOLF_CORES: Omit<GolfCourse, "id">[] = [
   }
 ];
 
-export const DEPARTMENTS = [
-  { id: "dep-esportiu", name: "Esportiu", description: "Organització de tornejos, campionats de socis i activitats del Club.", color: "#3B82F6" },
-  { id: "dep-comercial", name: "Comercial", description: "Vendes de green fees, abonaments de socis i esdeveniments corporatius.", color: "#EF4444" },
-  { id: "dep-marqueting", name: "Màrqueting", description: "Disseny gràfic, campanyes digitals, gestió de web i xarxes socials.", color: "#F59E0B" }
-];
+// NOTA: la llista fixa "DEPARTMENTS" que hi havia aquí s'ha eliminat a
+// petició d'Isabel — feia que qualsevol departament creat més tard des de
+// l'app (com "Pitch and Putt") no aparegués en algunes pantalles perquè
+// aquest fitxer no s'actualitzava. Ara els "departaments" de tota l'app
+// són sempre `getDepartmentOptions(workspaces)` (src/lib/departments.ts),
+// calculats en directe a partir dels espais de treball reals de Firestore.
+// NO tornar a afegir cap llista fixa de departaments aquí.
+
 
 export const STARTER_MEMBERS: UserProfile[] = [
   {

@@ -37,11 +37,11 @@ import {
   STARTER_WORKSPACES,
   STARTER_PROJECTS,
   STARTER_TASKS,
-  DEPARTMENTS,
   getRealWorldCompetitorPrices,
   parseAndCleanPrice,
   isAllowedTariff
 } from "./data";
+import { getDepartmentOptions } from "./lib/departments";
 import {
   UserProfile,
   Workspace,
@@ -4339,7 +4339,7 @@ export default function App() {
                   tasks={visibleTasks}
                   projects={projects}
                   users={users}
-                  workspaces={DEPARTMENTS}
+                  workspaces={getDepartmentOptions(workspaces)}
                   onSelectTask={(task) => setSelectedTask(task)}
                   onBack={() => setActiveTab("inici")}
                 />
@@ -4360,6 +4360,7 @@ export default function App() {
                   tasks={visibleTasks}
                   users={users}
                   projects={projects}
+                  workspaces={workspaces}
                 />
               )}
 
@@ -4383,6 +4384,7 @@ export default function App() {
                     onSaveNote={handleSaveInfoNote}
                     onDeleteNote={handleDeleteInfoNote}
                     now={infoNotesNow}
+                    workspaces={workspaces}
                   />
                 </div>
               )}
@@ -4475,6 +4477,7 @@ export default function App() {
                     tasks={visibleTasks}
                     users={users}
                     projects={projects}
+                    workspaces={workspaces}
                   />
 
                   <div className="space-y-3">

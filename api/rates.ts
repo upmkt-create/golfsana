@@ -548,7 +548,7 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
   let url = targetUrl;
   let proxyLabel = "";
   if (scrapingBeeKey) {
-    url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true`;
+    url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true&render_js=false`;
     proxyLabel = "via ScrapingBee (premium)";
   } else if (scraperApiKey) {
     url = `https://api.scraperapi.com/?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}${usePremium ? "&premium=true" : ""}`;
@@ -665,7 +665,7 @@ async function fetchTeeOnePage(ep: CourseEndpoint): Promise<{ html: string | nul
   // ha clau configurada, si no intent directe.
   const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
   const url = scrapingBeeKey
-    ? `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true`
+    ? `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true&render_js=false`
     : targetUrl;
 
   try {

@@ -524,6 +524,47 @@ interface ScrapeResult {
                   // nosaltres mateixos al servidor de GolfManager.
 }
 
+// ScrapingBee, quan falla amb un 500 propi (no del lloc de destí), indica
+// explícitament al seu missatge d'error que es torni a intentar ("please
+// try again... you will not be charged for this request"). Aquest ajudant
+// fa fins a 3 intents abans de donar-ho per perdut, només per a fallades
+// d'aquest tipus concret (no per timeouts genuïns, que ja es gestionen a
+// fora amb el seu propi missatge).
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  maxAttempts: number = 3
+): Promise<{ resp: Response | null; lastErr: any; attempts: number }> {
+  let lastErr: any = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const resp = await fetch(url, init);
+      if (resp.status === 500 && attempt < maxAttempts) {
+        // Comprovem si és el missatge típic de ScrapingBee de "reintenta-ho"
+        // (llegim una còpia perquè el body només es pot llegir un cop)
+        const clone = resp.clone();
+        const bodyText = await clone.text().catch(() => "");
+        if (/try again|scrapingbee/i.test(bodyText)) {
+          await new Promise((r) => setTimeout(r, 900 * attempt));
+          continue;
+        }
+      }
+      return { resp, lastErr: null, attempts: attempt };
+    } catch (err) {
+      lastErr = err;
+      // Un timeout/AbortError no es reintenta (ja consumeix el marge de temps)
+      if ((err as any)?.name === "TimeoutError" || (err as any)?.name === "AbortError") {
+        return { resp: null, lastErr, attempts: attempt };
+      }
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 900 * attempt));
+        continue;
+      }
+    }
+  }
+  return { resp: null, lastErr, attempts: maxAttempts };
+}
+
 async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<ScrapeResult> {
   const targetUrl = `${ep.base}/availability.json?date=${dateStr}`;
 
@@ -557,23 +598,37 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
   const usingProxy = !!(scrapingBeeKey || scraperApiKey);
 
   try {
-    const resp = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": `${ep.base}/book?date=${dateStr}`,
-        "Origin": ep.base.replace(/\/consumer$/, ""),
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "sec-ch-ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
+    const { resp, lastErr, attempts } = await fetchWithRetry(
+      url,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
+          "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
+          "Accept-Encoding": "gzip, deflate, br",
+          "Referer": `${ep.base}/book?date=${dateStr}`,
+          "Origin": ep.base.replace(/\/consumer$/, ""),
+          "Sec-Fetch-Dest": "empty",
+          "Sec-Fetch-Mode": "cors",
+          "Sec-Fetch-Site": "same-origin",
+          "sec-ch-ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": '"Windows"',
+        },
+        signal: AbortSignal.timeout(usingProxy ? 20000 : 8000), // marge reduït perquè hi pot haver fins a 3 intents dins del límit de 60s de Vercel
       },
-      signal: AbortSignal.timeout(usingProxy ? 45000 : 8000), // Un proxy premium pot trigar molt per sortejar bloquejos, aprofitem el marge de 60s de la funció
-    });
+      usingProxy ? 3 : 1
+    );
+
+    if (!resp) {
+      const isTimeout = lastErr?.name === "TimeoutError" || lastErr?.name === "AbortError";
+      return {
+        teeTimes: null,
+        debug: isTimeout
+          ? `Timeout connectant a ${targetUrl}${usingProxy ? ` (${proxyLabel})` : ""} (${attempts} intent${attempts > 1 ? "s" : ""})`
+          : `Error de xarxa: ${String(lastErr?.message || lastErr)} (${attempts} intent${attempts > 1 ? "s" : ""})`,
+      };
+    }
 
     if (!resp.ok) {
       let bodySnippet = "";
@@ -584,7 +639,7 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
       }
       return {
         teeTimes: null,
-        debug: `HTTP ${resp.status} ${resp.statusText} a ${targetUrl}${usingProxy ? ` (${proxyLabel})` : ""}${bodySnippet ? ` — cos: ${bodySnippet}` : ""}`,
+        debug: `HTTP ${resp.status} ${resp.statusText} a ${targetUrl}${usingProxy ? ` (${proxyLabel}, ${attempts} intent${attempts > 1 ? "s" : ""})` : ""}${bodySnippet ? ` — cos: ${bodySnippet}` : ""}`,
       };
     }
 
@@ -669,15 +724,28 @@ async function fetchTeeOnePage(ep: CourseEndpoint): Promise<{ html: string | nul
     : targetUrl;
 
   try {
-    const resp = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
+    const { resp, lastErr, attempts } = await fetchWithRetry(
+      url,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
+        },
+        signal: AbortSignal.timeout(scrapingBeeKey ? 20000 : 8000),
       },
-      signal: AbortSignal.timeout(scrapingBeeKey ? 45000 : 8000),
-    });
-    if (!resp.ok) return { html: null, debug: `HTTP ${resp.status} ${resp.statusText} carregant ${targetUrl}` };
+      scrapingBeeKey ? 3 : 1
+    );
+    if (!resp) {
+      const isTimeout = lastErr?.name === "TimeoutError" || lastErr?.name === "AbortError";
+      return {
+        html: null,
+        debug: isTimeout
+          ? `Timeout carregant ${targetUrl} (${attempts} intent${attempts > 1 ? "s" : ""})`
+          : `Error de xarxa carregant la pàgina: ${String(lastErr?.message || lastErr)} (${attempts} intent${attempts > 1 ? "s" : ""})`,
+      };
+    }
+    if (!resp.ok) return { html: null, debug: `HTTP ${resp.status} ${resp.statusText} carregant ${targetUrl} (${attempts} intent${attempts > 1 ? "s" : ""})` };
     const html = await resp.text();
     return { html, debug: "ok" };
   } catch (err: any) {

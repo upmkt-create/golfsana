@@ -576,7 +576,16 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
     });
 
     if (!resp.ok) {
-      return { teeTimes: null, debug: `HTTP ${resp.status} ${resp.statusText} a ${targetUrl}${usingProxy ? ` (${proxyLabel})` : ""}` };
+      let bodySnippet = "";
+      try {
+        bodySnippet = (await resp.text()).slice(0, 300).replace(/\s+/g, " ").trim();
+      } catch {
+        // ignorem si no es pot llegir el cos
+      }
+      return {
+        teeTimes: null,
+        debug: `HTTP ${resp.status} ${resp.statusText} a ${targetUrl}${usingProxy ? ` (${proxyLabel})` : ""}${bodySnippet ? ` — cos: ${bodySnippet}` : ""}`,
+      };
     }
 
     const ct = resp.headers.get("content-type") || "";
@@ -592,7 +601,15 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
 
     const teeTimes = parseGolfManagerItems(data.items, ep.allowedTariffs);
     if (teeTimes.length === 0) {
-      return { teeTimes: null, debug: `Resposta correcta amb ${data.items.length} items, però cap coincideix amb les tarifes permeses (${ep.allowedTariffs.join(", ")}) o el resourceType Golf.` };
+      const golfItems = data.items.filter((i) => i.resourceType === 3);
+      const foundNames = Array.from(new Set(golfItems.map((i) => i.name))).slice(0, 15);
+      return {
+        teeTimes: null,
+        debug:
+          golfItems.length === 0
+            ? `Resposta correcta amb ${data.items.length} items, però cap és de tipus Golf (resourceType 3).`
+            : `Resposta correcta amb ${golfItems.length} items de Golf, però cap coincideix amb les tarifes permeses (${ep.allowedTariffs.join(", ")}). Noms reals trobats: ${foundNames.join(" | ")}`,
+      };
     }
     return { teeTimes, debug: "ok" };
   } catch (err: any) {
@@ -833,9 +850,12 @@ async function scrapeTeeOne(ep: CourseEndpoint, dateStr: string): Promise<Scrape
 
     const teeTimes = parseTeeOneItems(data.horasDisponibles, ep.allowedTariffs);
     if (teeTimes.length === 0) {
+      const foundNames = Array.from(
+        new Set(data.horasDisponibles.flatMap((h) => (h.tarifas || []).map((t) => t.nombre)))
+      ).slice(0, 15);
       return {
         teeTimes: null,
-        debug: `Resposta correcta amb ${data.horasDisponibles.length} hores, però cap coincideix amb les tarifes permeses (${ep.allowedTariffs.join(", ")}).`,
+        debug: `Resposta correcta amb ${data.horasDisponibles.length} hores, però cap coincideix amb les tarifes permeses (${ep.allowedTariffs.join(", ")}). Noms reals trobats: ${foundNames.join(" | ")}`,
       };
     }
     return { teeTimes, debug: "ok" };

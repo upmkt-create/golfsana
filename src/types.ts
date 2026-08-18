@@ -26,7 +26,6 @@ export interface UserProfile {
   accessCode?: string; // Custom access code for non-google auth
   notes?: string; // (Antic — format previ d'una sola nota. Es manté per compatibilitat de lectura.)
   notesList?: MemberNote[]; // Notes internes sobre aquest membre — se'n poden afegir vàries
-  restrictedToOwnDepartment?: boolean; // Si és true, aquest membre només veu/pot accedir al(s) seu(s) propi(s) espai(s) de treball — pensat per a rols molt acotats (Caddy Master, Greenkeeper...). Per defecte false/absent = comportament normal (veuen tots els espais no privats, com sempre).
 }
 
 export interface ActivityLog {
@@ -123,7 +122,7 @@ export interface Task {
   startDate?: string; // YYYY-MM-DD (Data d'inici)
   startTime?: string; // HH:MM — hora opcional (reunions, visites...); si no es defineix, la tasca es tracta com "de tot el dia"
   endTime?: string; // HH:MM — hora de fi opcional, associada a dueDate
-  recurrence?: "none" | "weekly" | "fortnightly" | "monthly" | "bimonthly" | "quarterly" | "semiannually" | "yearly"; // Periodicitat
+  recurrence?: "none" | "daily" | "weekly" | "fortnightly" | "monthly" | "bimonthly" | "quarterly" | "semiannually" | "yearly"; // Periodicitat
   isBaseTask?: boolean; // Tasca estructural del projecte (Base del Projecte), a diferència de les puntuals/ad-hoc
   completedAt?: string; // YYYY-MM-DD
   completedOnTime?: boolean; // Ha acabat a temps?

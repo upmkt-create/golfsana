@@ -950,6 +950,7 @@ export default function TaskList({
                             <RefreshCw className="w-2.5 h-2.5 text-indigo-505 animate-spin-slow" />
                             <span>{(() => {
                               switch(task.recurrence) {
+                                case "daily": return "Diari";
                                 case "weekly": return "Setmanal";
                                 case "fortnightly": return "Quinzenal";
                                 case "monthly": return "Mensual";

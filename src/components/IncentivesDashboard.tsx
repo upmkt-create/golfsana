@@ -812,6 +812,7 @@ export default function IncentivesDashboard({ tasks, users, projects, workspaces
                         {task.recurrence && task.recurrence !== "none" ? (
                           <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 text-[8.5px] font-bold rounded-sm uppercase tracking-wide">
                             Recurrent: {
+                              task.recurrence === "daily" ? "Diari" :
                               task.recurrence === "weekly" ? "Setmanal" :
                               task.recurrence === "fortnightly" ? "Quinzenal" :
                               task.recurrence === "monthly" ? "Mensual" :

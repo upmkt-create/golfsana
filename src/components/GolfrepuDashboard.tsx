@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
+import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { ReputationSnapshot, RatingBreakdown } from "../types";
@@ -7,12 +7,16 @@ import { ReputationSnapshot, RatingBreakdown } from "../types";
 const NAVY = "#033b7a";
 const CACHE_KEY = "golfsana_reputation_cache";
 
+interface GolfrepuDashboardProps {
+  onBack: () => void;
+}
+
 function formatDate(iso?: string) {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString("ca-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export default function GolfrepuDashboard() {
+export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
   const [snapshot, setSnapshot] = useState<ReputationSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,35 +104,58 @@ export default function GolfrepuDashboard() {
   const maxBreakdownCount = breakdown ? Math.max(breakdown[5], breakdown[4], breakdown[3], breakdown[2], breakdown[1], 1) : 1;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">
-            <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-            Golfrepu — Reputació online
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Puntuació i ressenyes reals del club a Google Maps.
-          </p>
+    <div className="h-screen w-full flex flex-col bg-slate-50 text-slate-900 overflow-y-auto">
+      {/* Capçalera pròpia de Golfrepu — espai diferent de GolfSana, no una pestanya més */}
+      <header className="shrink-0 bg-gradient-to-r from-[#022e5f] to-[#044c9c] px-6 py-4 flex items-center justify-between border-b-[3px] border-amber-400 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-amber-400 flex items-center justify-center shrink-0">
+            <Star className="w-5 h-5 fill-[#022e5f] text-[#022e5f]" />
+          </div>
+          <div>
+            <p className="text-[9px] uppercase tracking-wider font-mono text-blue-200 font-bold">
+              GolfSana · Tercer pilar
+            </p>
+            <h1 className="text-white font-black text-lg leading-tight">Golfrepu</h1>
+          </div>
         </div>
         <button
-          onClick={handleSync}
-          disabled={isLoading}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white transition-all disabled:opacity-60"
-          style={{ backgroundColor: NAVY }}
+          onClick={onBack}
+          className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-blue-100 hover:text-white hover:bg-white/10 border border-blue-300/40 transition-all"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          {isLoading ? "Sincronitzant..." : "Sincronitzar ara"}
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Tornar a GolfSana
         </button>
-      </div>
+      </header>
 
-      {error && (
-        <div className="bg-rose-50 border border-rose-200 p-3 flex items-start gap-2 text-xs text-rose-700">
-          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+      <div className="flex-1 p-6 space-y-6 max-w-5xl w-full mx-auto">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <p className="font-bold">No s'ha pogut sincronitzar</p>
-            <p className="mt-0.5">{error}</p>
+            <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              Reputació online
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Puntuació i ressenyes reals del club a Google Maps.
+            </p>
           </div>
+          <button
+            onClick={handleSync}
+            disabled={isLoading}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white transition-all disabled:opacity-60"
+            style={{ backgroundColor: NAVY }}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            {isLoading ? "Sincronitzant..." : "Sincronitzar ara"}
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-rose-50 border border-rose-200 p-3 flex items-start gap-2 text-xs text-rose-700">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold">No s'ha pogut sincronitzar</p>
+              <p className="mt-0.5">{error}</p>
+            </div>
         </div>
       )}
 
@@ -200,6 +227,7 @@ export default function GolfrepuDashboard() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

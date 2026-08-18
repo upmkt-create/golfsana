@@ -233,7 +233,8 @@ export interface InfoNote {
   scheduledFor?: string;    // ISO amb data i hora — moment en que una nota "scheduled" passa a ser visible per tothom
   acknowledgedBy: InfoNoteAck[]; // Qui l'ha llegida i acceptada (nomes te sentit un cop publicada)
   attachments?: InfoNoteAttachment[]; // Enllaços externs (Google Drive, etc.) — el pla gratuït no permet pujar fitxers directament
-  targetDepartmentIds?: string[]; // Si buit/absent = tothom. Si té valors, només membres d'aquests departaments la veuen.
+  targetDepartmentIds?: string[]; // Si buit/absent (i sense targetUserIds) = tothom. Si té valors, membres d'aquests departaments la veuen.
+  targetUserIds?: string[]; // Usuaris concrets afegits com a destinataris, a més (o en lloc) dels departaments.
   reminders?: InfoNoteReminder[]; // Recordatoris ja enviats (per no repetir-los cada dia)
 }
 

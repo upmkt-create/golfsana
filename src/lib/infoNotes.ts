@@ -15,16 +15,27 @@ export function isInfoNoteLive(note: InfoNote, now: Date = new Date()): boolean 
 }
 
 // Determina si un usuari concret és dins del públic al qui va dirigida la
-// nota (independentment de si ja s'ha publicat o no). Si `targetDepartmentIds`
-// és buit o absent, és per a tothom — comportament igual que abans d'afegir
-// aquesta funcionalitat, per no trencar notes ja creades.
+// nota (independentment de si ja s'ha publicat o no). Si no hi ha ni
+// `targetDepartmentIds` ni `targetUserIds`, és per a tothom — comportament
+// igual que abans d'afegir aquesta funcionalitat, per no trencar notes ja
+// creades. Si n'hi ha algun dels dos, l'usuari hi és si compleix QUALSEVOL
+// dels dos criteris (departament O afegit individualment).
 export function isInfoNoteForUser(note: InfoNote, user: UserProfile): boolean {
-  if (!note.targetDepartmentIds || note.targetDepartmentIds.length === 0) return true;
-  const userDeptIds = new Set([
-    ...(user.departmentIds || []),
-    ...(user.departmentId ? [user.departmentId] : []),
-  ]);
-  return note.targetDepartmentIds.some((d) => userDeptIds.has(d));
+  const hasDeptFilter = !!note.targetDepartmentIds && note.targetDepartmentIds.length > 0;
+  const hasUserFilter = !!note.targetUserIds && note.targetUserIds.length > 0;
+  if (!hasDeptFilter && !hasUserFilter) return true;
+
+  if (hasUserFilter && note.targetUserIds!.includes(user.id)) return true;
+
+  if (hasDeptFilter) {
+    const userDeptIds = new Set([
+      ...(user.departmentIds || []),
+      ...(user.departmentId ? [user.departmentId] : []),
+    ]);
+    if (note.targetDepartmentIds!.some((d) => userDeptIds.has(d))) return true;
+  }
+
+  return false;
 }
 
 // En directe + dirigida a aquest usuari — la comprovació combinada que cal

@@ -152,12 +152,14 @@ async function scrapeReputation(): Promise<ReputationResult> {
   }
 
   // Google Maps és 100% JavaScript: cal render_js=true (a diferència de
-  // GolfManager, que és una API JSON i no en necessita). Això consumeix més
-  // crèdits de ScrapingBee per petició — per això la sincronització és
-  // manual, no automàtica.
+  // GolfManager, que és una API JSON i no en necessita). A més, ScrapingBee
+  // exigeix el paràmetre custom_google=True per a qualsevol domini de
+  // Google (confirmat amb un error real: sense això, respon HTTP 400) —
+  // aquest mode cobra 20 crèdits per petició (molt més que un scraping
+  // normal), per això la sincronització és manual, no automàtica.
   const url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(
     CLUB_MAPS_URL
-  )}&premium_proxy=true&render_js=true&wait=2500`;
+  )}&premium_proxy=true&render_js=true&wait=2500&custom_google=True`;
 
   try {
     const { resp, lastErr, attempts } = await fetchWithRetry(

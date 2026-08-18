@@ -20,6 +20,8 @@ import {
   Image as ImageIcon,
   FileText,
   Building2,
+  Search,
+  UserPlus,
 } from "lucide-react";
 import { InfoNote, InfoNoteAttachment, InfoNoteStatus, UserProfile, Workspace } from "../types";
 import { isInfoNoteLive, isInfoNoteForUser } from "../lib/infoNotes";
@@ -139,6 +141,8 @@ export default function InfoNotesDashboard({
   const [linkNameInput, setLinkNameInput] = useState("");
   const [linkUrlInput, setLinkUrlInput] = useState("");
   const [targetDepartmentIds, setTargetDepartmentIds] = useState<string[]>([]);
+  const [targetUserIds, setTargetUserIds] = useState<string[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const [expandedReaders, setExpandedReaders] = useState<string | null>(null);
 
   // Departaments = espais de treball reals que existeixen ara mateix a
@@ -183,6 +187,8 @@ export default function InfoNotesDashboard({
     setLinkNameInput("");
     setLinkUrlInput("");
     setTargetDepartmentIds([]);
+    setTargetUserIds([]);
+    setUserSearchQuery("");
   };
 
   const startCreate = () => {
@@ -199,6 +205,7 @@ export default function InfoNotesDashboard({
     setScheduledFor(toDatetimeLocalValue(note.scheduledFor));
     setAttachments(note.attachments || []);
     setTargetDepartmentIds(note.targetDepartmentIds || []);
+    setTargetUserIds(note.targetUserIds || []);
   };
 
   // Qui pot editar/gestionar una nota concreta: l'autor mentre no s'hagi
@@ -211,6 +218,18 @@ export default function InfoNotesDashboard({
       prev.includes(depId) ? prev.filter((d) => d !== depId) : [...prev, depId]
     );
   };
+
+  const toggleUser = (userId: string) => {
+    setTargetUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((u) => u !== userId) : [...prev, userId]
+    );
+  };
+
+  const filteredUsersForPicker = useMemo(() => {
+    const q = userSearchQuery.trim().toLowerCase();
+    const base = q ? users.filter((u) => u.name.toLowerCase().includes(q)) : users;
+    return base.slice().sort((a, b) => a.name.localeCompare(b.name));
+  }, [users, userSearchQuery]);
 
   // Els adjunts són enllaços externs (Google Drive, etc.) — el pla gratuït
   // de Firebase no permet pujar fitxers directament (caldria Blaze).
@@ -251,6 +270,7 @@ export default function InfoNotesDashboard({
       scheduledFor: status === "scheduled" ? new Date(scheduledFor).toISOString() : undefined,
       attachments,
       targetDepartmentIds: targetDepartmentIds.length > 0 ? targetDepartmentIds : undefined,
+      targetUserIds: targetUserIds.length > 0 ? targetUserIds : undefined,
     };
 
     if (existing) {
@@ -281,6 +301,7 @@ export default function InfoNotesDashboard({
     setScheduledFor("");
     setAttachments(note.attachments || []);
     setTargetDepartmentIds(note.targetDepartmentIds || []);
+    setTargetUserIds(note.targetUserIds || []);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -305,13 +326,22 @@ export default function InfoNotesDashboard({
   };
 
   const renderTargetBadge = (note: InfoNote) => {
-    if (!note.targetDepartmentIds || note.targetDepartmentIds.length === 0) return null;
-    const names = note.targetDepartmentIds
-      .map((id) => targetOptions.find((d) => d.id === id)?.name || id)
-      .join(", ");
+    const hasDept = note.targetDepartmentIds && note.targetDepartmentIds.length > 0;
+    const hasUsers = note.targetUserIds && note.targetUserIds.length > 0;
+    if (!hasDept && !hasUsers) return null;
+    const parts: string[] = [];
+    if (hasDept) {
+      parts.push(
+        note.targetDepartmentIds!.map((id) => targetOptions.find((d) => d.id === id)?.name || id).join(", ")
+      );
+    }
+    if (hasUsers) {
+      const names = note.targetUserIds!.map((id) => users.find((u) => u.id === id)?.name || id);
+      parts.push(names.length <= 2 ? names.join(" i ") : `${names[0]} i ${names.length - 1} més`);
+    }
     return (
       <span className="text-[9px] flex items-center gap-1 bg-blue-50 text-blue-700 px-1.5 py-0.5 font-bold uppercase tracking-wide">
-        <Building2 className="w-3 h-3" /> Només {names}
+        <Building2 className="w-3 h-3" /> Només {parts.join(" · ")}
       </span>
     );
   };
@@ -438,6 +468,62 @@ export default function InfoNotesDashboard({
                 );
               })}
             </div>
+          </div>
+
+          {/* Destinataris per usuari concret — se sumen als departaments, no els substitueixen */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-semibold text-slate-500 flex items-center gap-1.5">
+              <UserPlus className="w-3.5 h-3.5" />
+              O bé usuaris concrets — se sumen als departaments triats a sobre
+            </label>
+            {targetUserIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {targetUserIds.map((uid) => {
+                  const u = users.find((usr) => usr.id === uid);
+                  return (
+                    <span
+                      key={uid}
+                      className="flex items-center gap-1 bg-slate-100 border border-slate-200 px-2 py-1 text-[11px] text-slate-700"
+                    >
+                      {u?.name || uid}
+                      <button onClick={() => toggleUser(uid)} className="text-slate-400 hover:text-rose-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                placeholder="Cerca un membre pel nom..."
+                className="w-full border border-slate-200 pl-7 pr-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+              />
+            </div>
+            {userSearchQuery.trim() && (
+              <div className="max-h-40 overflow-y-auto border border-slate-200 divide-y divide-slate-100">
+                {filteredUsersForPicker.length === 0 && (
+                  <p className="text-xs text-slate-400 px-2 py-2">Cap membre coincideix.</p>
+                )}
+                {filteredUsersForPicker.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() => toggleUser(u.id)}
+                    className={`w-full text-left px-2 py-1.5 text-xs flex items-center justify-between hover:bg-slate-50 ${
+                      targetUserIds.includes(u.id) ? "bg-blue-50 text-blue-700 font-semibold" : "text-slate-600"
+                    }`}
+                  >
+                    {u.name}
+                    {targetUserIds.includes(u.id) && <CheckCircle2 className="w-3.5 h-3.5" />}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -574,14 +660,10 @@ export default function InfoNotesDashboard({
           </div>
         )}
         {published.map((note) => {
-          // Els destinataris reals (per calcular % de lectura) són només els
-          // membres del(s) departament(s) triats, o tothom si no n'hi ha.
-          const targetUsers = note.targetDepartmentIds && note.targetDepartmentIds.length > 0
-            ? users.filter((u) => {
-                const uDeps = new Set([...(u.departmentIds || []), ...(u.departmentId ? [u.departmentId] : [])]);
-                return note.targetDepartmentIds!.some((d) => uDeps.has(d));
-              })
-            : users;
+          // Els destinataris reals (per calcular % de lectura) — mateixa
+          // lògica que decideix qui la veu (departament i/o usuaris concrets,
+          // o tothom si no hi ha cap filtre), font única a lib/infoNotes.ts.
+          const targetUsers = users.filter((u) => isInfoNoteForUser(note, u));
           const readers = note.acknowledgedBy || [];
           const readerIds = new Set(readers.map((r) => r.userId));
           const pending = targetUsers.filter((u) => !readerIds.has(u.id));

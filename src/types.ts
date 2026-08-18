@@ -26,6 +26,7 @@ export interface UserProfile {
   accessCode?: string; // Custom access code for non-google auth
   notes?: string; // (Antic — format previ d'una sola nota. Es manté per compatibilitat de lectura.)
   notesList?: MemberNote[]; // Notes internes sobre aquest membre — se'n poden afegir vàries
+  restrictedToOwnDepartment?: boolean; // Si és true, aquest membre només veu/pot accedir al(s) seu(s) propi(s) espai(s) de treball — pensat per a rols molt acotats (Caddy Master, Greenkeeper...). Per defecte false/absent = comportament normal (veuen tots els espais no privats, com sempre).
 }
 
 export interface ActivityLog {

@@ -124,6 +124,11 @@ service cloud.firestore {
       allow delete: if true;
     }
 
+    // REPUTATION SNAPSHOTS COLLECTION (Golfrepu — puntuació de Google Maps)
+    match /reputationSnapshots/{snapshotId} {
+      allow read, write: if true;
+    }
+
     // DELETEDITEMS COLLECTION
     match /deletedItems/{itemId} {
       allow read, write: if true;

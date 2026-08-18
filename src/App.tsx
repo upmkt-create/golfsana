@@ -113,6 +113,7 @@ import TaskList from "./components/TaskList";
 import TaskBoard from "./components/TaskBoard";
 import TaskTimeline from "./components/TaskTimeline";
 import GolfAdminDashboard from "./components/GolfAdminDashboard";
+import GolfrepuDashboard from "./components/GolfrepuDashboard";
 import WorkloadDashboard from "./components/WorkloadDashboard";
 import ProjectSummary from "./components/ProjectSummary";
 import WorkspaceKPICards from "./components/WorkspaceKPICards";
@@ -254,7 +255,7 @@ export default function App() {
   }, [deletedItemIds]);
   
   // Interactive / detailed UI State
-  const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "base_tasks" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes" | "novetats">("inici");
+  const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "base_tasks" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes" | "novetats" | "golfrepu">("inici");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   // Quina subtasca té l'editor de descripció desplegat, dins del drawer de
   // detall de tasca (una alhora, per no allargar excessivament la llista)
@@ -2457,6 +2458,26 @@ export default function App() {
                 </span>
               )}
             </button>
+
+            {/* Golfrepu — Reputació online */}
+            <button
+              onClick={() => {
+                setActiveTab("golfrepu");
+                setFilterAssigneeId(null);
+                setActiveProjectId(null);
+                setIsMobileSidebarOpen(false);
+              }}
+              className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
+                activeTab === "golfrepu" && filterAssigneeId === null
+                  ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
+                  : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                <span>Golfrepu</span>
+              </div>
+            </button>
           </div>
 
           {/* Active Workspace Selector */}
@@ -4388,6 +4409,12 @@ export default function App() {
                     now={infoNotesNow}
                     workspaces={workspaces}
                   />
+                </div>
+              )}
+
+              {activeTab === "golfrepu" && (
+                <div className="p-6">
+                  <GolfrepuDashboard />
                 </div>
               )}
 

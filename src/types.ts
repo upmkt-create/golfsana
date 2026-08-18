@@ -26,6 +26,7 @@ export interface UserProfile {
   accessCode?: string; // Custom access code for non-google auth
   notes?: string; // (Antic — format previ d'una sola nota. Es manté per compatibilitat de lectura.)
   notesList?: MemberNote[]; // Notes internes sobre aquest membre — se'n poden afegir vàries
+  restrictedToOwnDepartment?: boolean; // Si és true, aquest membre només veu/pot accedir al(s) seu(s) propi(s) espai(s) de treball — pensat per a rols molt acotats (Caddy Master, Greenkeeper...). Per defecte false/absent = comportament normal (veuen tots els espais no privats, com sempre).
 }
 
 export interface ActivityLog {
@@ -236,5 +237,29 @@ export interface InfoNote {
   targetDepartmentIds?: string[]; // Si buit/absent (i sense targetUserIds) = tothom. Si té valors, membres d'aquests departaments la veuen.
   targetUserIds?: string[]; // Usuaris concrets afegits com a destinataris, a més (o en lloc) dels departaments.
   reminders?: InfoNoteReminder[]; // Recordatoris ja enviats (per no repetir-los cada dia)
+}
+
+// ----------------------------------------------------------------------------
+// GOLFREPU — Reputació online (puntuació i ressenyes de Google Maps)
+// ----------------------------------------------------------------------------
+export interface RatingBreakdown {
+  5: number;
+  4: number;
+  3: number;
+  2: number;
+  1: number;
+}
+
+export interface ReputationSnapshot {
+  id: string;               // sempre "current" — només es desa l'últim snapshot (no calen totes les còpies històriques a Firestore)
+  scrapedAt: string;        // ISO — quan es va fer la darrera sincronització
+  placeName: string;        // Nom oficial de la fitxa a Google Maps
+  mapsUrl: string;          // Enllaç directe a la fitxa (per "Veure totes les ressenyes")
+  overallRating: number | null;   // ex: 4.3
+  reviewCount: number | null;     // ex: 128
+  ratingBreakdown: RatingBreakdown | null; // Quantes ressenyes de cada puntuació (5→1 estrelles)
+  source: "live" | "error"; // "live" = dades reals acabades de llegir; "error" = no s'ha pogut llegir (es manté l'últim snapshot bo)
+  scrapeDebug?: string;     // Motiu exacte si source==="error" (HTTP xxx, timeout, format no reconegut...)
+  history?: { date: string; overallRating: number; reviewCount: number }[]; // Un punt per sincronització, per mostrar la tendència
 }
 

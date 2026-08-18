@@ -42,6 +42,7 @@ import {
   isAllowedTariff
 } from "./data";
 import { getDepartmentOptions } from "./lib/departments";
+import { canAccessWorkspace, getOwnWorkspaceIds } from "./lib/permissions";
 import {
   UserProfile,
   Workspace,
@@ -411,13 +412,21 @@ export default function App() {
     if (!isAdmin && activeTab === "incentives") {
       setActiveTab("summary");
     }
-    // Seguretat: si un no-admin té actiu l'espai privat de direcció, el treiem
+    // Seguretat: si l'usuari actual no té accés a l'espai actiu (privat de
+    // direcció, o fora del seu propi espai si té restrictedToOwnDepartment),
+    // el treiem cap al primer espai a què sí que té accés.
+    if (!currentUser) return;
     const activeWs = workspaces.find(w => w.id === activeWorkspaceId);
-    if (!isAdmin && activeWs?.adminOnly) {
-      const firstAllowed = workspaces.find(w => !w.adminOnly);
+    if (activeWs && !canAccessWorkspace(currentUser, activeWs, isAdmin)) {
+      const firstAllowed = workspaces.find(w => canAccessWorkspace(currentUser, w, isAdmin));
       setActiveWorkspaceId(firstAllowed?.id || "");
     }
-  }, [isAdmin, activeTab, activeWorkspaceId, workspaces]);
+    // Els usuaris amb accés restringit no poden fer servir les vistes
+    // transversals que barregen tots els departaments.
+    if (currentUser.restrictedToOwnDepartment && (activeTab === "all_tasks_global" || activeTab === "reports" || activeTab === "monitoring" || activeTab === "all_workspaces")) {
+      setActiveTab("summary");
+    }
+  }, [isAdmin, activeTab, activeWorkspaceId, workspaces, currentUser]);
 
   // 1. Authenticate silently or manage google login
   useEffect(() => {
@@ -2054,6 +2063,26 @@ export default function App() {
     }
   };
 
+  // Permet a un admin canviar el(s) departament(s) d'un membre i activar/
+  // desactivar l'accés restringit al seu propi espai de treball (Caddy
+  // Master, Greenkeeper...). Genèric: accepta qualsevol subconjunt de camps
+  // del perfil per si en el futur cal editar-ne més des d'aquí.
+  const handleUpdateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
+    const updated = users.map((u) => (u.id === userId ? { ...u, ...updates } : u));
+    setUsers(updated);
+    localStorage.setItem("golfsana_users", JSON.stringify(updated));
+    const target = updated.find((u) => u.id === userId);
+    logEnterpriseAction(`Perfil actualitzat per a ${target?.name || userId}`);
+    addToast("Perfil del membre actualitzat", "success");
+
+    try {
+      await saveDoc(doc(db, "users", userId), updates, { merge: true });
+    } catch (err) {
+      console.warn("[Firestore Write Warning] user profile: saved in client sandbox", err);
+    }
+  };
+
+
   const handleAddUserNote = async (userId: string, content: string) => {
     if (!content.trim()) return;
     const newNote = { id: "note-" + Date.now() + "-" + Math.floor(Math.random() * 1000), content, createdAt: new Date().toISOString() };
@@ -2203,14 +2232,31 @@ export default function App() {
   // dashboards d'incentius/informes/càrrega de treball, comptadors de KPIs
   // generals i el dashboard personal d'un membre.
   const visibleTasks = React.useMemo(() => {
-    if (isAdmin) return tasks;
-    const restrictedWsIds = new Set(workspaces.filter((w) => w.adminOnly).map((w) => w.id));
-    if (restrictedWsIds.size === 0) return tasks;
+    if (isAdmin || !currentUser) return tasks;
+    const accessibleWsIds = new Set(workspaces.filter((w) => canAccessWorkspace(currentUser, w, isAdmin)).map((w) => w.id));
     return tasks.filter((t) => {
       const wsId = t.workspaceId || projects.find((p) => p.id === t.projectId)?.workspaceId;
-      return !wsId || !restrictedWsIds.has(wsId);
+      // Una tasca sense espai de treball assignat es considera general/visible
+      // per a tothom que no tingui accés restringit; per als usuaris amb
+      // restrictedToOwnDepartment, en canvi, cal amagar-la (no és "seva").
+      if (!wsId) return !currentUser.restrictedToOwnDepartment;
+      return accessibleWsIds.has(wsId);
     });
-  }, [tasks, workspaces, projects, isAdmin]);
+  }, [tasks, workspaces, projects, isAdmin, currentUser]);
+
+  // Espais de treball que l'usuari actual pot veure — es fa servir per no
+  // ensenyar, als desplegables de filtre (Llistat, Kanban), departaments als
+  // quals de totes maneres no té accés.
+  const accessibleWorkspaces = React.useMemo(() => {
+    if (isAdmin || !currentUser) return workspaces;
+    return workspaces.filter((w) => canAccessWorkspace(currentUser, w, isAdmin));
+  }, [workspaces, isAdmin, currentUser]);
+
+  const accessibleProjects = React.useMemo(() => {
+    if (isAdmin || !currentUser) return projects;
+    const accessibleWsIds = new Set(accessibleWorkspaces.map((w) => w.id));
+    return projects.filter((p) => !p.workspaceId || accessibleWsIds.has(p.workspaceId));
+  }, [projects, accessibleWorkspaces, isAdmin, currentUser]);
 
   // Filtres de tasques COMPARTITS entre el Llistat i el Calendari — abans
   // cada component tenia la seva pròpia còpia (el calendari només filtrava
@@ -2287,7 +2333,10 @@ export default function App() {
   ]);
 
   // Filter tasks dynamically if a team member is clicked in sidebar and by global search query (Improvement 3)
-  const displayedTasks = tasks.filter((t) => {
+  // Parteix de `visibleTasks` (ja filtrat per accés a l'espai de treball) en
+  // lloc del llistat cru `tasks`, perquè el Kanban i el Llistat mai mostrin
+  // tasques d'un espai al qual l'usuari no té accés.
+  const displayedTasks = visibleTasks.filter((t) => {
     // Member filter
     const matchesMember = !filterAssigneeId || t.assigneeIds?.includes(filterAssigneeId) || t.assigneeId === filterAssigneeId;
     if (!matchesMember) return false;
@@ -2491,7 +2540,7 @@ export default function App() {
               <div className="space-y-1 pl-1.5">
                 {workspaces.map((ws) => {
                   const isActive = ws.id === activeWorkspaceId;
-                  const isLocked = ws.adminOnly && !isAdmin; // Espai restringit i usuari no admin
+                  const isLocked = !!currentUser && !canAccessWorkspace(currentUser, ws, isAdmin); // Espai restringit (privat de direcció, o fora de l'espai propi si l'usuari té accés restringit)
                   return (
                     <div
                       key={ws.id}
@@ -2506,7 +2555,12 @@ export default function App() {
                       <button
                         onClick={() => {
                           if (isLocked) {
-                            addToast("Aquest és un espai privat de direcció. No tens accés.", "warning");
+                            addToast(
+                              ws.adminOnly
+                                ? "Aquest és un espai privat de direcció. No tens accés."
+                                : "No tens accés a aquest espai de treball.",
+                              "warning"
+                            );
                             return;
                           }
                           setActiveWorkspaceId(ws.id);
@@ -3123,6 +3177,7 @@ export default function App() {
                   tasks={visibleTasks}
                   projects={projects}
                   workspaces={workspaces}
+                  isAdmin={isAdmin}
                   onClose={() => setFilterAssigneeId(null)}
                   onUpdateTaskStatus={async (taskId, newStatus) => {
                     await handleUpdateTask(taskId, { status: newStatus });
@@ -3132,6 +3187,7 @@ export default function App() {
                   onAddUserNote={handleAddUserNote}
                   onEditUserNote={handleEditUserNote}
                   onDeleteUserNote={handleDeleteUserNote}
+                  onUpdateUserProfile={handleUpdateUserProfile}
                 />
               ) : (
                 <>
@@ -3716,7 +3772,7 @@ export default function App() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {workspaces.filter((ws) => isAdmin || !ws.adminOnly).map((ws) => {
+                    {workspaces.filter((ws) => currentUser && canAccessWorkspace(currentUser, ws, isAdmin)).map((ws) => {
                       const wsProjects = projects.filter(p => p.workspaceId === ws.id);
                       const wsTasks = visibleTasks.filter(t => (t.workspaceId || projects.find(p => p.id === t.projectId)?.workspaceId) === ws.id);
                       const wsTaskCount = wsTasks.length;
@@ -4234,8 +4290,8 @@ export default function App() {
                 <TaskList
                   tasks={applyTaskFilters(displayedTasks.filter((t) => !t.isBaseTask))}
                   users={users}
-                  projects={projects}
-                  workspaces={workspaces}
+                  projects={accessibleProjects}
+                  workspaces={accessibleWorkspaces}
                   activeProjectId={activeProjectId}
                   activeWorkspaceId={activeWorkspaceId}
                   onAddTask={handleAddTask}
@@ -4274,8 +4330,8 @@ export default function App() {
                 <TaskList
                   tasks={applyTaskFilters(displayedTasks.filter((t) => t.isBaseTask))}
                   users={users}
-                  projects={projects}
-                  workspaces={workspaces}
+                  projects={accessibleProjects}
+                  workspaces={accessibleWorkspaces}
                   activeProjectId={activeProjectId}
                   activeWorkspaceId={activeWorkspaceId}
                   onAddTask={handleAddTask}
@@ -4314,8 +4370,8 @@ export default function App() {
                 <TaskBoard
                   tasks={displayedTasks}
                   users={users}
-                  projects={projects}
-                  workspaces={workspaces}
+                  projects={accessibleProjects}
+                  workspaces={accessibleWorkspaces}
                   activeProjectId={activeProjectId}
                   activeWorkspaceId={activeWorkspaceId}
                   onUpdateTask={handleUpdateTask}
@@ -4398,9 +4454,9 @@ export default function App() {
                 <div className="p-6">
                   <ProjectCalendar 
                     tasks={applyTaskFilters(displayedTasks)}
-                    projects={projects}
+                    projects={accessibleProjects}
                     users={users}
-                    workspaces={workspaces}
+                    workspaces={accessibleWorkspaces}
                     activeWorkspaceId={activeWorkspaceId}
                     activeProjectId={activeProjectId}
                     onAddTask={handleAddTask}

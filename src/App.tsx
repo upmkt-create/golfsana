@@ -2321,6 +2321,21 @@ export default function App() {
     return <LoginScreen onLogin={handleCustomLogin} />;
   }
 
+  // Golfrepu obre com un espai propi de GolfSana: pantalla completa, sense
+  // el menú/capçalera habituals — no és una pestanya més dins del layout
+  // normal (Tasques/Comparador), és una zona diferent amb el seu propi botó
+  // "Tornar a GolfSana".
+  if (activeTab === "golfrepu") {
+    return (
+      <GolfrepuDashboard
+        onBack={() => {
+          setActiveTab("inici");
+          setFilterAssigneeId(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-900 overflow-hidden font-sans">
       
@@ -2467,11 +2482,7 @@ export default function App() {
                 setActiveProjectId(null);
                 setIsMobileSidebarOpen(false);
               }}
-              className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
-                activeTab === "golfrepu" && filterAssigneeId === null
-                  ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                  : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
-              }`}
+              className="w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
             >
               <div className="flex items-center gap-2">
                 <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
@@ -4409,12 +4420,6 @@ export default function App() {
                     now={infoNotesNow}
                     workspaces={workspaces}
                   />
-                </div>
-              )}
-
-              {activeTab === "golfrepu" && (
-                <div className="p-6">
-                  <GolfrepuDashboard />
                 </div>
               )}
 

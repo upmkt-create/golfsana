@@ -6,6 +6,7 @@ import {
   OperationType,
   handleFirestoreError
 } from "./firebase";
+import { supabase, TASK_ATTACHMENTS_BUCKET } from "./supabase";
 import { logActivity } from "./lib/logger";
 import { stripHtmlToText } from "./lib/textUtils";
 
@@ -5558,29 +5559,50 @@ export default function App() {
                     <span className="text-[11px] text-slate-450 font-bold uppercase tracking-wider block font-mono">Arxius Adjunts</span>
                     
                     <div className="flex flex-wrap items-center gap-1.5">
-                      {/* Hidden input for local computer file upload */}
+                      {/* Input real per pujar un fitxer del PC a Supabase Storage */}
                       <input
                         type="file"
                         id="task-pc-file-upload-input"
                         className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const files = e.target.files;
-                          if (files && files.length > 0) {
-                            const file = files[0];
-                            const name = file.name;
-                            const size = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
-                            
-                            const current = selectedTask.attachments || [];
-                            const next = [...current, {
-                              id: "att-pc-" + Date.now(),
-                              name,
-                              size,
-                              createdAt: new Date().toISOString()
-                            }];
-                            handleUpdateTask(selectedTask.id, { attachments: next });
-                            setSelectedTask({ ...selectedTask, attachments: next });
-                            addToast(`S'ha penjat correctament el fitxer: "${name}"`, "success");
+                          if (!files || files.length === 0) return;
+                          const file = files[0];
+                          e.target.value = ""; // permet tornar a seleccionar el mateix fitxer després
+
+                          if (file.size > 50 * 1024 * 1024) {
+                            addToast(`"${file.name}" supera els 50 MB i no s'ha pujat.`, "warning");
+                            return;
                           }
+
+                          addToast(`Pujant "${file.name}"...`, "info");
+                          const storagePath = `tasks/${selectedTask.id}/${Date.now()}-${file.name}`;
+                          const { error: uploadError } = await supabase.storage
+                            .from(TASK_ATTACHMENTS_BUCKET)
+                            .upload(storagePath, file);
+
+                          if (uploadError) {
+                            console.warn("[Task Attachment Upload Warning]", uploadError);
+                            addToast(`No s'ha pogut pujar "${file.name}": ${uploadError.message}`, "warning");
+                            return;
+                          }
+
+                          const { data: publicUrlData } = supabase.storage
+                            .from(TASK_ATTACHMENTS_BUCKET)
+                            .getPublicUrl(storagePath);
+
+                          const current = selectedTask.attachments || [];
+                          const next = [...current, {
+                            id: "att-pc-" + Date.now(),
+                            name: file.name,
+                            url: publicUrlData.publicUrl,
+                            size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+                            storagePath,
+                            createdAt: new Date().toISOString()
+                          }];
+                          handleUpdateTask(selectedTask.id, { attachments: next });
+                          setSelectedTask({ ...selectedTask, attachments: next });
+                          addToast(`S'ha penjat correctament el fitxer: "${file.name}"`, "success");
                         }}
                       />
                       
@@ -5647,33 +5669,37 @@ export default function App() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
-                                {att.url || isDrive ? (
+                                {att.url ? (
                                   <a
-                                    href={att.url || "#"}
+                                    href={att.url}
                                     target="_blank"
                                     rel="noreferrer"
+                                    download={!isDrive ? att.name : undefined}
                                     className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-sm transition-colors text-xs font-bold"
-                                    title="Obrir fitxer de Google Drive"
+                                    title={isDrive ? "Obrir fitxer de Google Drive" : "Descarregar fitxer al PC"}
                                   >
-                                    <ExternalLink className="w-3 h-3" />
+                                    {isDrive ? <ExternalLink className="w-3 h-3" /> : <Download className="w-3 h-3" />}
                                   </a>
                                 ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => alert(`[Sincronitzador GolfSana] Descarregant l'arxiu integral del PC local: ${att.name}`)}
-                                    className="p-1 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-sm transition-colors"
-                                    title="Descarregar fitxer local"
-                                  >
+                                  <span className="p-1 text-slate-300" title="Enllaç no disponible">
                                     <Download className="w-3 h-3" />
-                                  </button>
+                                  </span>
                                 )}
                                 <button
                                   type="button"
-                                  onClick={() => {
+                                  onClick={async () => {
                                     const current = selectedTask.attachments || [];
                                     const next = current.filter(a => a.id !== att.id);
                                     handleUpdateTask(selectedTask.id, { attachments: next });
                                     setSelectedTask({ ...selectedTask, attachments: next });
+                                    if (att.storagePath) {
+                                      const { error: removeError } = await supabase.storage
+                                        .from(TASK_ATTACHMENTS_BUCKET)
+                                        .remove([att.storagePath]);
+                                      if (removeError) {
+                                        console.warn("[Task Attachment Delete Warning]", removeError);
+                                      }
+                                    }
                                   }}
                                   className="p-1 hover:bg-rose-50 text-slate-450 hover:text-rose-600 rounded-sm transition-colors"
                                   title="Eliminar fitxer adjunt"

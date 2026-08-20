@@ -105,6 +105,7 @@ export interface Attachment {
   size?: string;
   createdAt: string;
   createdBy?: string;
+  storagePath?: string; // Ruta dins del bucket de Supabase Storage — present només si és un fitxer real pujat des del PC (per poder-lo eliminar del tot en esborrar l'adjunt)
 }
 
 export interface Task {

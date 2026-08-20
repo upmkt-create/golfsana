@@ -136,7 +136,7 @@ function parseReputationFromHtml(html: string): {
   return { overallRating, reviewCount, ratingBreakdown, placeName };
 }
 
-async function scrapeReputation(): Promise<ReputationResult> {
+async function scrapeReputation(rawDebug: boolean = false): Promise<ReputationResult | { rawHtml: string; httpStatus: number }> {
   const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
 
   if (!scrapingBeeKey) {
@@ -202,6 +202,15 @@ async function scrapeReputation(): Promise<ReputationResult> {
     }
 
     const html = await resp.text();
+
+    // Mode diagnòstic: retorna el HTML cru tal qual, sense intentar
+    // interpretar-lo — es fa servir només puntualment per veure exactament
+    // què respon Google a través de ScrapingBee, per construir l'extractor
+    // sobre dades reals en lloc de suposicions (?debug=true a la URL).
+    if (rawDebug) {
+      return { rawHtml: html, httpStatus: resp.status };
+    }
+
     const parsed = parseReputationFromHtml(html);
 
     if (parsed.overallRating === null && parsed.reviewCount === null) {
@@ -240,8 +249,16 @@ async function scrapeReputation(): Promise<ReputationResult> {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  const isDebug = req.query.debug === "true" || req.query.debug === "1";
   try {
-    const result = await scrapeReputation();
+    const result = await scrapeReputation(isDebug);
+
+    if (isDebug && "rawHtml" in result) {
+      // Retorna el HTML cru (com a text JSON) perquè es pugui llegir
+      // directament — només per a diagnòstic puntual.
+      return res.status(200).json({ rawHtml: result.rawHtml.slice(0, 400000), httpStatus: result.httpStatus });
+    }
+
     return res.status(200).json(result);
   } catch (err: any) {
     try {

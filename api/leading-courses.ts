@@ -226,9 +226,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  // Es llegeixen els 7 clubs en paral·lel — és scraping normal (sense
-  // render_js ni custom_google), molt més barat que Google Maps.
-  const clubs = await Promise.all(TARGETS.map((t) => scrapeClub(t, scrapingBeeKey)));
+  // Mode diagnòstic: ?debug=<slug> retorna el HTML cru d'un sol club, sense
+  // intentar interpretar-lo — per veure exactament què respon ScrapingBee
+  // en lloc de suposar-ho.
+  const debugSlug = typeof req.query.debug === "string" ? req.query.debug : null;
+  if (debugSlug) {
+    const target = TARGETS.find((t) => t.slug === debugSlug);
+    if (!target) {
+      return res.status(200).json({ error: `Slug desconegut: ${debugSlug}` });
+    }
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(
+      target.url
+    )}&premium_proxy=true&render_js=false`;
+    const { resp, lastErr } = await fetchWithRetry(
+      url,
+      { headers: { "Accept-Language": "en-US,en;q=0.9" }, signal: AbortSignal.timeout(30000) },
+      1
+    );
+    if (!resp) {
+      return res.status(200).json({ error: String(lastErr?.message || lastErr) });
+    }
+    const html = await resp.text();
+    return res.status(200).json({ httpStatus: resp.status, rawHtml: html.slice(0, 400000) });
+  }
+
+  // Es llegeixen els 7 clubs D'UN EN UN, no en paral·lel — el pla de
+  // ScrapingBee només permet 5 peticions simultànies com a màxim (confirmat
+  // amb un error real: "Max concurrency allowed 5"), i llançar-les totes
+  // alhora en superava el límit.
+  const clubs: ClubResult[] = [];
+  for (const target of TARGETS) {
+    const result = await scrapeClub(target, scrapingBeeKey);
+    clubs.push(result);
+  }
 
   return res.status(200).json({
     scrapedAt: new Date().toISOString(),

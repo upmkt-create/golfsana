@@ -121,20 +121,30 @@ async function fetchWithRetry(
 // course, 18 holes and an average rating of 8.1 based on 331 reviews."
 // Es cerca sobre el text ja net d'etiquetes HTML, no sobre el HTML cru, per
 // no dependre de classes/estructura que Leading Courses pugui canviar.
+// Patró real confirmat manualment el 21/08/2026 llegint la resposta d'una
+// petició real: la pàgina porta un bloc <script type="application/ld+json">
+// amb dades estructurades schema.org/GolfCourse, que inclou
+// "aggregateRating":{"ratingValue":"8.2","reviewCount":575,...} — molt més
+// fiable que buscar una frase de text concreta (que ni tan sols existeix
+// literalment a la pàgina real).
 function parseLeadingCourses(html: string): { overallRating: number | null; reviewCount: number | null } {
-  const text = html
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ");
-
-  const match = text.match(/average rating of (\d[.,]\d)\s*based on\s*([\d.,]+)\s*reviews?/i);
-  if (match) {
-    return {
-      overallRating: parseFloat(match[1].replace(",", ".")),
-      reviewCount: parseInt(match[2].replace(/[.,]/g, ""), 10),
-    };
+  const scriptMatches = html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
+  for (const scriptMatch of scriptMatches) {
+    const jsonText = scriptMatch[1];
+    if (!jsonText.includes("aggregateRating")) continue;
+    try {
+      const data = JSON.parse(jsonText);
+      const agg = data?.aggregateRating;
+      if (agg?.ratingValue) {
+        return {
+          overallRating: parseFloat(String(agg.ratingValue).replace(",", ".")),
+          reviewCount: agg.reviewCount != null ? parseInt(String(agg.reviewCount), 10) : null,
+        };
+      }
+    } catch {
+      // aquest bloc de <script> no era JSON vàlid — es prova el següent
+      continue;
+    }
   }
   return { overallRating: null, reviewCount: null };
 }

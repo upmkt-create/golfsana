@@ -264,3 +264,23 @@ export interface ReputationSnapshot {
   history?: { date: string; overallRating: number; reviewCount: number }[]; // Un punt per sincronització, per mostrar la tendència
 }
 
+// ----------------------------------------------------------------------------
+// GOLFREPU — Benchmark amb Leading Courses (Golf d'Aro + competidors)
+// ----------------------------------------------------------------------------
+export interface LeadingCoursesClub {
+  slug: string;          // identificador curt, el mateix que ja es fa servir al comparador de tarifes (golfdaro, pals, costabrava...)
+  name: string;          // Nom mostrat
+  url: string;            // Fitxa a Leading Courses
+  overallRating: number | null;
+  reviewCount: number | null;
+  isOwnClub: boolean;     // true només per a Golf d'Aro — per destacar-lo al benchmark
+  source: "live" | "error";
+  scrapeDebug?: string;
+}
+
+export interface LeadingCoursesSnapshot {
+  id: string;       // sempre "current"
+  scrapedAt: string; // ISO
+  clubs: LeadingCoursesClub[];
+}
+

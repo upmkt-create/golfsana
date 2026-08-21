@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft } from "lucide-react";
+import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft, Trophy, Flag } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { ReputationSnapshot, RatingBreakdown } from "../types";
+import { ReputationSnapshot, RatingBreakdown, LeadingCoursesSnapshot } from "../types";
 
 const NAVY = "#033b7a";
 const CACHE_KEY = "golfsana_reputation_cache";
+const LC_CACHE_KEY = "golfsana_leadingcourses_cache";
 
 interface GolfrepuDashboardProps {
   onBack: () => void;
@@ -20,6 +21,10 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
   const [snapshot, setSnapshot] = useState<ReputationSnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [lcSnapshot, setLcSnapshot] = useState<LeadingCoursesSnapshot | null>(null);
+  const [isLcLoading, setIsLcLoading] = useState(false);
+  const [lcError, setLcError] = useState<string | null>(null);
 
   // Carrega l'últim snapshot desat (Firestore, amb fallback a localStorage) en
   // obrir la pestanya — no fa cap petició nova a ScrapingBee només per mirar-ho.
@@ -39,6 +44,23 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
         if (cached) setSnapshot(JSON.parse(cached));
       } catch {
         // sense cache, es queda buit fins que l'usuari sincronitzi
+      }
+    })();
+    (async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "leadingCoursesSnapshots", "current"));
+        if (docSnap.exists()) {
+          setLcSnapshot(docSnap.data() as LeadingCoursesSnapshot);
+          return;
+        }
+      } catch (err) {
+        console.warn("[Golfrepu] No s'ha pogut llegir el benchmark de Firestore, provant cache local:", err);
+      }
+      try {
+        const cached = localStorage.getItem(LC_CACHE_KEY);
+        if (cached) setLcSnapshot(JSON.parse(cached));
+      } catch {
+        // sense cache
       }
     })();
   }, []);
@@ -88,6 +110,37 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
       setError(`Error de connexió: ${String(err?.message || err)}`);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSyncBenchmark = async () => {
+    setIsLcLoading(true);
+    setLcError(null);
+    try {
+      const resp = await fetch("/api/leading-courses");
+      const data = await resp.json();
+
+      const newSnapshot: LeadingCoursesSnapshot = {
+        id: "current",
+        scrapedAt: data.scrapedAt,
+        clubs: data.clubs,
+      };
+      setLcSnapshot(newSnapshot);
+      localStorage.setItem(LC_CACHE_KEY, JSON.stringify(newSnapshot));
+
+      if (newSnapshot.clubs.every((c: any) => c.source === "error")) {
+        setLcError("No s'ha pogut llegir cap dels clubs. Comprova la connexió i torna-ho a provar.");
+      }
+
+      try {
+        await setDoc(doc(db, "leadingCoursesSnapshots", "current"), newSnapshot);
+      } catch (err) {
+        console.warn("[Golfrepu] Benchmark desat localment, Firestore no disponible:", err);
+      }
+    } catch (err: any) {
+      setLcError(`Error de connexió: ${String(err?.message || err)}`);
+    } finally {
+      setIsLcLoading(false);
     }
   };
 
@@ -227,6 +280,109 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
           </div>
         </div>
       )}
+
+      {/* Benchmark amb competidors — Leading Courses */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-amber-500" />
+              Benchmark amb competidors — Leading Courses
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Golf d'Aro comparat amb els mateixos competidors del comparador de tarifes.
+            </p>
+          </div>
+          <button
+            onClick={handleSyncBenchmark}
+            disabled={isLcLoading}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white transition-all disabled:opacity-60"
+            style={{ backgroundColor: NAVY }}
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLcLoading ? "animate-spin" : ""}`} />
+            {isLcLoading ? "Sincronitzant..." : "Sincronitzar benchmark"}
+          </button>
+        </div>
+
+        {lcError && (
+          <div className="bg-rose-50 border border-rose-200 p-3 flex items-start gap-2 text-xs text-rose-700">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <p>{lcError}</p>
+          </div>
+        )}
+
+        {!lcSnapshot && !lcError && (
+          <div className="text-center py-16 text-sm text-slate-400 border border-dashed border-slate-200">
+            Encara no hi ha cap dada. Prem "Sincronitzar benchmark" per llegir les puntuacions reals de Leading Courses.
+          </div>
+        )}
+
+        {lcSnapshot && lcSnapshot.clubs.length > 0 && (
+          <div className="bg-white border border-slate-200 divide-y divide-slate-100">
+            {lcSnapshot.clubs
+              .slice()
+              .sort((a, b) => {
+                if (a.overallRating === null) return 1;
+                if (b.overallRating === null) return -1;
+                return b.overallRating - a.overallRating;
+              })
+              .map((club) => (
+                <div
+                  key={club.slug}
+                  className={`p-4 flex items-center justify-between gap-3 ${club.isOwnClub ? "bg-amber-50/60" : ""}`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {club.isOwnClub ? (
+                      <Flag className="w-4 h-4 text-amber-500 shrink-0" />
+                    ) : (
+                      <span className="w-4 shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className={`text-sm truncate ${club.isOwnClub ? "font-black text-slate-900" : "font-semibold text-slate-700"}`}>
+                        {club.name}
+                        {club.isOwnClub && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-600 font-bold">(vosaltres)</span>}
+                      </p>
+                      {club.source === "error" && (
+                        <p className="text-[10px] text-rose-500 mt-0.5" title={club.scrapeDebug}>
+                          No s'ha pogut llegir{club.scrapeDebug ? `: ${club.scrapeDebug}` : ""}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    {club.overallRating !== null ? (
+                      <div className="text-right">
+                        <div className="flex items-baseline gap-1 justify-end">
+                          <span className="text-xl font-black text-slate-900 font-mono">{club.overallRating.toFixed(1)}</span>
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        </div>
+                        {club.reviewCount !== null && (
+                          <p className="text-[10px] text-slate-400">{club.reviewCount} ressenyes</p>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-300">—</span>
+                    )}
+                    <a
+                      href={club.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                      title="Veure a Leading Courses"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+        {lcSnapshot && (
+          <p className="text-[10px] text-slate-400">
+            Actualitzat {formatDate(lcSnapshot.scrapedAt)}
+          </p>
+        )}
+      </div>
       </div>
     </div>
   );

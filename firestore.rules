@@ -129,6 +129,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // LEADING COURSES SNAPSHOTS COLLECTION (Golfrepu — benchmark competidors)
+    match /leadingCoursesSnapshots/{snapshotId} {
+      allow read, write: if true;
+    }
+
     // DELETEDITEMS COLLECTION
     match /deletedItems/{itemId} {
       allow read, write: if true;

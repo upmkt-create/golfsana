@@ -105,6 +105,8 @@ import {
   Play,
   Square,
   Star,
+  Radar,
+  ArrowLeft,
   Pencil,
   Megaphone,
 } from "lucide-react";
@@ -2337,6 +2339,49 @@ export default function App() {
     );
   }
 
+  // Golfradar (comparador de preus) — mateix tractament: espai propi, no una
+  // pestanya més. Es manté GolfAdminDashboard intacte per dins, només se li
+  // afegeix la capçalera/pantalla completa per fora, per no arriscar el
+  // component que ja funciona.
+  if (activeTab === "golf") {
+    return (
+      <div className="h-screen w-full flex flex-col bg-slate-50 text-slate-900 overflow-y-auto">
+        <header className="shrink-0 bg-gradient-to-r from-[#022e5f] to-[#044c9c] px-6 py-4 flex items-center justify-between border-b-[3px] border-emerald-400 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-emerald-400 flex items-center justify-center shrink-0">
+              <Radar className="w-5 h-5 text-[#022e5f]" />
+            </div>
+            <div>
+              <p className="text-[9px] uppercase tracking-wider font-mono text-blue-200 font-bold">
+                GolfSana · Tercer pilar
+              </p>
+              <h1 className="text-white font-black text-lg leading-tight">Golfradar</h1>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              setActiveTab("inici");
+              setFilterAssigneeId(null);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-blue-100 hover:text-white hover:bg-white/10 border border-blue-300/40 transition-all"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Tornar a GolfSana
+          </button>
+        </header>
+        <div className="flex-1 p-6 max-w-6xl w-full mx-auto">
+          <GolfAdminDashboard
+            golfCourses={golfCourses}
+            isAdmin={isAdmin}
+            onAddCourse={handleAddGolfCourse}
+            onUpdateCourse={handleUpdateGolfCourse}
+            onDeleteCourse={handleDeleteGolfCourse}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-full bg-slate-50 text-slate-900 overflow-hidden font-sans">
       
@@ -2488,6 +2533,22 @@ export default function App() {
               <div className="flex items-center gap-2">
                 <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
                 <span>Golfrepu</span>
+              </div>
+            </button>
+
+            {/* Golfradar — Comparador de preus */}
+            <button
+              onClick={() => {
+                setActiveTab("golf");
+                setFilterAssigneeId(null);
+                setActiveProjectId(null);
+                setIsMobileSidebarOpen(false);
+              }}
+              className="w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+            >
+              <div className="flex items-center gap-2">
+                <Radar className="w-3.5 h-3.5 text-emerald-300" />
+                <span>Golfradar</span>
               </div>
             </button>
           </div>
@@ -3125,14 +3186,10 @@ export default function App() {
             {/* Golf pricing matrix (Super Admin workspace) */}
             <button
               onClick={() => setActiveTab("golf")}
-              className={`py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border relative ${
-                activeTab === "golf"
-                  ? "bg-emerald-50 border-emerald-350 text-emerald-800"
-                  : "text-slate-505 border-transparent hover:bg-slate-50 hover:text-emerald-700"
-              }`}
+              className="py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border relative text-slate-505 border-transparent hover:bg-slate-50 hover:text-emerald-700"
             >
               <Activity className="w-3.5 h-3.5" />
-              <span>Comparador de Golf (Admin)</span>
+              <span>Golfradar (Comparador)</span>
               {!isAdmin && (
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-none bg-amber-500 animate-pulse" title="S'adverteix accés restringit"></span>
               )}
@@ -4377,16 +4434,6 @@ export default function App() {
                   workspaces={getDepartmentOptions(workspaces)}
                   onSelectTask={(task) => setSelectedTask(task)}
                   onBack={() => setActiveTab("inici")}
-                />
-              )}
-
-              {activeTab === "golf" && (
-                <GolfAdminDashboard
-                  golfCourses={golfCourses}
-                  isAdmin={isAdmin}
-                  onAddCourse={handleAddGolfCourse}
-                  onUpdateCourse={handleUpdateGolfCourse}
-                  onDeleteCourse={handleDeleteGolfCourse}
                 />
               )}
 

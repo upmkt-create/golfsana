@@ -265,17 +265,27 @@ export interface ReputationSnapshot {
 }
 
 // ----------------------------------------------------------------------------
-// GOLFREPU — Benchmark amb Leading Courses (Golf d'Aro + competidors)
+// GOLFREPU — Benchmark amb Leading Courses + 1golf.eu (Golf d'Aro + competidors)
 // ----------------------------------------------------------------------------
+export interface ReviewSourceResult {
+  rating: number | null;
+  scale: 5 | 10;           // 1golf.eu puntua sobre 5, Leading Courses sobre 10 — es mostren per separat, no es barregen
+  reviewCount: number | null;
+  source: "live" | "error";
+  scrapeDebug?: string;
+}
+
 export interface LeadingCoursesClub {
   slug: string;          // identificador curt, el mateix que ja es fa servir al comparador de tarifes (golfdaro, pals, costabrava...)
   name: string;          // Nom mostrat
   url: string;            // Fitxa a Leading Courses
-  overallRating: number | null;
-  reviewCount: number | null;
+  overallRating: number | null; // manté's per compatibilitat — igual que leadingCourses.rating
+  reviewCount: number | null;   // manté's per compatibilitat — igual que leadingCourses.reviewCount
   isOwnClub: boolean;     // true només per a Golf d'Aro — per destacar-lo al benchmark
   source: "live" | "error";
   scrapeDebug?: string;
+  leadingCourses: ReviewSourceResult;
+  oneGolf: ReviewSourceResult; // 1golf.eu (Albrecht Golf Guide)
 }
 
 export interface LeadingCoursesSnapshot {

@@ -2528,11 +2528,11 @@ export default function App() {
                 setActiveProjectId(null);
                 setIsMobileSidebarOpen(false);
               }}
-              className="w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+              className="w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/25 hover:text-white"
             >
               <div className="flex items-center gap-2">
                 <Star className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-                <span>Golfrepu</span>
+                <span className="font-semibold">Golfrepu</span>
               </div>
             </button>
 
@@ -2544,11 +2544,11 @@ export default function App() {
                 setActiveProjectId(null);
                 setIsMobileSidebarOpen(false);
               }}
-              className="w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+              className="w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border border-emerald-400/40 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/25 hover:text-white"
             >
               <div className="flex items-center gap-2">
                 <Radar className="w-3.5 h-3.5 text-emerald-300" />
-                <span>Golfradar</span>
+                <span className="font-semibold">Golfradar</span>
               </div>
             </button>
           </div>

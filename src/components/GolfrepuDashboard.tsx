@@ -329,7 +329,7 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
               .map((club) => (
                 <div
                   key={club.slug}
-                  className={`p-4 flex items-center justify-between gap-3 ${club.isOwnClub ? "bg-amber-50/60" : ""}`}
+                  className={`p-4 flex items-center justify-between gap-3 flex-wrap ${club.isOwnClub ? "bg-amber-50/60" : ""}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {club.isOwnClub ? (
@@ -342,27 +342,53 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
                         {club.name}
                         {club.isOwnClub && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-600 font-bold">(vosaltres)</span>}
                       </p>
-                      {club.source === "error" && (
-                        <p className="text-[10px] text-rose-500 mt-0.5" title={club.scrapeDebug}>
-                          No s'ha pogut llegir{club.scrapeDebug ? `: ${club.scrapeDebug}` : ""}
-                        </p>
-                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
-                    {club.overallRating !== null ? (
-                      <div className="text-right">
-                        <div className="flex items-baseline gap-1 justify-end">
-                          <span className="text-xl font-black text-slate-900 font-mono">{club.overallRating.toFixed(1)}</span>
-                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                        </div>
-                        {club.reviewCount !== null && (
-                          <p className="text-[10px] text-slate-400">{club.reviewCount} ressenyes</p>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-300">—</span>
-                    )}
+                  <div className="flex items-center gap-3 shrink-0">
+                    {/* Leading Courses */}
+                    <div className="text-right min-w-[86px]">
+                      <p className="text-[8px] uppercase tracking-wide text-slate-400 font-bold">Leading Courses</p>
+                      {club.leadingCourses.rating !== null ? (
+                        <>
+                          <div className="flex items-baseline gap-1 justify-end">
+                            <span className="text-lg font-black text-slate-900 font-mono">{club.leadingCourses.rating.toFixed(1)}</span>
+                            <span className="text-[9px] text-slate-400">/10</span>
+                          </div>
+                          {club.leadingCourses.reviewCount !== null && (
+                            <p className="text-[9px] text-slate-400">{club.leadingCourses.reviewCount} ressenyes</p>
+                          )}
+                        </>
+                      ) : (
+                        <span
+                          className="text-xs text-rose-400 cursor-help"
+                          title={club.leadingCourses.scrapeDebug}
+                        >
+                          — error
+                        </span>
+                      )}
+                    </div>
+                    {/* 1golf.eu */}
+                    <div className="text-right min-w-[70px]">
+                      <p className="text-[8px] uppercase tracking-wide text-slate-400 font-bold">1golf.eu</p>
+                      {club.oneGolf.rating !== null ? (
+                        <>
+                          <div className="flex items-baseline gap-1 justify-end">
+                            <span className="text-lg font-black text-slate-900 font-mono">{club.oneGolf.rating.toFixed(1)}</span>
+                            <span className="text-[9px] text-slate-400">/5</span>
+                          </div>
+                          {club.oneGolf.reviewCount !== null && (
+                            <p className="text-[9px] text-slate-400">{club.oneGolf.reviewCount} ressenyes</p>
+                          )}
+                        </>
+                      ) : (
+                        <span
+                          className="text-xs text-rose-400 cursor-help"
+                          title={club.oneGolf.scrapeDebug}
+                        >
+                          — error
+                        </span>
+                      )}
+                    </div>
                     <a
                       href={club.url}
                       target="_blank"

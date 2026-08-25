@@ -257,7 +257,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ error: String(lastErr?.message || lastErr) });
     }
     const html = await resp.text();
-    return res.status(200).json({ httpStatus: resp.status, rawHtml: html.slice(0, 400000) });
+
+    // En lloc de tornar tot el HTML a cegues (es tallava abans d'arribar-hi),
+    // es busca específicament el bloc __NEXT_DATA__ — on Next.js sol posar
+    // les dades ja carregades al servidor (puntuacions per categoria, fotos)
+    // — i, si no hi és, es retorna el context al voltant de paraules clau
+    // conegudes ("Facilities", "Maintenance"...) per localitzar-ho igualment.
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
+    if (nextDataMatch) {
+      return res.status(200).json({
+        httpStatus: resp.status,
+        foundNextData: true,
+        nextData: nextDataMatch[1].slice(0, 400000),
+      });
+    }
+
+    const keywords = ["Facilities", "Maintenance", "Clubhouse", "Value for money", "Hospitality", "Surroundings"];
+    const snippets: Record<string, string> = {};
+    for (const kw of keywords) {
+      const idx = html.indexOf(kw);
+      if (idx !== -1) {
+        snippets[kw] = html.slice(Math.max(0, idx - 300), idx + 300);
+      }
+    }
+    return res.status(200).json({
+      httpStatus: resp.status,
+      foundNextData: false,
+      htmlLength: html.length,
+      keywordSnippets: snippets,
+      rawHtmlEnd: html.slice(-20000), // el final de la pàgina, per si les dades hi són cap al fons
+    });
   }
 
   // Es llegeixen els 7 clubs D'UN EN UN, no en paral·lel — el pla de

@@ -2,12 +2,14 @@
 // VERCEL API ROUTE — /api/leading-courses
 // ============================================================================
 // Llegeix, per a Golf d'Aro i els 6 competidors ja identificats al
-// comparador de tarifes, la puntuació mitjana i el nombre de ressenyes a
-// Leading Courses (web específica de golf, a diferència de Google Maps).
-// Les pàgines de Leading Courses són majoritàriament renderitzades al
-// servidor (confirmat manualment abans de construir aquest fitxer, no és
-// una suposició), així que NO calen els paràmetres cars de render_js — un
-// scraping normal n'hi ha prou, com amb GolfManager.
+// comparador de tarifes, la puntuació i el nombre de ressenyes a dues fonts
+// de golf (Leading Courses i 1golf.eu / Albrecht Golf Guide).
+//
+// Totes dues pàgines són majoritàriament renderitzades al servidor
+// (confirmat manualment abans de construir aquest fitxer) — per això es
+// prova SEMPRE primer una petició directa, SENSE ScrapingBee. Només si això
+// falla (per exemple, si algun dia comencen a bloquejar peticions sense
+// proxy) es fa servir ScrapingBee com a reserva, si hi ha clau configurada.
 //
 // ús: GET /api/leading-courses
 // ============================================================================
@@ -24,55 +26,71 @@ interface ClubTarget {
   slug: string;
   name: string;
   isOwnClub: boolean;
-  url: string;
+  leadingCoursesUrl: string;
+  oneGolfUrl: string;
 }
 
-// Fitxes confirmades a Leading Courses (18/08/2026). Mateixos slugs que ja
-// es fan servir al comparador de tarifes (api/rates.ts), per coherència.
+// Fitxes confirmades manualment (21/08/2026). Mateixos slugs que ja es fan
+// servir al comparador de tarifes (api/rates.ts), per coherència.
 const TARGETS: ClubTarget[] = [
   {
     slug: "golfdaro",
     name: "Club Golf d'Aro - Mas Nou",
     isOwnClub: true,
-    url: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-golf-d-aro-mas-nou",
+    leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-golf-d-aro-mas-nou",
+    oneGolfUrl: "https://www.1golf.eu/en/club/club-golf-d-aro-mas-nou/reviews/",
   },
   {
     slug: "torremirona",
     name: "Torremirona Golf Club",
     isOwnClub: false,
-    url: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/torremirona-golf-&-spa-resort",
+    leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/torremirona-golf-&-spa-resort",
+    oneGolfUrl: "https://www.1golf.eu/en/club/torremirona-golf-club/reviews/",
   },
   {
     slug: "emporda",
     name: "Empordà Golf Club",
     isOwnClub: false,
-    url: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/empord%C3%A0-golf-resort",
+    leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/empord%C3%A0-golf-resort",
+    oneGolfUrl: "https://www.1golf.eu/en/club/emporda-golf-club/reviews/",
   },
   {
     slug: "camiral",
     name: "Camiral Golf & Wellness",
     isOwnClub: false,
-    url: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/camiral-golf-wellness-fka-pga-catalunya",
+    leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/camiral-golf-wellness-fka-pga-catalunya",
+    oneGolfUrl: "https://www.1golf.eu/en/club/camiral-a-quinta-do-lago-resort/reviews/",
   },
   {
     slug: "pals",
     name: "Golf de Pals",
     isOwnClub: false,
-    url: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/golf-de-pals",
+    leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/golf-de-pals",
+    oneGolfUrl: "https://www.1golf.eu/en/club/golf-de-pals/reviews/",
   },
   {
     slug: "costabrava",
     name: "Golf Costa Brava",
     isOwnClub: false,
-    url: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-de-golf-costa-brava",
+    leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-de-golf-costa-brava",
+    oneGolfUrl: "https://www.1golf.eu/en/club/club-de-golf-costa-brava/reviews/",
   },
   {
     slug: "perelada",
     name: "Camp de Golf Perelada",
     isOwnClub: false,
-    url: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-de-golf-peralada",
+    leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-de-golf-peralada",
+    oneGolfUrl: "https://www.1golf.eu/en/club/golf-club-peralada/reviews/",
   },
 ];
+
+interface ReviewSourceResult {
+  rating: number | null;
+  scale: 5 | 10;
+  reviewCount: number | null;
+  source: "live" | "error";
+  scrapeDebug?: string;
+}
 
 interface ClubResult {
   slug: string;
@@ -83,12 +101,17 @@ interface ClubResult {
   isOwnClub: boolean;
   source: "live" | "error";
   scrapeDebug?: string;
+  leadingCourses: ReviewSourceResult;
+  oneGolf: ReviewSourceResult;
 }
+
+const CHROME_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 async function fetchWithRetry(
   url: string,
   init: RequestInit,
-  maxAttempts: number = 3
+  maxAttempts: number = 2
 ): Promise<{ resp: Response | null; lastErr: any; attempts: number }> {
   let lastErr: any = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -117,17 +140,11 @@ async function fetchWithRetry(
   return { resp: null, lastErr, attempts: maxAttempts };
 }
 
-// Patró real confirmat manualment el 18/08/2026: "This golf club has 1 golf
-// course, 18 holes and an average rating of 8.1 based on 331 reviews."
-// Es cerca sobre el text ja net d'etiquetes HTML, no sobre el HTML cru, per
-// no dependre de classes/estructura que Leading Courses pugui canviar.
-// Patró real confirmat manualment el 21/08/2026 llegint la resposta d'una
-// petició real: la pàgina porta un bloc <script type="application/ld+json">
-// amb dades estructurades schema.org/GolfCourse, que inclou
-// "aggregateRating":{"ratingValue":"8.2","reviewCount":575,...} — molt més
-// fiable que buscar una frase de text concreta (que ni tan sols existeix
-// literalment a la pàgina real).
-function parseLeadingCourses(html: string): { overallRating: number | null; reviewCount: number | null } {
+// Confirmat manualment el 21/08/2026 llegint la resposta d'una petició
+// real: la pàgina porta un bloc <script type="application/ld+json"> amb
+// dades estructurades schema.org/GolfCourse, que inclou
+// "aggregateRating":{"ratingValue":"8.2","reviewCount":575,...}
+function parseLeadingCourses(html: string): { rating: number | null; reviewCount: number | null } {
   const scriptMatches = html.matchAll(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi);
   for (const scriptMatch of scriptMatches) {
     const jsonText = scriptMatch[1];
@@ -137,162 +154,134 @@ function parseLeadingCourses(html: string): { overallRating: number | null; revi
       const agg = data?.aggregateRating;
       if (agg?.ratingValue) {
         return {
-          overallRating: parseFloat(String(agg.ratingValue).replace(",", ".")),
+          rating: parseFloat(String(agg.ratingValue).replace(",", ".")),
           reviewCount: agg.reviewCount != null ? parseInt(String(agg.reviewCount), 10) : null,
         };
       }
     } catch {
-      // aquest bloc de <script> no era JSON vàlid — es prova el següent
       continue;
     }
   }
-  return { overallRating: null, reviewCount: null };
+  return { rating: null, reviewCount: null };
 }
 
-async function scrapeClub(target: ClubTarget, scrapingBeeKey: string): Promise<ClubResult> {
-  const url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(
-    target.url
-  )}&premium_proxy=true&render_js=false`;
-
-  const base: Omit<ClubResult, "source" | "scrapeDebug" | "overallRating" | "reviewCount"> = {
-    slug: target.slug,
-    name: target.name,
-    url: target.url,
-    isOwnClub: target.isOwnClub,
-  };
-
-  try {
-    const { resp, lastErr, attempts } = await fetchWithRetry(
-      url,
-      { headers: { "Accept-Language": "en-US,en;q=0.9" }, signal: AbortSignal.timeout(30000) },
-      3
-    );
-
-    if (!resp) {
-      const isTimeout = lastErr?.name === "TimeoutError" || lastErr?.name === "AbortError";
-      return {
-        ...base,
-        overallRating: null,
-        reviewCount: null,
-        source: "error",
-        scrapeDebug: isTimeout
-          ? `Timeout (${attempts} intent${attempts > 1 ? "s" : ""})`
-          : `Error de xarxa: ${String(lastErr?.message || lastErr)}`,
-      };
-    }
-
-    if (!resp.ok) {
-      const bodySnippet = (await resp.text().catch(() => "")).slice(0, 150);
-      return {
-        ...base,
-        overallRating: null,
-        reviewCount: null,
-        source: "error",
-        scrapeDebug: `HTTP ${resp.status} ${resp.statusText}${bodySnippet ? ` — ${bodySnippet}` : ""}`,
-      };
-    }
-
-    const html = await resp.text();
-    const parsed = parseLeadingCourses(html);
-
-    if (parsed.overallRating === null) {
-      return {
-        ...base,
-        overallRating: null,
-        reviewCount: null,
-        source: "error",
-        scrapeDebug: "Format de la pàgina no reconegut (pot haver canviat l'estructura de Leading Courses).",
-      };
-    }
-
-    return { ...base, overallRating: parsed.overallRating, reviewCount: parsed.reviewCount, source: "live" };
-  } catch (err: any) {
+// Confirmat manualment el 21/08/2026: la pàgina porta una etiqueta
+// <meta name="description" content="Read 38 reviews for Club Golf
+// d'Aro-Mas Nou in Platja d'Aro, España, rated 3.6 from 5 by our users."/>
+// — molt més estable que llegir el text visible o taules de la pàgina.
+function parseOneGolf(html: string): { rating: number | null; reviewCount: number | null } {
+  const match = html.match(
+    /Read\s+(\d+)\s+reviews?\s+for[\s\S]*?rated\s+(\d[.,]\d)\s+from\s+5/i
+  );
+  if (match) {
     return {
-      ...base,
-      overallRating: null,
-      reviewCount: null,
-      source: "error",
-      scrapeDebug: `Error: ${String(err?.message || err)}`,
+      reviewCount: parseInt(match[1], 10),
+      rating: parseFloat(match[2].replace(",", ".")),
     };
   }
+  return { rating: null, reviewCount: null };
+}
+
+async function fetchSource(
+  url: string,
+  scrapingBeeKey: string | undefined
+): Promise<{ html: string | null; scrapeDebug?: string }> {
+  // 1r intent: directe, sense ScrapingBee.
+  const direct = await fetchWithRetry(
+    url,
+    { headers: { "Accept-Language": "en-US,en;q=0.9", "User-Agent": CHROME_UA }, signal: AbortSignal.timeout(25000) },
+    2
+  );
+  if (direct.resp?.ok) {
+    return { html: await direct.resp.text() };
+  }
+
+  // 2n intent (reserva): ScrapingBee, només si hi ha clau configurada.
+  if (scrapingBeeKey) {
+    const beeUrl = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(
+      url
+    )}&premium_proxy=true&render_js=false`;
+    const bee = await fetchWithRetry(beeUrl, { headers: { "Accept-Language": "en-US,en;q=0.9" }, signal: AbortSignal.timeout(25000) }, 2);
+    if (bee.resp?.ok) {
+      return { html: await bee.resp.text() };
+    }
+    return {
+      html: null,
+      scrapeDebug: `Directe: ${direct.resp ? `HTTP ${direct.resp.status}` : String(direct.lastErr?.message || direct.lastErr)} · ScrapingBee: ${bee.resp ? `HTTP ${bee.resp.status}` : String(bee.lastErr?.message || bee.lastErr)}`,
+    };
+  }
+
+  return {
+    html: null,
+    scrapeDebug: direct.resp
+      ? `HTTP ${direct.resp.status} ${direct.resp.statusText}`
+      : `Error de xarxa: ${String(direct.lastErr?.message || direct.lastErr)}`,
+  };
+}
+
+async function scrapeSource(
+  url: string,
+  scale: 5 | 10,
+  parser: (html: string) => { rating: number | null; reviewCount: number | null },
+  scrapingBeeKey: string | undefined
+): Promise<ReviewSourceResult> {
+  try {
+    const { html, scrapeDebug } = await fetchSource(url, scrapingBeeKey);
+    if (!html) {
+      return { rating: null, scale, reviewCount: null, source: "error", scrapeDebug };
+    }
+    const parsed = parser(html);
+    if (parsed.rating === null) {
+      return { rating: null, scale, reviewCount: null, source: "error", scrapeDebug: "Format de la pàgina no reconegut." };
+    }
+    return { rating: parsed.rating, scale, reviewCount: parsed.reviewCount, source: "live" };
+  } catch (err: any) {
+    return { rating: null, scale, reviewCount: null, source: "error", scrapeDebug: `Error: ${String(err?.message || err)}` };
+  }
+}
+
+async function scrapeClub(target: ClubTarget, scrapingBeeKey: string | undefined): Promise<ClubResult> {
+  const leadingCourses = await scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, scrapingBeeKey);
+  const oneGolf = await scrapeSource(target.oneGolfUrl, 5, parseOneGolf, scrapingBeeKey);
+
+  return {
+    slug: target.slug,
+    name: target.name,
+    url: target.leadingCoursesUrl,
+    isOwnClub: target.isOwnClub,
+    // Camps antics (overallRating/reviewCount/source) es mantenen per
+    // compatibilitat, apuntant a Leading Courses.
+    overallRating: leadingCourses.rating,
+    reviewCount: leadingCourses.reviewCount,
+    source: leadingCourses.source,
+    scrapeDebug: leadingCourses.scrapeDebug,
+    leadingCourses,
+    oneGolf,
+  };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
+  const scrapingBeeKey = process.env.SCRAPINGBEE_KEY; // opcional — només com a reserva
 
-  if (!scrapingBeeKey) {
-    return res.status(200).json({
-      scrapedAt: new Date().toISOString(),
-      clubs: TARGETS.map((t) => ({
-        slug: t.slug,
-        name: t.name,
-        url: t.url,
-        isOwnClub: t.isOwnClub,
-        overallRating: null,
-        reviewCount: null,
-        source: "error",
-        scrapeDebug: "Falta la variable d'entorn SCRAPINGBEE_KEY a Vercel.",
-      })),
-    });
-  }
-
-  // Mode diagnòstic: ?debug=<slug> retorna el HTML cru d'un sol club, sense
-  // intentar interpretar-lo — per veure exactament què respon ScrapingBee
-  // en lloc de suposar-ho.
+  // Mode diagnòstic: ?debug=<slug>&source=leadingcourses|onegolf retorna el
+  // HTML cru, sense intentar interpretar-lo.
   const debugSlug = typeof req.query.debug === "string" ? req.query.debug : null;
   if (debugSlug) {
     const target = TARGETS.find((t) => t.slug === debugSlug);
     if (!target) {
       return res.status(200).json({ error: `Slug desconegut: ${debugSlug}` });
     }
-    const url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(
-      target.url
-    )}&premium_proxy=true&render_js=false`;
-    const { resp, lastErr } = await fetchWithRetry(
-      url,
-      { headers: { "Accept-Language": "en-US,en;q=0.9" }, signal: AbortSignal.timeout(30000) },
-      1
-    );
-    if (!resp) {
-      return res.status(200).json({ error: String(lastErr?.message || lastErr) });
+    const wantSource = req.query.source === "onegolf" ? "onegolf" : "leadingcourses";
+    const url = wantSource === "onegolf" ? target.oneGolfUrl : target.leadingCoursesUrl;
+    const { html, scrapeDebug } = await fetchSource(url, scrapingBeeKey);
+    if (!html) {
+      return res.status(200).json({ error: scrapeDebug });
     }
-    const html = await resp.text();
-
-    // En lloc de tornar tot el HTML a cegues (es tallava abans d'arribar-hi),
-    // es busca específicament el bloc __NEXT_DATA__ — on Next.js sol posar
-    // les dades ja carregades al servidor (puntuacions per categoria, fotos)
-    // — i, si no hi és, es retorna el context al voltant de paraules clau
-    // conegudes ("Facilities", "Maintenance"...) per localitzar-ho igualment.
-    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i);
-    if (nextDataMatch) {
-      return res.status(200).json({
-        httpStatus: resp.status,
-        foundNextData: true,
-        nextData: nextDataMatch[1].slice(0, 400000),
-      });
-    }
-
-    const keywords = ["Facilities", "Maintenance", "Clubhouse", "Value for money", "Hospitality", "Surroundings"];
-    const snippets: Record<string, string> = {};
-    for (const kw of keywords) {
-      const idx = html.indexOf(kw);
-      if (idx !== -1) {
-        snippets[kw] = html.slice(Math.max(0, idx - 300), idx + 300);
-      }
-    }
-    return res.status(200).json({
-      httpStatus: resp.status,
-      foundNextData: false,
-      htmlLength: html.length,
-      keywordSnippets: snippets,
-      rawHtmlEnd: html.slice(-20000), // el final de la pàgina, per si les dades hi són cap al fons
-    });
+    return res.status(200).json({ htmlLength: html.length, htmlSnippet: html.slice(0, 3000), rawHtmlEnd: html.slice(-15000) });
   }
 
-  // Es llegeixen els 7 clubs D'UN EN UN, no en paral·lel — el pla de
-  // ScrapingBee només permet 5 peticions simultànies com a màxim (confirmat
-  // amb un error real: "Max concurrency allowed 5"), i llançar-les totes
-  // alhora en superava el límit.
+  // Es llegeixen els 7 clubs D'UN EN UN (no en paral·lel) — el pla de
+  // ScrapingBee (usat només com a reserva) limita a 5 peticions simultànies.
   const clubs: ClubResult[] = [];
   for (const target of TARGETS) {
     const result = await scrapeClub(target, scrapingBeeKey);

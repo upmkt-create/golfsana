@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft, Trophy, Flag } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { ReputationSnapshot, RatingBreakdown, LeadingCoursesSnapshot } from "../types";
+import { ReputationSnapshot, RatingBreakdown, LeadingCoursesSnapshot, LeadingCoursesClub, ReviewSourceResult } from "../types";
 
 const NAVY = "#033b7a";
 const CACHE_KEY = "golfsana_reputation_cache";
@@ -15,6 +15,61 @@ interface GolfrepuDashboardProps {
 function formatDate(iso?: string) {
   if (!iso) return "";
   return new Date(iso).toLocaleDateString("ca-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+// Font única de normalització: converteix qualsevol club rebut (nou format
+// amb leadingCourses/oneGolf, o format antic amb overallRating/reviewCount
+// plans, o fins i tot un objecte a mig fer) en un LeadingCoursesClub complet
+// i segur de renderitzar. Sense això, dades desades amb una versió anterior
+// del codi feien petar la pantalla en sencer (club.leadingCourses.rating
+// sobre un club sense leadingCourses).
+function normalizeClub(raw: any): LeadingCoursesClub {
+  const emptySource = (scale: 5 | 10): ReviewSourceResult => ({
+    rating: null,
+    scale,
+    reviewCount: null,
+    source: "error",
+    scrapeDebug: "Dades antigues — torna a sincronitzar per veure aquesta font.",
+  });
+
+  const leadingCourses: ReviewSourceResult =
+    raw?.leadingCourses && typeof raw.leadingCourses === "object"
+      ? { scale: 10, rating: null, reviewCount: null, source: "error", ...raw.leadingCourses }
+      : raw?.overallRating != null || raw?.source
+      ? {
+          rating: raw.overallRating ?? null,
+          scale: 10,
+          reviewCount: raw.reviewCount ?? null,
+          source: raw.source === "live" ? "live" : "error",
+          scrapeDebug: raw.scrapeDebug,
+        }
+      : emptySource(10);
+
+  const oneGolf: ReviewSourceResult =
+    raw?.oneGolf && typeof raw.oneGolf === "object"
+      ? { scale: 5, rating: null, reviewCount: null, source: "error", ...raw.oneGolf }
+      : emptySource(5);
+
+  return {
+    slug: raw?.slug || "unknown",
+    name: raw?.name || "Club desconegut",
+    url: raw?.url || "#",
+    isOwnClub: !!raw?.isOwnClub,
+    overallRating: leadingCourses.rating,
+    reviewCount: leadingCourses.reviewCount,
+    source: leadingCourses.source,
+    scrapeDebug: leadingCourses.scrapeDebug,
+    leadingCourses,
+    oneGolf,
+  };
+}
+
+function normalizeSnapshot(raw: any): LeadingCoursesSnapshot {
+  return {
+    id: raw?.id || "current",
+    scrapedAt: raw?.scrapedAt || new Date().toISOString(),
+    clubs: Array.isArray(raw?.clubs) ? raw.clubs.map(normalizeClub) : [],
+  };
 }
 
 export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
@@ -50,7 +105,7 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
       try {
         const docSnap = await getDoc(doc(db, "leadingCoursesSnapshots", "current"));
         if (docSnap.exists()) {
-          setLcSnapshot(docSnap.data() as LeadingCoursesSnapshot);
+          setLcSnapshot(normalizeSnapshot(docSnap.data()));
           return;
         }
       } catch (err) {
@@ -58,7 +113,7 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
       }
       try {
         const cached = localStorage.getItem(LC_CACHE_KEY);
-        if (cached) setLcSnapshot(JSON.parse(cached));
+        if (cached) setLcSnapshot(normalizeSnapshot(JSON.parse(cached)));
       } catch {
         // sense cache
       }
@@ -120,15 +175,15 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
       const resp = await fetch("/api/leading-courses");
       const data = await resp.json();
 
-      const newSnapshot: LeadingCoursesSnapshot = {
+      const newSnapshot = normalizeSnapshot({
         id: "current",
         scrapedAt: data.scrapedAt,
         clubs: data.clubs,
-      };
+      });
       setLcSnapshot(newSnapshot);
       localStorage.setItem(LC_CACHE_KEY, JSON.stringify(newSnapshot));
 
-      if (newSnapshot.clubs.every((c: any) => c.source === "error")) {
+      if (newSnapshot.clubs.every((c) => c.leadingCourses.source === "error" && c.oneGolf.source === "error")) {
         setLcError("No s'ha pogut llegir cap dels clubs. Comprova la connexió i torna-ho a provar.");
       }
 

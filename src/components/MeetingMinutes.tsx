@@ -70,14 +70,25 @@ export default function MeetingMinutes({
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Filtres — es declaren abans de l'efecte d'openMinuteId perquè aquest ja
+  // fa servir setFilterPersonId.
+  const [filterPersonId, setFilterPersonId] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState<string>("");
+  const [filterDateTo, setFilterDateTo] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
+
   // Si arribem aquí des d'una notificació ("openMinuteId"), obrim
-  // directament aquesta acta en lloc de deixar la llista general.
+  // directament aquesta acta en lloc de deixar la llista general — i, com
+  // que ara les actes es veuen "dins" de la targeta del membre, també cal
+  // entrar-hi (si no, el formulari d'edició no tindria on renderitzar-se).
   React.useEffect(() => {
     if (openMinuteId) {
       setIsCreatingNew(false);
       setEditingId(openMinuteId);
+      const target = minutes.find((m) => m.id === openMinuteId);
+      if (target) setFilterPersonId(target.memberId);
     }
-  }, [openMinuteId]);
+  }, [openMinuteId, minutes]);
 
 
   // Acord per al qual s'està triant l'espai i el projecte de destinació
@@ -91,12 +102,6 @@ export default function MeetingMinutes({
   // Formulari (compartit entre crear nova acta i editar-ne una existent)
   const emptyForm: MinuteFormValues = { memberId: "", date: todayStr(), title: "", notes: "", agreements: [] };
   const [form, setForm] = useState<MinuteFormValues>(emptyForm);
-
-  // Filtres
-  const [filterPersonId, setFilterPersonId] = useState<string>("all");
-  const [filterDateFrom, setFilterDateFrom] = useState<string>("");
-  const [filterDateTo, setFilterDateTo] = useState<string>("");
-  const [showFilters, setShowFilters] = useState(false);
 
   // Actes visibles: admin veu totes, membre només les seves
   const visibleMinutes = isAdmin
@@ -114,6 +119,37 @@ export default function MeetingMinutes({
   }, [visibleMinutes, filterPersonId, filterDateFrom, filterDateTo]);
 
   const sortedMinutes = [...filteredMinutes].sort((a, b) => b.date.localeCompare(a.date));
+
+  // Targetes per persona (nomès per a la vista d'admin, "tots els membres") —
+  // agrupa les actes visibles per memberId, independentment del filtre de
+  // persona (que aquí encara no s'ha aplicat), respectant només el filtre de
+  // dates si n'hi ha.
+  const minutesForGrouping = useMemo(() => {
+    return visibleMinutes.filter((m) => {
+      const created = createdDateOnly(m.createdAt);
+      if (filterDateFrom && created && created < filterDateFrom) return false;
+      if (filterDateTo && created && created > filterDateTo) return false;
+      return true;
+    });
+  }, [visibleMinutes, filterDateFrom, filterDateTo]);
+
+  const memberCards = useMemo(() => {
+    const map = new Map<string, { memberId: string; memberName: string; count: number; lastDate: string }>();
+    for (const m of minutesForGrouping) {
+      const existing = map.get(m.memberId);
+      if (existing) {
+        existing.count += 1;
+        if (m.date > existing.lastDate) existing.lastDate = m.date;
+      } else {
+        map.set(m.memberId, { memberId: m.memberId, memberName: m.memberName, count: 1, lastDate: m.date });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate));
+  }, [minutesForGrouping]);
+
+  // Vista de targetes per membre: només per a admins, quan no s'ha entrat
+  // encara a cap persona concreta ni s'està creant/editant res.
+  const showMemberGrid = isAdmin && filterPersonId === "all" && !isCreatingNew && !editingId;
 
   const hasActiveFilters = filterPersonId !== "all" || !!filterDateFrom || !!filterDateTo;
   const clearFilters = () => {
@@ -450,8 +486,55 @@ export default function MeetingMinutes({
       {/* Formulari de creació d'una acta nova (a dalt, només quan no s'edita cap existent) */}
       {isAdmin && isCreatingNew && renderForm("new")}
 
-      {/* Llista d'actes */}
-      {sortedMinutes.length === 0 ? (
+      {/* Graella de targetes per membre (només admins, vista "tots") */}
+      {showMemberGrid && !isCreatingNew && (
+        memberCards.length === 0 ? (
+          <div className="text-center py-12 text-slate-400">
+            <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
+            <p className="text-sm">
+              {hasActiveFilters ? "Cap acta coincideix amb els filtres de data seleccionats." : "Encara no s'ha creat cap acta."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {memberCards.map((card) => (
+              <button
+                key={card.memberId}
+                onClick={() => setFilterPersonId(card.memberId)}
+                className="text-left border border-slate-200 bg-white rounded-sm shadow-sm hover:shadow-md hover:border-indigo-300 transition-all p-4 flex items-center gap-3"
+              >
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0"
+                  style={{ backgroundColor: NAVY }}
+                >
+                  {card.memberName.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-800 truncate">{card.memberName}</p>
+                  <p className="text-[11px] text-slate-500">
+                    {card.count} acta{card.count === 1 ? "" : "es"} · última el {card.lastDate}
+                  </p>
+                </div>
+                <FileText className="w-4 h-4 text-slate-300 shrink-0" />
+              </button>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Llista d'actes d'una persona concreta (o de tothom, per a un membre
+          no-admin, que sempre veu directament les seves pròpies) */}
+      {!showMemberGrid && (
+        <>
+          {isAdmin && filterPersonId !== "all" && (
+            <button
+              onClick={() => setFilterPersonId("all")}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-700 mb-1"
+            >
+              ← Tornar a tots els membres
+            </button>
+          )}
+          {sortedMinutes.length === 0 ? (
         <div className="text-center py-12 text-slate-400">
           <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
           <p className="text-sm">
@@ -628,6 +711,8 @@ export default function MeetingMinutes({
             )
           )}
         </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -106,19 +106,8 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
 • Com afegir usuaris: Un administrador pot anar a la capçalera (selector d'usuaris superior dalt a la dreta) i utilitzar la funció "Afegeix Usuari Indefinit" per donar d'alta immediatament nous perfils associats al seu de departament de destinació.`
     },
     {
-      id: "incentives-metrics",
-      title: "6. Rendiment, Mètriques i Incentius",
-      category: "metrics",
-      icon: Clock,
-      content: `La finalització de tasques col·labora en el creixement del club i la compensació de l'equip:
-
-• Model d'Incentiu Trimestral de 150€ (Proporcional): Exclusiu de la Rocío i la Isabel. Cada persona compta amb un fons variable de recompensa trimestral d'un màxim de 150€. L'import definitiu a percebre es calcula en part proporcional segons el % de tasques finals acabades sobre les totals que tenien assignades.
-• Model Variable per Tasca (Alternatiu): Mètode que valora de forma individual cada esdeveniment tancat a temps amb multiplicadors editables en temps real.
-• Informes i Dashboards: Gràfiques interactives en temps real de productivitat, evolució de projectes i càrrega repartida per departament.`
-    },
-    {
       id: "offline-redundancy",
-      title: "7. Mode de Seguretat i Sincronització Redundada",
+      title: "6. Mode de Seguretat i Sincronització Redundada",
       category: "security",
       icon: Shield,
       content: `Per garantir l'operació diària fins i tot a les zones més allunyades del camp de golf, GolfSana incorpora un Mode de Redundància i Sincro Segura:
@@ -129,7 +118,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
     },
     {
       id: "mobile-install",
-      title: "8. Instal·lació com a App al Mòbil",
+      title: "7. Instal·lació com a App al Mòbil",
       category: "general",
       icon: Smartphone,
       content: `GolfSana es pot instal·lar al mòbil com si fos una aplicació real, amb icona pròpia a la pantalla d'inici i sense la barra del navegador.
@@ -148,6 +137,18 @@ Actualitzacions — mai cal desinstal·lar: cada millora que es publica a GolfSa
 • Si alguna vegada sembla que no s'ha actualitzat (una pantalla que no quadra amb el que s'ha anunciat a Novetats), el primer pas és sempre tancar l'app del tot (no només posar-la en segon pla, sinó fer-la fora de la llista d'apps recents) i tornar-la a obrir.
 • Si això no n'hi ha prou (poc habitual): a Android, es pot buidar la memòria cau sense perdre la sessió des de Configuració del mòbil → Apps → GolfSana → Emmagatzematge → "Esborrar memòria cau" (mai "Esborrar dades", això sí que tancaria la sessió).
 • Desinstal·lar i tornar a instal·lar només hauria de fer falta com a últim recurs.`
+    },
+    {
+      id: "incentives-metrics",
+      title: "8. Rendiment, Mètriques i Incentius",
+      category: "metrics",
+      icon: Clock,
+      adminOnly: true,
+      content: `La finalització de tasques col·labora en el creixement del club i la compensació de l'equip:
+
+• Model d'Incentiu Trimestral de 150€ (Proporcional): Exclusiu de la Rocío i la Isabel. Cada persona compta amb un fons variable de recompensa trimestral d'un màxim de 150€. L'import definitiu a percebre es calcula en part proporcional segons el % de tasques finals acabades sobre les totals que tenien assignades.
+• Model Variable per Tasca (Alternatiu): Mètode que valora de forma individual cada esdeveniment tancat a temps amb multiplicadors editables en temps real.
+• Informes i Dashboards: Gràfiques interactives en temps real de productivitat, evolució de projectes i càrrega repartida per departament.`
     }
   ], []);
 
@@ -160,14 +161,6 @@ Actualitzacions — mai cal desinstal·lar: cada millora que es publica a GolfSa
     {
       question: "Com puc assignar una mateixa tasca a diversos departaments?",
       answer: "En editar o crear una tasca, s'inclou un selector d'àrees de treball múltiples. Si la tasca afecta tant a reserves de camp com a l'escola, podeu marcar múltiples caselles de departaments perquè aparegui en ambdós fluxos simultàniament."
-    },
-    {
-      question: "Com funciona el web scraping de la competència?",
-      answer: "Es tracta d'un simulador controlat adaptiu que replica com la plataforma llegeix les pàgines de reserves públiques dels nostres competidors (Empordà Golf, PGA Catalunya, Real Club de Golf El Prat) per extreure les seves millors ofertes d'un bugui o green fee segons temporada i hora de l'audiència."
-    },
-    {
-      question: "Es poden importar o exportar les tasques de GolfSana?",
-      answer: "Sí. Tot departament compta amb vistes de descàrrega. A més, a la taula 'Seguretat i Registres' o 'Monitorització' els administradors poden visualitzar totes les auditories oficials de canvis de l'equip."
     },
     {
       question: "Com es representen les tasques amb rangs de més d'un dia al Calendari/Timeline?",
@@ -205,16 +198,24 @@ Actualitzacions — mai cal desinstal·lar: cada millora que es publica a GolfSa
     }
   }), []);
 
+  // Seccions visibles segons el rol: "Rendiment, Mètriques i Incentius"
+  // (adminOnly) només la veuen Isabel i Rocío — la resta de l'equip
+  // (Caddy Master, Greenkeeper, etc.) no hi té accés ni al manual.
+  const visibleSections = useMemo(
+    () => manualSections.filter((s) => !("adminOnly" in s && s.adminOnly) || currentUser.role === "admin"),
+    [manualSections, currentUser.role]
+  );
+
   // Search logic for simple highlighting of sections
   const filteredSections = useMemo(() => {
-    if (!searchQuery.trim()) return manualSections;
+    if (!searchQuery.trim()) return visibleSections;
     const query = searchQuery.toLowerCase();
-    return manualSections.filter(
+    return visibleSections.filter(
       section => 
         section.title.toLowerCase().includes(query) || 
         section.content.toLowerCase().includes(query)
     );
-  }, [searchQuery, manualSections]);
+  }, [searchQuery, visibleSections]);
 
   // Converteix el text pla d'una secció (línies amb •, sub-punts amb "  -",
   // llistes numerades, i paràgrafs) en una llista ben formatada — amb les

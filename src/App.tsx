@@ -138,7 +138,7 @@ import UpcomingDeadlinesWidget from "./components/UpcomingDeadlinesWidget";
 import { getTaskUrgency, URGENCY_STYLES } from "./lib/taskUrgency";
 import MeetingMinutes from "./components/MeetingMinutes";
 // @ts-ignore
-import golfBallIcon from "./campo-de-golf.png";
+import golfBallIcon from "./up-icon-light.png";
 
 import LoginScreen from "./components/LoginScreen";
 

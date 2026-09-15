@@ -259,6 +259,10 @@ export default function App() {
   
   // Interactive / detailed UI State
   const [activeTab, setActiveTab] = useState<"inici" | "summary" | "list" | "base_tasks" | "board" | "timeline" | "golf" | "security" | "incentives" | "reports" | "monitoring" | "manual" | "calendar" | "all_workspaces" | "all_tasks_global" | "minutes" | "novetats" | "golfrepu">("inici");
+  // Dins de "Llistat de tasques" ara hi ha un interruptor Llista/Tauler, en
+  // lloc d'una pestanya "Taulell Kanban" separada al menú superior — més
+  // senzill de navegar i evita la vista (trencada) d'agrupar per departament.
+  const [taskListViewMode, setTaskListViewMode] = useState<"list" | "board">("list");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   // Quina subtasca té l'editor de descripció desplegat, dins del drawer de
   // detall de tasca (una alhora, per no allargar excessivament la llista)
@@ -3097,7 +3101,7 @@ export default function App() {
         </header>
 
         {/* WORKSPACE NAVIGATION BAR (Asana tabs list) */}
-        {!filterAssigneeId && ["summary", "list", "base_tasks", "board", "timeline", "calendar", "golf"].includes(activeTab) && (
+        {!filterAssigneeId && ["summary", "list", "base_tasks", "timeline", "calendar", "golf"].includes(activeTab) && (
           <nav className="bg-white border-b border-slate-200 px-6 py-2.5 flex items-center gap-2 shrink-0 overflow-x-auto select-none">
             <button
               onClick={() => setActiveTab("summary")}
@@ -3133,18 +3137,6 @@ export default function App() {
             >
               <Star className="w-3.5 h-3.5 text-amber-500" />
               <span>Base del Projecte</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("board")}
-              className={`py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border ${
-                activeTab === "board"
-                  ? "bg-slate-100 border-slate-355 text-slate-900"
-                  : "text-slate-500 border-transparent hover:bg-slate-50 hover:text-slate-850"
-              }`}
-            >
-              <Trello className="w-3.5 h-3.5 text-slate-500" />
-              <span>Taulell Kanban</span>
             </button>
 
             <button
@@ -3759,7 +3751,7 @@ export default function App() {
                                   <span className="text-[10px] text-blue-600 dark:text-blue-400">Obrir →</span>
                                 </button>
                                 <button
-                                  onClick={() => setActiveTab("board")}
+                                  onClick={() => { setActiveTab("list"); setTaskListViewMode("board"); }}
                                   className="w-full text-left p-2 border border-slate-100 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-slate-50 dark:hover:bg-slate-850 text-xs font-bold transition-all flex items-center justify-between"
                                 >
                                   <span>Visualitzar Kanban</span>
@@ -4323,43 +4315,84 @@ export default function App() {
               )}
 
               {activeTab === "list" && (
-                <TaskList
-                  tasks={applyTaskFilters(displayedTasks.filter((t) => !t.isBaseTask))}
-                  users={users}
-                  projects={projects}
-                  workspaces={workspaces}
-                  activeProjectId={activeProjectId}
-                  activeWorkspaceId={activeWorkspaceId}
-                  onAddTask={handleAddTask}
-                  onUpdateTask={handleUpdateTask}
-                  onDeleteTask={handleDeleteTask}
-                  onSelectTaskForDetails={(task) => setSelectedTask(task)}
-                  isCompactView={isCompactView}
-                  activeTimer={activeTimer}
-                  setActiveTimer={setActiveTimer}
-                  searchTerm={taskSearchTerm}
-                  setSearchTerm={setTaskSearchTerm}
-                  filterPriority={taskFilterPriority}
-                  setFilterPriority={setTaskFilterPriority}
-                  filterStatus={taskFilterStatus}
-                  setFilterStatus={setTaskFilterStatus}
-                  filterDepartment={taskFilterDepartment}
-                  setFilterDepartment={setTaskFilterDepartment}
-                  filterAssignee={taskFilterAssignee}
-                  setFilterAssignee={setTaskFilterAssignee}
-                  filterProject={taskFilterProject}
-                  setFilterProject={setTaskFilterProject}
-                  sortField={taskSortField}
-                  sortDirection={taskSortDirection}
-                  setSortDirection={setTaskSortDirection}
-                  onSortClick={handleTaskSortClick}
-                  dateFilterField={taskDateFilterField}
-                  setDateFilterField={setTaskDateFilterField}
-                  dateFilterFrom={taskDateFilterFrom}
-                  setDateFilterFrom={setTaskDateFilterFrom}
-                  dateFilterTo={taskDateFilterTo}
-                  setDateFilterTo={setTaskDateFilterTo}
-                />
+                <div className="space-y-3">
+                  {/* Interruptor Llista / Tauler — abans eren dues pestanyes
+                      separades ("Llistat de tasques" i "Taulell Kanban"),
+                      ara és una sola vista amb dues maneres de veure les
+                      mateixes tasques. */}
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 w-fit">
+                    <button
+                      onClick={() => setTaskListViewMode("list")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold transition-all ${
+                        taskListViewMode === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      Llista
+                    </button>
+                    <button
+                      onClick={() => setTaskListViewMode("board")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold transition-all ${
+                        taskListViewMode === "board" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      <Trello className="w-3.5 h-3.5" />
+                      Tauler
+                    </button>
+                  </div>
+
+                  {taskListViewMode === "list" ? (
+                    <TaskList
+                      tasks={applyTaskFilters(displayedTasks.filter((t) => !t.isBaseTask))}
+                      users={users}
+                      projects={projects}
+                      workspaces={workspaces}
+                      activeProjectId={activeProjectId}
+                      activeWorkspaceId={activeWorkspaceId}
+                      onAddTask={handleAddTask}
+                      onUpdateTask={handleUpdateTask}
+                      onDeleteTask={handleDeleteTask}
+                      onSelectTaskForDetails={(task) => setSelectedTask(task)}
+                      isCompactView={isCompactView}
+                      activeTimer={activeTimer}
+                      setActiveTimer={setActiveTimer}
+                      searchTerm={taskSearchTerm}
+                      setSearchTerm={setTaskSearchTerm}
+                      filterPriority={taskFilterPriority}
+                      setFilterPriority={setTaskFilterPriority}
+                      filterStatus={taskFilterStatus}
+                      setFilterStatus={setTaskFilterStatus}
+                      filterDepartment={taskFilterDepartment}
+                      setFilterDepartment={setTaskFilterDepartment}
+                      filterAssignee={taskFilterAssignee}
+                      setFilterAssignee={setTaskFilterAssignee}
+                      filterProject={taskFilterProject}
+                      setFilterProject={setTaskFilterProject}
+                      sortField={taskSortField}
+                      sortDirection={taskSortDirection}
+                      setSortDirection={setTaskSortDirection}
+                      onSortClick={handleTaskSortClick}
+                      dateFilterField={taskDateFilterField}
+                      setDateFilterField={setTaskDateFilterField}
+                      dateFilterFrom={taskDateFilterFrom}
+                      setDateFilterFrom={setTaskDateFilterFrom}
+                      dateFilterTo={taskDateFilterTo}
+                      setDateFilterTo={setTaskDateFilterTo}
+                    />
+                  ) : (
+                    <TaskBoard
+                      tasks={displayedTasks}
+                      users={users}
+                      projects={projects}
+                      workspaces={workspaces}
+                      activeProjectId={activeProjectId}
+                      activeWorkspaceId={activeWorkspaceId}
+                      onUpdateTask={handleUpdateTask}
+                      onSelectTaskForDetails={(task) => setSelectedTask(task)}
+                      isCompactView={isCompactView}
+                    />
+                  )}
+                </div>
               )}
 
               {activeTab === "base_tasks" && (
@@ -4399,20 +4432,6 @@ export default function App() {
                   setDateFilterFrom={setTaskDateFilterFrom}
                   dateFilterTo={taskDateFilterTo}
                   setDateFilterTo={setTaskDateFilterTo}
-                />
-              )}
-
-              {activeTab === "board" && (
-                <TaskBoard
-                  tasks={displayedTasks}
-                  users={users}
-                  projects={projects}
-                  workspaces={workspaces}
-                  activeProjectId={activeProjectId}
-                  activeWorkspaceId={activeWorkspaceId}
-                  onUpdateTask={handleUpdateTask}
-                  onSelectTaskForDetails={(task) => setSelectedTask(task)}
-                  isCompactView={isCompactView}
                 />
               )}
 

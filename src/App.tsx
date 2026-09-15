@@ -2878,7 +2878,7 @@ export default function App() {
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <div className="w-6 h-6 rounded-full bg-blue-900/60 border border-blue-700 text-blue-200 font-bold text-[10px] flex items-center justify-center shrink-0">
+                        <div className="w-6 h-6 rounded-full bg-brand-blue/50 border border-white/15 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
                           {u.avatar || u.name.slice(0, 2).toUpperCase()}
                         </div>
                         <div className="truncate flex flex-col leading-tight">
@@ -4265,7 +4265,7 @@ export default function App() {
                                           {/* Assignee Badge info */}
                                           {assigneeObj && (
                                             <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 border border-slate-150">
-                                              <span className="w-5 h-5 rounded-full bg-indigo-600 text-white font-mono font-bold text-[9px] flex items-center justify-center shrink-0">
+                                              <span className="w-5 h-5 rounded-full bg-brand-blue/15 text-brand-blue font-mono font-bold text-[9px] flex items-center justify-center shrink-0">
                                                 {assigneeObj.avatar}
                                               </span>
                                               <span className="text-[10px] hidden md:block font-bold text-slate-600 shrink-0">{assigneeObj.name}</span>
@@ -5569,11 +5569,11 @@ export default function App() {
                                           }}
                                           className={`flex items-center gap-1 px-1.5 py-0.5 border text-[9.5px] rounded-full transition-all cursor-pointer ${
                                             isSubAssigned
-                                              ? "bg-indigo-50 border-indigo-200 text-indigo-750 font-bold"
+                                              ? "bg-brand-blue/10 border-brand-blue/25 text-brand-blue font-bold"
                                               : "bg-white border-slate-150 text-slate-500 hover:bg-slate-50"
                                           }`}
                                         >
-                                          <div className="w-3.5 h-3.5 rounded-full bg-slate-200 text-slate-700 text-[8px] font-extrabold flex items-center justify-center shrink-0">
+                                          <div className="w-3.5 h-3.5 rounded-full bg-brand-blue/15 text-brand-blue text-[8px] font-extrabold flex items-center justify-center shrink-0">
                                             {u.avatar || u.name.slice(0, 2).toUpperCase()}
                                           </div>
                                           <span>{u.name.split(' ')[0]}</span>
@@ -5800,7 +5800,7 @@ export default function App() {
                       taskComments.map((com) => (
                         <div key={com.id} className="p-3 bg-slate-50 border border-slate-200 rounded-sm space-y-1 relative group hover:bg-white transition-colors">
                           <div className="flex items-center gap-1.5">
-                            <div className="w-5.5 h-5.5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[9.5px] flex items-center justify-center border border-indigo-200">
+                            <div className="w-5.5 h-5.5 rounded-full bg-brand-blue/10 text-brand-blue font-bold text-[9.5px] flex items-center justify-center border border-brand-blue/20">
                               {com.userAvatar}
                             </div>
                             <span className="text-[11px] font-bold text-slate-800">{com.userName}</span>

@@ -1,10 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Asap:ital,wght@0,400..700;1,400..700&family=Outfit:wght@400..800&family=Cormorant+Garamond:ital,wght@0,400..700;1,400..700&family=DM+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* Sistema de disseny UP! — tokens de marca reutilitzables (bg-brand-blue,
+   text-brand-gold, etc.) en lloc d'hexadecimals solts escampats pel codi.
+   Font única de veritat pel branding natiu de GolfSana — Golfrepu i
+   Golfradar, i els colors que l'usuari personalitza (projectes, espais de
+   treball), queden fora d'aquest sistema expressament. */
 @theme {
-  --font-sans: 'Open Sans', system-ui, -apple-system, sans-serif;
-  --font-display: 'Open Sans', system-ui, sans-serif;
-  --font-mono: 'Open Sans', system-ui, sans-serif;
+  --font-sans: 'Asap', system-ui, -apple-system, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-mono: 'DM Mono', 'JetBrains Mono', monospace;
+
+  --color-brand-blue: #1d3d4c;
+  --color-brand-gold: #c9a96e;
+  --color-brand-light: #f5f2ed;
+  --color-brand-paper: #ffffff;
 }
 
 body {
@@ -13,12 +24,12 @@ body {
 }
 
 * {
-  font-family: 'Open Sans', system-ui, -apple-system, sans-serif !important;
+  font-family: 'Asap', system-ui, -apple-system, sans-serif !important;
 }
 
 /* Allow actual raw terminal console text to use mono for logs */
 .font-mono, pre, code {
-  font-family: 'JetBrains Mono', monospace !important;
+  font-family: 'DM Mono', 'JetBrains Mono', monospace !important;
 }
 
 /* Custom scrollbar adjustments for a clean, premium enterprise spreadsheet look */

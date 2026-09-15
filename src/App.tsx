@@ -2494,7 +2494,7 @@ export default function App() {
             >
               <div className="flex items-center gap-2">
                 <BookOpen className="w-3.5 h-3.5 text-blue-300" />
-                <span>Manual d'Ús de la Plataforma</span>
+                <span>Manual d'ús</span>
               </div>
               <span className="text-[8px] bg-emerald-600 text-white px-1.5 py-0.5 font-black uppercase font-mono tracking-wider">GUIA</span>
             </button>

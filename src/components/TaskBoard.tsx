@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus, Workspace } from "../types";
-import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Kanban, LayoutGrid, Star, Wrench } from "lucide-react";
+import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Star, Wrench } from "lucide-react";
 import { motion } from "motion/react";
 import { getDepartmentOptions } from "../lib/departments";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
@@ -28,8 +28,12 @@ export default function TaskBoard({
   onSelectTaskForDetails,
   isCompactView = false,
 }: TaskBoardProps) {
-  // Option to group the board by status ("status") or by department ("department")
-  const [groupBy, setGroupBy] = useState<"status" | "department">("department");
+  // El Tauler sempre agrupa per Estat (Pendent/En Procés/En Revisió/
+  // Completada) — abans hi havia també l'opció "Per Departaments", però es
+  // va treure: com que la llista de tasques ja ve limitada a l'espai de
+  // treball actiu (activeWorkspaceId) abans d'arribar aquí, agrupar per
+  // departament només podia omplir UNA columna (la de l'espai actiu) i
+  // deixava totes les altres sempre buides — confonia més que ajudava.
   // Tasca que s'està arrossegant actualment (drag-and-drop natiu, com al
   // Calendari) — abans només es podia moure amb els botons de fletxes.
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -37,6 +41,8 @@ export default function TaskBoard({
 
   // Departaments = espais de treball reals que existeixen ara mateix a
   // Firestore — mai una llista fixa al codi (vegeu src/lib/departments.ts).
+  // Es fan servir només per pintar les etiquetes de departament de cada
+  // targeta, no per agrupar columnes.
   const boardDeptOptions = getDepartmentOptions(workspaces);
 
   interface BoardColumn {
@@ -44,27 +50,14 @@ export default function TaskBoard({
     title: string;
     color: string;
     bg: string;
-    borderTopColor?: string;
   }
 
-  // Columns for grouping by Status
   const statusColumns: BoardColumn[] = [
     { id: "todo", title: "Pendent", color: "text-slate-700 bg-slate-100 border-slate-300", bg: "bg-slate-50/60" },
     { id: "in_progress", title: "En Procés", color: "text-blue-700 bg-blue-50 border-blue-200", bg: "bg-slate-50/60" },
     { id: "review", title: "En Revisió", color: "text-indigo-700 bg-indigo-50 border-indigo-200", bg: "bg-slate-50/60" },
     { id: "done", title: "Completada", color: "text-emerald-700 bg-emerald-50 border-emerald-200", bg: "bg-slate-50/60" },
   ];
-
-  // Columns for grouping by Department
-  const deptColumns: BoardColumn[] = boardDeptOptions.map((d) => ({
-    id: d.id,
-    title: d.name.replace("Departament de ", "").replace("Departament ", ""),
-    color: `text-slate-800 bg-white`,
-    bg: "bg-slate-50/60",
-    borderTopColor: d.color,
-  }));
-
-  const activeColumns = groupBy === "status" ? statusColumns : deptColumns;
 
   // Filter tasks to active project/workspace
   const filteredTasks = tasks.filter((task) => {
@@ -82,7 +75,7 @@ export default function TaskBoard({
     return task.departmentId ? [task.departmentId] : ["dep-reserves"];
   };
 
-  // Helper to move task when grouped by status
+  // Helper to move task between status columns
   const handleMoveStatus = (task: Task, direction: "left" | "right", e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening detail panel
     const statuses: TaskStatus[] = ["todo", "in_progress", "review", "done"];
@@ -91,30 +84,6 @@ export default function TaskBoard({
 
     if (nextIdx >= 0 && nextIdx < statuses.length) {
       onUpdateTask(task.id, { status: statuses[nextIdx] });
-    }
-  };
-
-  // Helper to move task when grouped by department (assign / cycle primary department)
-  const handleMoveDept = (task: Task, direction: "left" | "right", e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening detail panel
-    const currentDepts = getTaskDepartments(task);
-    const allDeptIds = boardDeptOptions.map((d) => d.id);
-    
-    // Cycle the primary (first) department
-    const currIdx = allDeptIds.indexOf(currentDepts[0] || "dep-reserves");
-    let nextIdx = direction === "right" ? currIdx + 1 : currIdx - 1;
-
-    if (nextIdx >= 0 && nextIdx < allDeptIds.length) {
-      const nextDept = allDeptIds[nextIdx];
-      // Build updated list (place new dept first)
-      const nextDeptsList = currentDepts.includes(nextDept)
-        ? [nextDept, ...currentDepts.filter((id) => id !== nextDept)]
-        : [nextDept, ...currentDepts];
-
-      onUpdateTask(task.id, {
-        departmentId: nextDept,
-        departmentIds: nextDeptsList,
-      });
     }
   };
 
@@ -131,84 +100,33 @@ export default function TaskBoard({
     }
   };
 
-  // Deixar anar una targeta arrossegada sobre una columna: canvia l'estat
-  // (mode "status") o afegeix aquell departament com a principal (mode
-  // "department"), mantenint els altres departaments ja assignats.
+  // Deixar anar una targeta arrossegada sobre una columna: canvia l'estat.
   const handleDropOnColumn = (colId: string) => {
     if (!draggedTaskId) return;
     const task = tasks.find((t) => t.id === draggedTaskId);
     setDraggedTaskId(null);
     setDragOverColId(null);
     if (!task) return;
-
-    if (groupBy === "status") {
-      if (task.status === colId) return;
-      onUpdateTask(task.id, { status: colId as TaskStatus });
-    } else {
-      const currentDepts = getTaskDepartments(task);
-      if (currentDepts[0] === colId) return;
-      const nextDeptsList = currentDepts.includes(colId)
-        ? [colId, ...currentDepts.filter((id) => id !== colId)]
-        : [colId, ...currentDepts];
-      onUpdateTask(task.id, { departmentId: colId, departmentIds: nextDeptsList });
-    }
+    if (task.status === colId) return;
+    onUpdateTask(task.id, { status: colId as TaskStatus });
   };
 
   return (
     <div className="space-y-4" id="task-board-wrapper">
       {/* Board Controls */}
-      <div className="flex items-center justify-between pb-2">
-        <div>
-          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-150">Taulell Interactiu d'Acció</h3>
-          <p className="text-[11px] text-slate-400">Arrossega una targeta a una altra columna per moure-la, o utilitza les fletxes. Desplaça't lateralment per veure totes les columnes.</p>
-        </div>
-        
-        {/* Toggle Selector */}
-        <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
-          <button
-            onClick={() => setGroupBy("department")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-semibold transition-all ${
-              groupBy === "department"
-                ? "bg-white text-blue-600 shadow-xs"
-                : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Per Departaments</span>
-          </button>
-          
-          <button
-            onClick={() => setGroupBy("status")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-sm text-xs font-semibold transition-all ${
-              groupBy === "status"
-                ? "bg-white text-blue-600 shadow-xs"
-                : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <Kanban className="w-3.5 h-3.5" />
-            <span>Per Estats</span>
-          </button>
-        </div>
+      <div className="pb-2">
+        <h3 className="text-sm font-bold text-slate-800 dark:text-slate-150">Taulell Interactiu d'Acció</h3>
+        <p className="text-[11px] text-slate-400">Arrossega una targeta a una altra columna per moure-la, o utilitza les fletxes. Desplaça't lateralment per veure totes les columnes.</p>
       </div>
 
       {/* Board columns — fila única amb desplaçament lateral, com qualsevol
-          Kanban real (Trello, Jira...). Abans era una graella amb un nombre
-          fix de columnes per fila, que es trencava en un mosaic confús quan
-          hi havia més espais de treball que columnes previstes. */}
+          Kanban real (Trello, Jira...). */}
       <div 
         className="flex gap-4 overflow-x-auto pb-2"
         id="kanban-board-cols"
       >
-        {activeColumns.map((col) => {
-          // Filter tasks correctly matching this column
-          const colTasks = filteredTasks.filter((t) => {
-            if (groupBy === "status") {
-              return t.status === col.id;
-            } else {
-              // Task belongs to this department
-              return getTaskDepartments(t).includes(col.id);
-            }
-          });
+        {statusColumns.map((col) => {
+          const colTasks = filteredTasks.filter((t) => t.status === col.id);
 
           return (
             <div
@@ -221,7 +139,6 @@ export default function TaskBoard({
               } ${
                 isCompactView ? "p-2.5 min-h-[400px]" : "p-4 min-h-[550px]"
               }`}
-              style={groupBy === "department" ? { borderTop: `4px solid ${col.borderTopColor}` } : undefined}
             >
               {/* Column Header */}
               <div className={`flex items-center justify-between border-b border-slate-200/50 ${
@@ -354,30 +271,18 @@ export default function TaskBoard({
                           
                           <button
                             type="button"
-                            onClick={(e) => {
-                              if (groupBy === "status") {
-                                handleMoveStatus(task, "left", e);
-                              } else {
-                                handleMoveDept(task, "left", e);
-                              }
-                            }}
+                            onClick={(e) => handleMoveStatus(task, "left", e)}
                             className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-blue-600 border border-slate-200"
-                            title={groupBy === "status" ? "Moure a columna esquerra" : "Atribuir a departament anterior"}
+                            title="Moure a columna esquerra"
                           >
                             <ChevronLeft className="w-3.5 h-3.5" />
                           </button>
 
                           <button
                             type="button"
-                            onClick={(e) => {
-                              if (groupBy === "status") {
-                                handleMoveStatus(task, "right", e);
-                              } else {
-                                handleMoveDept(task, "right", e);
-                              }
-                            }}
+                            onClick={(e) => handleMoveStatus(task, "right", e)}
                             className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-blue-600 border border-slate-200"
-                            title={groupBy === "status" ? "Moure a columna dreta" : "Atribuir a departament següent"}
+                            title="Moure a columna dreta"
                           >
                             <ChevronRight className="w-3.5 h-3.5" />
                           </button>

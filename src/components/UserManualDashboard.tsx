@@ -211,7 +211,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
         {/* Support by UP! Marketing Digital Stamp */}
         <div className="bg-slate-50 border border-slate-200 p-2 px-3 text-right shrink-0">
           <p className="text-[9px] font-mono text-slate-400 font-bold uppercase">Tecnologia Certificada</p>
-          <p className="text-xs font-bold text-indigo-600">UP! Marketing Digital</p>
+          <p className="text-xs font-bold text-brand-gold">UP! Marketing Digital</p>
           <span className="text-[9.5px] text-slate-500 font-medium">Sincronització SOC-2 de Seguretat</span>
         </div>
       </div>
@@ -228,7 +228,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
               placeholder="Cerca al manual..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full text-xs bg-white text-slate-800 border border-slate-350 pr-8 pl-3 py-2 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 text-[11px]"
+              className="w-full text-xs bg-white text-slate-800 border border-slate-350 pr-8 pl-3 py-2 outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue text-[11px]"
             />
             <Search className="w-4 h-4 text-slate-400 absolute right-2.5 top-2" />
           </div>
@@ -256,12 +256,12 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
                     }}
                     className={`p-3 text-left w-full transition-all flex items-center justify-between group ${
                       isSelected 
-                        ? "bg-slate-100/80 text-indigo-900 border-l-4 border-l-indigo-600 font-bold" 
+                        ? "bg-slate-100/80 text-brand-blue border-l-4 border-l-brand-gold font-bold" 
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <SecIcon className={`w-4 h-4 shrink-0 ${isSelected ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600"}`} />
+                      <SecIcon className={`w-4 h-4 shrink-0 ${isSelected ? "text-brand-blue" : "text-slate-400 group-hover:text-slate-600"}`} />
                       <span className="truncate">{sec.title}</span>
                     </div>
                     <ChevronRight className={`w-3 h-3 text-slate-400 shrink-0 ${isSelected ? "translate-x-1" : ""}`} />
@@ -272,26 +272,26 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
           </div>
 
           {/* Quick interactive roles cheatsheet widget */}
-          <div className="bg-gradient-to-br from-[#1d3d4c] to-indigo-950 text-white p-4 border border-indigo-900 shadow-sm">
+          <div className="bg-gradient-to-br from-brand-blue to-[#10232b] text-white p-4 border border-brand-blue shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <User className="w-4 h-4 text-emerald-400" />
-              <span className="text-[10px] font-mono tracking-wider font-extrabold text-blue-200 uppercase">
+              <span className="text-[10px] font-mono tracking-wider font-extrabold text-brand-gold/90 uppercase">
                 Guia Ràpida Per Rol de l'Equip
               </span>
             </div>
 
-            <p className="text-[11px] text-blue-100/90 leading-relaxed mb-4">
+            <p className="text-[11px] text-white/85 leading-relaxed mb-4">
               Cada perfil té un mètode de treball diferenciat segons el seu nivell d'accés tecnològic:
             </p>
 
             {/* Role selector buttons */}
-            <div className="flex border border-indigo-800 bg-black/10 text-[10px] font-bold uppercase mb-4">
+            <div className="flex border border-white/15 bg-black/10 text-[10px] font-bold uppercase mb-4">
               <button
                 onClick={() => setSelectedRoleGuide("admin")}
                 className={`flex-1 py-1.5 text-center transition-all ${
                   selectedRoleGuide === "admin"
-                    ? "bg-indigo-600 text-white"
-                    : "text-blue-200 hover:bg-indigo-900/30"
+                    ? "bg-brand-gold text-brand-blue"
+                    : "text-white/70 hover:bg-white/10"
                 }`}
               >
                 Isabel / Rocío
@@ -300,8 +300,8 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
                 onClick={() => setSelectedRoleGuide("member")}
                 className={`flex-1 py-1.5 text-center transition-all ${
                   selectedRoleGuide === "member"
-                    ? "bg-indigo-600 text-white"
-                    : "text-blue-200 hover:bg-indigo-900/30"
+                    ? "bg-brand-gold text-brand-blue"
+                    : "text-white/70 hover:bg-white/10"
                 }`}
               >
                 Marc, Erika, etc.
@@ -309,14 +309,14 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
             </div>
 
             {/* Selected guide details widget */}
-            <div className="bg-black/30 p-3 border border-indigo-800/40 space-y-2">
+            <div className="bg-black/30 p-3 border border-white/10 space-y-2">
               <h5 className="text-[11px] font-extrabold uppercase text-emerald-300 tracking-tight leading-tight">
                 {roleGuides[selectedRoleGuide as keyof typeof roleGuides].title}
               </h5>
-              <p className="text-[10.5px] text-blue-200/90 leading-normal">
+              <p className="text-[10.5px] text-white/75 leading-normal">
                 {roleGuides[selectedRoleGuide as keyof typeof roleGuides].brief}
               </p>
-              <ul className="text-[10px] space-y-2 text-white/80 list-decimal list-inside pl-0.5 pt-1.5 border-t border-indigo-905 mt-1">
+              <ul className="text-[10px] space-y-2 text-white/80 list-decimal list-inside pl-0.5 pt-1.5 border-t border-white/15 mt-1">
                 {roleGuides[selectedRoleGuide as keyof typeof roleGuides].steps.map((st, idx) => (
                   <li key={idx} className="leading-snug">
                     <span className="text-white font-medium">{st}</span>
@@ -356,8 +356,8 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
                     key={sec.id}
                     className="space-y-3.5 scroll-mt-24 border-b border-slate-100 last:border-0 pb-6 last:pb-0"
                   >
-                    <div className="flex items-center gap-2.5 pb-2 border-b border-indigo-50/50">
-                      <div className="w-8 h-8 rounded-none bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+                    <div className="flex items-center gap-2.5 pb-2 border-b border-brand-light">
+                      <div className="w-8 h-8 rounded-none bg-brand-light flex items-center justify-center text-brand-blue shrink-0">
                         <SecIcon className="w-4.5 h-4.5" />
                       </div>
                       <h3 className="text-sm font-black uppercase text-slate-900 tracking-wide">
@@ -377,7 +377,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
           {/* FAQs Accordion */}
           <div className="bg-white border border-slate-200 p-6 space-y-4 print:break-before-page">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <HelpCircle className="w-5 h-5 text-indigo-600 stroke-[2]" />
+              <HelpCircle className="w-5 h-5 text-brand-blue stroke-[2]" />
               <h3 className="font-extrabold text-sm uppercase tracking-wide text-slate-950">
                 Preguntes Freqüents (FAQ)
               </h3>
@@ -415,17 +415,17 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
           </div>
 
           {/* Contact with UP! Marketing Digital & Corporate stamp */}
-          <div className="bg-indigo-50 border border-indigo-100 p-5 rounded-none flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="bg-brand-light border border-brand-blue/10 p-5 rounded-none flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="space-y-1">
-              <h4 className="font-bold text-xs uppercase tracking-wider text-indigo-950 font-mono">Precisament més ajuda o gestió amb el portal?</h4>
-              <p className="text-[11px] text-indigo-750 max-w-xl">
+              <h4 className="font-bold text-xs uppercase tracking-wider text-brand-blue font-mono">Precisament més ajuda o gestió amb el portal?</h4>
+              <p className="text-[11px] text-brand-blue/70 max-w-xl">
                 GolfSana és de propietat intel·lectual exclusiva d'UP! Marketing Digital dissenyada per a l'ús restringit de l'equip del Club de Golf d'Aro. El sistema monitoritza canvis per seguretat.
               </p>
             </div>
             
             <a 
               href="mailto:info@up-mktdigital.com"
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0"
+              className="px-4 py-2 bg-brand-blue hover:bg-brand-blue/90 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 shrink-0"
               title="Clica per escriure un correu directament"
             >
               <span>Contacta Suport</span>

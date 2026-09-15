@@ -102,11 +102,11 @@ export default function UserSessionSelector({
           <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
         </span>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-none bg-indigo-600 text-white flex items-center justify-center font-bold text-xs select-none">
+          <div className="w-6 h-6 rounded-none bg-brand-blue text-white flex items-center justify-center font-bold text-xs select-none shrink-0">
             {currentUser.avatar}
           </div>
-          <span className="truncate max-w-[150px]">{currentUser.name}</span>
-          <span className="text-[10px] px-2 py-0.5 rounded-none font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
+          <span className="truncate max-w-[150px] hidden md:inline">{currentUser.name}</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-none font-semibold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 hidden lg:inline">
             {currentUser.role === "admin" ? "Administrador Total" : currentUser.role === "owner" ? "Owner/Director" : "Membre"}
           </span>
         </div>

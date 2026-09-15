@@ -358,18 +358,18 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
             }
             setIsOpen(!isOpen);
           }}
-          className={`relative p-1 px-2 border transition-all flex items-center gap-1.5 rounded-sm text-xs font-semibold ${
+          className={`relative p-1 px-2 border transition-all flex items-center gap-1.5 rounded-sm text-xs font-semibold shrink-0 ${
             isOpen
-              ? "bg-blue-900/85 border-blue-800 text-white"
-              : "border-blue-800 bg-blue-900/60 hover:bg-blue-800/85 text-blue-200 hover:text-white"
+              ? "bg-brand-blue border-brand-blue text-white"
+              : "border-brand-blue/70 bg-brand-blue/80 hover:bg-brand-blue text-white/80 hover:text-white"
           }`}
           title="Canvis de Preus de la Competència (Web Scraping)"
           id="comparator-notification-bubble"
         >
-          <Bell className={`w-3.5 h-3.5 ${unreadCount > 0 ? "text-amber-400 animate-bounce" : ""}`} />
-          <span>Preus</span>
+          <Bell className={`w-3.5 h-3.5 ${unreadCount > 0 ? "text-brand-gold animate-bounce" : ""}`} />
+          <span className="hidden sm:inline">Preus</span>
           {unreadCount > 0 && (
-            <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 rounded-full">
+            <span className="bg-brand-gold text-brand-blue text-[9px] font-black px-1.5 rounded-full">
               {unreadCount}
             </span>
           )}

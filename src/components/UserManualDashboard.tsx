@@ -34,9 +34,11 @@ export default function UserManualDashboard({ currentUser }: UserManualDashboard
   const [selectedSection, setSelectedSection] = useState<string>("intro");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [selectedRoleGuide, setSelectedRoleGuide] = useState<string>(
-    currentUser.role === "admin" ? "admin" : "member"
-  );
+  const [selectedRoleGuide, setSelectedRoleGuide] = useState<string>(() => {
+    if (currentUser.name === "Caddy Master") return "caddymaster";
+    if (currentUser.name === "Greenkeeper") return "greenkeeper";
+    return currentUser.role === "admin" ? "admin" : "team";
+  });
 
   // Raw data for the manual
   const manualSections = useMemo(() => [
@@ -175,7 +177,8 @@ Actualitzacions — mai cal desinstal·lar: cada millora que es publica a GolfSa
   // Role details guide mapping
   const roleGuides = useMemo(() => ({
     admin: {
-      title: "Pla de Treball per a Administradors (Isabel, Rocío, Direcció)",
+      label: "Administració",
+      title: "Pla de Treball per a Administració",
       brief: "Com a administrador/a, disposes d'un control transversal sobre l'operació del golf i els preus comercials de GolfSana d'alt nivell.",
       steps: [
         "Fer seguiment individual: Crea una Acta de Reunió després de cada trobada amb un membre de l'equip, amb els acords concrets. Cada membre rep notificació i només veu les seves pròpies actes.",
@@ -185,18 +188,57 @@ Actualitzacions — mai cal desinstal·lar: cada millora que es publica a GolfSa
         "Supervisar la seguretat: Consulta els registres d'activitat per realitzar auditories completes de sistema en temps real."
       ]
     },
-    member: {
-      title: "Guia d'Operacions per a l'Equip de Gestió (Marc, Erika, Ester, Mònica, Saba, etc.)",
+    team: {
+      label: "Equip",
+      title: "Guia d'Operacions per a l'Equip",
       brief: "El vostre focus és mantenir activa l'excel·lència operativa de la marca i el servei al client directament.",
       steps: [
-        "Revisar les vostres Actes de Reunió: Consulteu la pestanya d'Actes per veure els acords de la darrera reunió amb Rocío/Direcció, i convertiu els que calgui en tasques reals amb el botó 'Crear tasca'.",
+        "Revisar les vostres Actes de Reunió: Consulteu la pestanya d'Actes per veure els acords de la darrera reunió amb Direcció, i convertiu els que calgui en tasques reals amb el botó 'Crear tasca'.",
         "Mantenir el tauler actualitzat: Moveu les tasques diàries al Kanban de 'En curs' o 'Sota Revisió' perquè la direcció conegui l'estat d'ocupació.",
         "Marcar les hores i venciments: Intenteu obrir i tancar tasques dins de les dates certificades per acumular el bonus d'incentius setmanals.",
         "Adjuntar fitxers i comentaris: Feu servir el cercador de la dreta a la fitxa de cada tasca per registrar incidències, contractes o correus lamel·lars amb un sol clic.",
         "Consultar el monitor de preus: Abans d'establir un preu de sortida presencial a recepció, comproveu les tarifes canviants de la competència en la pestanya de Golf Monitor."
       ]
+    },
+    caddymaster: {
+      label: "Caddymaster",
+      title: "Guia d'Operacions per al Caddymaster",
+      brief: "El vostre focus és gestionar la flota de buggies i vehicles, i registrar qualsevol incidència perquè quedi resolta a temps.",
+      steps: [
+        "Registrar incidències: Feu servir el full d'incidències del portal (protocol Caddymaster) per anotar qualsevol problema d'un buggy o servei — es crea automàticament com a tasca dins del vostre espai de treball a GolfSana.",
+        "Consultar les vostres tasques: Dins del vostre espai de treball, a la pestanya Llistat o Tauler, veureu les tasques pendents.",
+        "Marcar-les com a resoltes: Un cop arreglada una incidència, moveu la tasca corresponent a 'Completada' des del Kanban o el Llistat.",
+        "Accés restringit: Per seguretat, només veieu el vostre propi espai de treball, no els de la resta de departaments."
+      ]
+    },
+    greenkeeper: {
+      label: "Greenkeeper",
+      title: "Guia d'Operacions per al Greenkeeper",
+      brief: "El vostre focus és el manteniment del camp i deixar constància de les tasques fetes i pendents.",
+      steps: [
+        "Consultar les vostres tasques: Dins del vostre espai de treball, a la pestanya Llistat o Tauler, veureu les tasques de manteniment assignades.",
+        "Actualitzar l'estat: Moveu cada tasca a 'En curs' quan hi treballeu i a 'Completada' quan acabi, perquè la resta de l'equip en tingui constància.",
+        "Afegir observacions: Feu servir els comentaris de cada tasca per anotar detalls (per exemple, zones tancades temporalment o material necessari).",
+        "Accés restringit: Per seguretat, només veieu el vostre propi espai de treball, no els de la resta de departaments."
+      ]
     }
   }), []);
+
+  // Quina guia correspon realment a qui ha iniciat sessió — Caddymaster i
+  // Greenkeeper s'identifiquen pel seu propi nom d'usuari (així es diu el
+  // seu compte i el seu espai de treball). Els administradors veuen les 4
+  // guies (els cal entendre com treballa tothom); la resta només la seva.
+  const myGuideKey = useMemo(() => {
+    if (currentUser.name === "Caddy Master") return "caddymaster";
+    if (currentUser.name === "Greenkeeper") return "greenkeeper";
+    if (currentUser.role === "admin") return "admin";
+    return "team";
+  }, [currentUser]);
+
+  const visibleGuideKeys = useMemo<(keyof typeof roleGuides)[]>(
+    () => (currentUser.role === "admin" ? ["admin", "team", "caddymaster", "greenkeeper"] : [myGuideKey as keyof typeof roleGuides]),
+    [currentUser.role, myGuideKey]
+  );
 
   // Seccions visibles segons el rol: "Rendiment, Mètriques i Incentius"
   // (adminOnly) només la veuen Isabel i Rocío — la resta de l'equip
@@ -408,40 +450,37 @@ Actualitzacions — mai cal desinstal·lar: cada millora que es publica a GolfSa
               Cada perfil té un mètode de treball diferenciat segons el seu nivell d'accés tecnològic:
             </p>
 
-            {/* Role selector buttons */}
-            <div className="flex border border-white/15 bg-black/10 text-[10px] font-bold uppercase mb-4">
-              <button
-                onClick={() => setSelectedRoleGuide("admin")}
-                className={`flex-1 py-1.5 text-center transition-all ${
-                  selectedRoleGuide === "admin"
-                    ? "bg-brand-gold text-brand-blue"
-                    : "text-white/70 hover:bg-white/10"
-                }`}
-              >
-                Isabel / Rocío
-              </button>
-              <button
-                onClick={() => setSelectedRoleGuide("member")}
-                className={`flex-1 py-1.5 text-center transition-all ${
-                  selectedRoleGuide === "member"
-                    ? "bg-brand-gold text-brand-blue"
-                    : "text-white/70 hover:bg-white/10"
-                }`}
-              >
-                Marc, Erika, etc.
-              </button>
-            </div>
+            {/* Role selector buttons — només es mostren les guies que
+                pertoquen a qui ha iniciat sessió (administració les veu
+                totes, la resta només la seva pròpia) */}
+            {visibleGuideKeys.length > 1 && (
+              <div className="flex border border-white/15 bg-black/10 text-[10px] font-bold uppercase mb-4">
+                {visibleGuideKeys.map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => setSelectedRoleGuide(k)}
+                    className={`flex-1 py-1.5 text-center transition-all ${
+                      selectedRoleGuide === k
+                        ? "bg-brand-gold text-brand-blue"
+                        : "text-white/70 hover:bg-white/10"
+                    }`}
+                  >
+                    {roleGuides[k].label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Selected guide details widget */}
             <div className="bg-black/30 p-3 border border-white/10 space-y-2">
               <h5 className="text-[11px] font-extrabold uppercase text-emerald-300 tracking-tight leading-tight">
-                {roleGuides[selectedRoleGuide as keyof typeof roleGuides].title}
+                {roleGuides[(visibleGuideKeys.includes(selectedRoleGuide as keyof typeof roleGuides) ? selectedRoleGuide : myGuideKey) as keyof typeof roleGuides].title}
               </h5>
               <p className="text-[10.5px] text-white/75 leading-normal">
-                {roleGuides[selectedRoleGuide as keyof typeof roleGuides].brief}
+                {roleGuides[(visibleGuideKeys.includes(selectedRoleGuide as keyof typeof roleGuides) ? selectedRoleGuide : myGuideKey) as keyof typeof roleGuides].brief}
               </p>
               <ul className="text-[10px] space-y-2 text-white/80 list-decimal list-inside pl-0.5 pt-1.5 border-t border-white/15 mt-1">
-                {roleGuides[selectedRoleGuide as keyof typeof roleGuides].steps.map((st, idx) => (
+                {roleGuides[(visibleGuideKeys.includes(selectedRoleGuide as keyof typeof roleGuides) ? selectedRoleGuide : myGuideKey) as keyof typeof roleGuides].steps.map((st, idx) => (
                   <li key={idx} className="leading-snug">
                     <span className="text-white font-medium">{st}</span>
                   </li>

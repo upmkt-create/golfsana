@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus, Workspace } from "../types";
-import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Kanban, LayoutGrid, Star } from "lucide-react";
+import { ChevronRight, ChevronLeft, ArrowRightLeft, Calendar, Kanban, LayoutGrid, Star, Wrench } from "lucide-react";
 import { motion } from "motion/react";
 import { getDepartmentOptions } from "../lib/departments";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
@@ -277,6 +277,11 @@ export default function TaskBoard({
                           <h4 className="text-xs font-bold text-slate-800 hover:text-blue-600 leading-snug tracking-tight flex items-center gap-1.5">
                             {task.isBaseTask && (
                               <Star className="w-3 h-3 fill-amber-400 text-amber-500 shrink-0" />
+                            )}
+                            {task.tags?.includes("Incidència Portal") && (
+                              <span title="Incidència registrada des del portal">
+                                <Wrench className="w-3 h-3 text-orange-500 shrink-0" />
+                              </span>
                             )}
                             {task.title}
                           </h4>

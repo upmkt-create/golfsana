@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Task, UserProfile, Project, TaskStatus, TaskPriority, Workspace } from "../types";
-import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle, Star, FileText } from "lucide-react";
+import { Plus, Trash, Search, Filter, MessageSquare, AlertCircle, Calendar, Check, Landmark, RefreshCw, Play, Square, ChevronDown, ChevronRight, CheckSquare, Circle, Star, FileText, Wrench } from "lucide-react";
 import { getDepartmentOptions } from "../lib/departments";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
 import RichTextEditor from "./RichTextEditor";
@@ -834,8 +834,13 @@ export default function TaskList({
                         )}
                         <button
                           onClick={() => onSelectTaskForDetails(task)}
-                          className="hover:text-blue-600 transition-colors text-left truncate max-w-[280px]"
+                          className="hover:text-blue-600 transition-colors text-left truncate max-w-[280px] flex items-center gap-1.5"
                         >
+                          {task.tags?.includes("Incidència Portal") && (
+                            <span title="Incidència registrada des del portal">
+                              <Wrench className="w-3 h-3 text-orange-500 shrink-0" />
+                            </span>
+                          )}
                           {task.title}
                         </button>
                         {task.description && (

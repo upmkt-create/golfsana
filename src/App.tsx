@@ -2403,10 +2403,10 @@ export default function App() {
       </AnimatePresence>
 
       {/* SIDEBAR NAVIGATION */}
-      <aside className={`fixed inset-y-0 left-0 z-50 md:relative md:translate-x-0 w-64 bg-[#022e5f] text-white flex flex-col justify-between shrink-0 border-r border-[#012042] select-none h-full shadow-lg md:shadow-none transition-transform duration-300 ease-in-out ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 md:relative md:translate-x-0 w-64 bg-[#1d3d4c] text-white flex flex-col justify-between shrink-0 border-r border-[#1d3d4c] select-none h-full shadow-lg md:shadow-none transition-transform duration-300 ease-in-out ${isMobileSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="p-5 flex flex-col gap-6 overflow-y-auto">
           {/* Corporate brand header */}
-          <div className="flex items-center gap-2.5 justify-between w-full border-b border-[#033b7a]/80 pb-4">
+          <div className="flex items-center gap-2.5 justify-between w-full border-b border-[#1d3d4c]/80 pb-4">
             <div className="flex items-center gap-2.5">
               {/* Custom uploaded brand image icon */}
               <div className="relative w-8 h-8 shrink-0 flex items-center justify-center bg-white rounded-full border border-slate-300 shadow-sm overflow-hidden select-none">
@@ -2428,7 +2428,7 @@ export default function App() {
             {/* Close button for mobile sidebar */}
             <button
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="p-1 text-blue-200 hover:text-white md:hidden hover:bg-[#033b7a] rounded transition-colors focus:outline-none"
+              className="p-1 text-blue-200 hover:text-white md:hidden hover:bg-[#1d3d4c] rounded transition-colors focus:outline-none"
               title="Tancar menú"
             >
               <X className="w-4 h-4" />
@@ -2470,8 +2470,8 @@ export default function App() {
               }}
               className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center gap-2 transition-all border ${
                 activeTab === "inici" && filterAssigneeId === null
-                  ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                  : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                  ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
+                  : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
               }`}
             >
               <Home className="w-3.5 h-3.5 text-blue-300" />
@@ -2488,8 +2488,8 @@ export default function App() {
               }}
               className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
                 activeTab === "manual" && filterAssigneeId === null
-                  ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                  : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                  ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
+                  : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -2509,8 +2509,8 @@ export default function App() {
               }}
               className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
                 activeTab === "novetats" && filterAssigneeId === null
-                  ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                  : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                  ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
+                  : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -2567,7 +2567,7 @@ export default function App() {
                 setFilterAssigneeId(null);
                 if(window.innerWidth < 1024) setIsMobileSidebarOpen(false);
               }} 
-              className={`flex items-center justify-between px-1 cursor-pointer hover:bg-[#033b7a]/40 py-1 transition-all ${activeTab === 'all_workspaces' ? 'bg-[#033b7a]/40' : ''}`}
+              className={`flex items-center justify-between px-1 cursor-pointer hover:bg-[#1d3d4c]/40 py-1 transition-all ${activeTab === 'all_workspaces' ? 'bg-[#1d3d4c]/40' : ''}`}
               title="Clica per desplegar / col·lapsar i veure tots els Espais de treball"
             >
               <span className="text-[10px] font-bold text-blue-200/70 uppercase tracking-wider flex items-center gap-1 font-mono select-none">
@@ -2580,7 +2580,7 @@ export default function App() {
                   e.stopPropagation();
                   setShowNewWorkspaceModal(true);
                 }}
-                className="p-1 hover:bg-[#033b7a] rounded-none text-blue-200 hover:text-white transition-all border border-[#033b7a] bg-[#022e5f] shadow-sm shrink-0"
+                className="p-1 hover:bg-[#1d3d4c] rounded-none text-blue-200 hover:text-white transition-all border border-[#1d3d4c] bg-[#1d3d4c] shadow-sm shrink-0"
                 title="Crear Nou Espai de Treball"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -2597,10 +2597,10 @@ export default function App() {
                       key={ws.id}
                       className={`group/ws w-full text-xs transition-all flex items-center justify-between border ${
                         isActive
-                          ? "bg-[#033b7a] text-white border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
+                          ? "bg-[#1d3d4c] text-white border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
                           : isLocked
                           ? "text-blue-300/50 border-transparent"
-                          : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                          : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
                       }`}
                     >
                       <button
@@ -2638,8 +2638,8 @@ export default function App() {
                         )}
                         <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-none border shrink-0 ${
                           isActive
-                            ? "bg-[#022e5f] text-blue-200 border-[#033b7a]"
-                            : "bg-[#012042] text-blue-200 border-[#022e5f]"
+                            ? "bg-[#1d3d4c] text-blue-200 border-[#1d3d4c]"
+                            : "bg-[#1d3d4c] text-blue-200 border-[#1d3d4c]"
                         }`}>
                           {isLocked ? "—" : tasks.filter(t => (t.workspaceId || projects.find(p => p.id === t.projectId)?.workspaceId) === ws.id).length}
                         </span>
@@ -2652,10 +2652,10 @@ export default function App() {
           </div>
 
           {/* Projects inside selected workspace */}
-          <div className="space-y-2 pt-3 border-t border-[#012042]">
+          <div className="space-y-2 pt-3 border-t border-[#1d3d4c]">
             <div 
               onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
-              className="flex items-center justify-between px-1 cursor-pointer hover:bg-[#033b7a]/20 py-1 transition-all"
+              className="flex items-center justify-between px-1 cursor-pointer hover:bg-[#1d3d4c]/20 py-1 transition-all"
               title="Clica per desplegar / col·lapsar els projectes de grup"
             >
               <span className="text-[10px] font-bold text-blue-200/70 uppercase tracking-wider flex items-center gap-1 font-mono select-none">
@@ -2668,7 +2668,7 @@ export default function App() {
                   e.stopPropagation();
                   setShowNewProjectModal(true);
                 }}
-                className="p-1 hover:bg-[#033b7a] rounded-none text-blue-200 hover:text-white transition-all border border-[#033b7a] bg-[#022e5f] shadow-sm shrink-0"
+                className="p-1 hover:bg-[#1d3d4c] rounded-none text-blue-200 hover:text-white transition-all border border-[#1d3d4c] bg-[#1d3d4c] shadow-sm shrink-0"
                 title="Crear projecte"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -2684,8 +2684,8 @@ export default function App() {
                   }}
                   className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center gap-2 transition-all border ${
                     activeProjectId === null
-                      ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm"
-                      : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                      ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm"
+                      : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
                   }`}
                 >
                   <Compass className="w-3.5 h-3.5 text-blue-300 shrink-0" />
@@ -2711,8 +2711,8 @@ export default function App() {
                         }}
                         className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
                           isActive
-                            ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm"
-                            : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                            ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm"
+                            : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
@@ -2730,10 +2730,10 @@ export default function App() {
           </div>
 
           {/* Anàlisis de Dades */}
-          <div className="space-y-2 pt-3 border-t border-[#012042]">
+          <div className="space-y-2 pt-3 border-t border-[#1d3d4c]">
             <div 
               onClick={() => setIsDataAnalysisExpanded(!isDataAnalysisExpanded)}
-              className="flex items-center justify-between px-1 cursor-pointer hover:bg-[#033b7a]/20 py-1 transition-all"
+              className="flex items-center justify-between px-1 cursor-pointer hover:bg-[#1d3d4c]/20 py-1 transition-all"
               title="Clica per desplegar / col·lapsar anàlisi de dades"
             >
               <span className="text-[10px] font-bold text-blue-200/70 uppercase tracking-wider flex items-center gap-1 font-mono select-none">
@@ -2755,8 +2755,8 @@ export default function App() {
                   }}
                   className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
                     activeTab === "reports" && filterAssigneeId === null
-                      ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                      : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                      ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
+                      : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
@@ -2777,8 +2777,8 @@ export default function App() {
                     }}
                     className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
                       activeTab === "incentives" && filterAssigneeId === null
-                        ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                        : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                        ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
+                        : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -2799,8 +2799,8 @@ export default function App() {
                   }}
                   className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
                     activeTab === "security" && filterAssigneeId === null
-                      ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                      : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                      ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
+                      : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
@@ -2819,8 +2819,8 @@ export default function App() {
                     }}
                     className={`w-full text-left py-2 px-3 rounded-none text-xs flex items-center justify-between transition-all border ${
                       activeTab === "monitoring" && filterAssigneeId === null
-                        ? "bg-[#033b7a] text-white font-bold border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                        : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                        ? "bg-[#1d3d4c] text-white font-bold border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
+                        : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
@@ -2834,10 +2834,10 @@ export default function App() {
           </div>
 
           {/* Membres de l'Equip & Filtre de Responsables */}
-          <div className="space-y-2 pt-3 border-t border-[#012042]">
+          <div className="space-y-2 pt-3 border-t border-[#1d3d4c]">
             <div 
               onClick={() => setIsMembersExpanded(!isMembersExpanded)}
-              className="flex items-center justify-between px-1 cursor-pointer hover:bg-[#033b7a]/20 py-1 transition-all"
+              className="flex items-center justify-between px-1 cursor-pointer hover:bg-[#1d3d4c]/20 py-1 transition-all"
               title="Clica per desplegar / col·lapsar membres de l'equip"
             >
               <span className="text-[10px] font-bold text-blue-200/70 uppercase tracking-wider flex items-center gap-1 font-mono select-none">
@@ -2873,8 +2873,8 @@ export default function App() {
                       }}
                       className={`w-full text-left p-1.5 px-2 rounded-none transition-all flex items-center justify-between border ${
                         isActiveFilter
-                          ? "bg-[#033b7a] text-white border-[#044a99] shadow-sm border-l-4 border-l-blue-400"
-                          : "text-blue-100 hover:bg-[#033b7a]/40 hover:text-white border-transparent"
+                          ? "bg-[#1d3d4c] text-white border-[#1d3d4c] shadow-sm border-l-4 border-l-[#c9a96e]"
+                          : "text-blue-100 hover:bg-[#1d3d4c]/40 hover:text-white border-transparent"
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
@@ -2888,8 +2888,8 @@ export default function App() {
                       {pendingCount > 0 && (
                         <span className={`text-[8px] font-mono font-bold px-1 py-0.5 rounded-none border ${
                           isActiveFilter
-                            ? "bg-[#022e5f] text-blue-200 border-[#033b7a]"
-                            : "bg-[#012042] text-blue-300 border-[#022e5f]"
+                            ? "bg-[#1d3d4c] text-blue-200 border-[#1d3d4c]"
+                            : "bg-[#1d3d4c] text-blue-300 border-[#1d3d4c]"
                         }`}>
                           {pendingCount}
                         </span>
@@ -2903,14 +2903,14 @@ export default function App() {
         </div>
 
         {/* Corporate bottom info & admin switcher status */}
-        <div className="mt-auto p-4 border-t border-[#012042] bg-[#012042]">
-          <div className="bg-[#022e5f] p-3 rounded-none mb-3 border border-[#033b7a]">
+        <div className="mt-auto p-4 border-t border-[#1d3d4c] bg-[#1d3d4c]">
+          <div className="bg-[#1d3d4c] p-3 rounded-none mb-3 border border-[#1d3d4c]">
             <p className="text-[10px] text-blue-200/70 mb-0.5 uppercase tracking-wider font-bold">Llicència Enterprise</p>
             <p className="text-xs text-white font-bold flex justify-between items-center">
               <span>Usuaris Indefinits</span>
               <span className="text-[9px] bg-blue-900/40 text-blue-200 px-1.5 py-0.5 rounded-none font-mono border border-blue-800">SOC 2 Cert</span>
             </p>
-            <div className="w-full bg-[#012042] h-1.5 mt-2 overflow-hidden border border-[#033b7a]">
+            <div className="w-full bg-[#1d3d4c] h-1.5 mt-2 overflow-hidden border border-[#1d3d4c]">
               <div className="bg-blue-500 h-full w-full"></div>
             </div>
 
@@ -3222,7 +3222,7 @@ export default function App() {
                   {activeTab === "inici" && (
                 <div className="space-y-6">
                   {/* Dynamic greeting & header with time of day and beautiful calendar date */}
-                  <div className="bg-gradient-to-r from-[#002f6c] to-[#044c9c] p-6 text-white shadow-md border-b-[3px] border-emerald-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div className="bg-gradient-to-r from-[#1d3d4c] to-[#1d3d4c] p-6 text-white shadow-md border-b-[3px] border-emerald-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                       <span className="text-[10px] bg-emerald-500 text-slate-900 font-mono font-extrabold px-2 py-0.5 tracking-wider uppercase">
                         SISTEMA INTEGRAT GOLFSANA

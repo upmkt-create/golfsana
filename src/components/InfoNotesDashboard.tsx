@@ -39,7 +39,7 @@ interface InfoNotesDashboardProps {
   workspaces: Workspace[]; // Departaments = espais de treball reals (Firestore), no una llista fixa
 }
 
-const NAVY = "#033b7a";
+const NAVY = "#1d3d4c";
 
 function formatDate(iso?: string) {
   if (!iso) return "";
@@ -397,7 +397,7 @@ export default function InfoNotesDashboard({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Títol del comunicat (ex: Nou horari de reserves)"
-            className="w-full border border-slate-200 px-3 py-2 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+            className="w-full border border-slate-200 px-3 py-2 text-sm font-bold focus:outline-none focus:ring-1 focus:ring-[#1d3d4c]"
           />
           <RichTextEditor
             value={content}
@@ -420,14 +420,14 @@ export default function InfoNotesDashboard({
                 value={linkNameInput}
                 onChange={(e) => setLinkNameInput(e.target.value)}
                 placeholder="Nom del document (ex: Cartell nou horari)"
-                className="flex-1 min-w-[10rem] border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+                className="flex-1 min-w-[10rem] border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1d3d4c]"
               />
               <input
                 type="text"
                 value={linkUrlInput}
                 onChange={(e) => setLinkUrlInput(e.target.value)}
                 placeholder="Enllaç (https://drive.google.com/...)"
-                className="flex-1 min-w-[14rem] border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+                className="flex-1 min-w-[14rem] border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1d3d4c]"
               />
               <button
                 onClick={addLink}
@@ -501,7 +501,7 @@ export default function InfoNotesDashboard({
                 value={userSearchQuery}
                 onChange={(e) => setUserSearchQuery(e.target.value)}
                 placeholder="Cerca un membre pel nom..."
-                className="w-full border border-slate-200 pl-7 pr-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+                className="w-full border border-slate-200 pl-7 pr-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1d3d4c]"
               />
             </div>
             {userSearchQuery.trim() && (
@@ -535,7 +535,7 @@ export default function InfoNotesDashboard({
               type="datetime-local"
               value={scheduledFor}
               onChange={(e) => setScheduledFor(e.target.value)}
-              className="border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
+              className="border border-slate-200 px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#1d3d4c]"
             />
           </div>
 

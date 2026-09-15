@@ -33,7 +33,7 @@ interface MeetingMinutesProps {
   openMinuteId?: string | null;
 }
 
-const NAVY = "#033b7a";
+const NAVY = "#1d3d4c";
 
 function todayStr() {
   const d = new Date();

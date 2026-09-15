@@ -138,7 +138,7 @@ export default function MemberDashboard({
         <ShieldAlert className="w-8 h-8 text-red-500 mx-auto mb-2" />
         <p className="font-extrabold text-slate-800">Membre no trobat</p>
         <p className="text-xs">S'ha proporcionat un identificador de membre de l'equip no vàlid.</p>
-        <button onClick={onClose} className="mt-4 px-4 py-1.5 bg-[#022e5f] text-white text-xs font-bold rounded-none uppercase">Torna</button>
+        <button onClick={onClose} className="mt-4 px-4 py-1.5 bg-[#1d3d4c] text-white text-xs font-bold rounded-none uppercase">Torna</button>
       </div>
     );
   }
@@ -270,7 +270,7 @@ export default function MemberDashboard({
   return (
     <div className="space-y-6" id="member-dashboard-panel">
       {/* Profil Header Card */}
-      <div className="bg-gradient-to-r from-[#022e5f] to-[#044c9c] p-6 text-white shadow-md border-b-[3px] border-emerald-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative">
+      <div className="bg-gradient-to-r from-[#1d3d4c] to-[#1d3d4c] p-6 text-white shadow-md border-b-[3px] border-emerald-500 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-blue-900 border-2 border-white/80 text-white font-extrabold text-xl flex items-center justify-center shrink-0 shadow-md">
             {member.avatar || member.name.slice(0, 2).toUpperCase()}
@@ -302,7 +302,7 @@ export default function MemberDashboard({
 
           <button
             onClick={onClose}
-            className="p-2 bg-[#022e5f] hover:bg-[#033b7a] text-blue-200 hover:text-white border border-[#033b7a] flex items-center gap-1.5 text-xs font-bold transition-all uppercase px-3 shadow-sm rounded-none"
+            className="p-2 bg-[#1d3d4c] hover:bg-[#1d3d4c] text-blue-200 hover:text-white border border-[#1d3d4c] flex items-center gap-1.5 text-xs font-bold transition-all uppercase px-3 shadow-sm rounded-none"
             title="Tanca vista de col·laborador"
           >
             <X className="w-4 h-4" />
@@ -620,7 +620,7 @@ export default function MemberDashboard({
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider font-mono">Tauler de Tasques</h3>
                 <button
                   onClick={() => setShowAddForm(!showAddForm)}
-                  className="bg-[#022e5f] hover:bg-[#033b7a] text-white font-bold text-xs py-1.5 px-4 rounded-none flex items-center gap-1.5 transition-all shadow-sm focus:outline-none"
+                  className="bg-[#1d3d4c] hover:bg-[#1d3d4c] text-white font-bold text-xs py-1.5 px-4 rounded-none flex items-center gap-1.5 transition-all shadow-sm focus:outline-none"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{showAddForm ? "Tancar" : "Nova Tasca"}</span>
@@ -936,7 +936,7 @@ export default function MemberDashboard({
                         <div className="flex justify-between pt-2 border-t border-slate-100 mt-2">
                           <button 
                             onClick={() => onUpdateTaskStatus(task.id, "in_progress")}
-                            className="text-[10px] font-bold text-[#022e5f] hover:underline leading-none uppercase"
+                            className="text-[10px] font-bold text-[#1d3d4c] hover:underline leading-none uppercase"
                           >
                             Rebutjar
                           </button>
@@ -1058,7 +1058,7 @@ export default function MemberDashboard({
                           Espai: {wsObj ? wsObj.name : "N/A"}
                         </p>
                       </div>
-                      <span className="text-xs font-bold font-mono bg-blue-50 text-[#022e5f] px-2 py-0.5 border border-blue-200 uppercase">
+                      <span className="text-xs font-bold font-mono bg-blue-50 text-[#1d3d4c] px-2 py-0.5 border border-blue-200 uppercase">
                         {statusLabels[project.status === "active" ? "in_progress" : "done"] || "Actiu"}
                       </span>
                     </div>
@@ -1070,7 +1070,7 @@ export default function MemberDashboard({
                     <div className="space-y-2 border-t border-slate-100 pt-3">
                       <div className="flex items-center justify-between text-xs font-semibold">
                         <span className="text-slate-500">Avenç Personal</span>
-                        <span className="font-mono text-[#022e5f] font-black">{projPct}% ({projTasksDone}/{projTasks.length} tasques)</span>
+                        <span className="font-mono text-[#1d3d4c] font-black">{projPct}% ({projTasksDone}/{projTasks.length} tasques)</span>
                       </div>
                       
                       <div className="w-full bg-slate-100 h-2 border border-slate-200/60 overflow-hidden">

@@ -383,7 +383,7 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
             style={{ top: panelPos.top, right: panelPos.right }}
           >
             {/* Header */}
-            <div className="p-4 bg-[#022e5f] text-white flex items-center justify-between">
+            <div className="p-4 bg-[#1d3d4c] text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1 px-2 text-[9.5px] uppercase font-mono font-extrabold bg-blue-500 text-white flex items-center gap-1 animate-pulse">
                   <Flame className="w-3.5 h-3.5 text-amber-300" />
@@ -426,7 +426,7 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
             <div className="p-2 px-3 border-b border-slate-100 flex items-center justify-between text-xs bg-slate-50/50">
               <button 
                 onClick={handleSimulateChange}
-                className="px-2 py-1 text-[10.5px] font-extrabold text-[#022e5f] hover:bg-blue-50 border border-[#022e5f]/20 uppercase tracking-tight flex items-center gap-1"
+                className="px-2 py-1 text-[10.5px] font-extrabold text-[#1d3d4c] hover:bg-blue-50 border border-[#1d3d4c]/20 uppercase tracking-tight flex items-center gap-1"
                 title="Llança immediatament un canvi aleatori d'un competidor per comprovar el sistema de so de la bombolla"
               >
                 <Sliders className="w-3 h-3 text-amber-500 animate-spin" />
@@ -435,7 +435,7 @@ export const PriceNotificationBubble: React.FC<PriceNotificationBubbleProps> = (
               <div className="flex items-center gap-2">
                 <button 
                   onClick={handleMarkAllRead}
-                  className="text-[10px] font-bold text-slate-650 hover:text-[#022e5f] hover:underline"
+                  className="text-[10px] font-bold text-slate-650 hover:text-[#1d3d4c] hover:underline"
                   disabled={unreadCount === 0}
                 >
                   Marcar llegits

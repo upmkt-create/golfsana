@@ -187,7 +187,7 @@ export default function ReportsDashboard({ tasks, users, projects, workspaces, d
     <div className="space-y-6 font-sans">
       
       {/* Header Panel */}
-      <div className="bg-[#03254c] text-white p-6 rounded-none border border-[#012042] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-[#03254c] text-white p-6 rounded-none border border-[#1d3d4c] shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-300" />
@@ -599,7 +599,7 @@ export default function ReportsDashboard({ tasks, users, projects, workspaces, d
           <div className="border border-slate-150 p-3 bg-white space-y-2">
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-[8.5px] bg-[#022e5f] text-blue-200 border border-[#033b7a] px-1.5 py-0.5 font-bold rounded-none uppercase font-mono tracking-widest block w-fit">
+                <span className="text-[8.5px] bg-[#1d3d4c] text-blue-200 border border-[#1d3d4c] px-1.5 py-0.5 font-bold rounded-none uppercase font-mono tracking-widest block w-fit">
                   Comercial
                 </span>
                 <h4 className="font-bold text-xs text-slate-800 mt-1">Augmentar green fees de socis un 15%</h4>
@@ -617,7 +617,7 @@ export default function ReportsDashboard({ tasks, users, projects, workspaces, d
           <div className="border border-slate-150 p-3 bg-white space-y-2">
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-[8.5px] bg-[#022e5f] text-blue-200 border border-[#033b7a] px-1.5 py-0.5 font-bold rounded-none uppercase font-mono tracking-widest block w-fit">
+                <span className="text-[8.5px] bg-[#1d3d4c] text-blue-200 border border-[#1d3d4c] px-1.5 py-0.5 font-bold rounded-none uppercase font-mono tracking-widest block w-fit">
                   Reserves
                 </span>
                 <h4 className="font-bold text-xs text-slate-800 mt-1">Sincronització de l'App Golf Manager</h4>
@@ -635,7 +635,7 @@ export default function ReportsDashboard({ tasks, users, projects, workspaces, d
           <div className="border border-slate-150 p-3 bg-white space-y-2">
             <div className="flex justify-between items-start">
               <div>
-                <span className="text-[8.5px] bg-[#022e5f] text-blue-200 border border-[#033b7a] px-1.5 py-0.5 font-bold rounded-none uppercase font-mono tracking-widest block w-fit">
+                <span className="text-[8.5px] bg-[#1d3d4c] text-blue-200 border border-[#1d3d4c] px-1.5 py-0.5 font-bold rounded-none uppercase font-mono tracking-widest block w-fit">
                   Incentius
                 </span>
                 <h4 className="font-bold text-xs text-slate-800 mt-1">Lliurar bonus variables mensuals</h4>

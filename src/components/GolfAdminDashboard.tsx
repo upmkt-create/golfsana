@@ -1723,18 +1723,18 @@ export default function GolfAdminDashboard({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs text-[#022e5f] font-extrabold uppercase">Enllaç Quadrant Directe Scraper</label>
+              <label className="text-xs text-[#1d3d4c] font-extrabold uppercase">Enllaç Quadrant Directe Scraper</label>
               <input
                 type="url"
                 placeholder="Ex. https://eu.golfmanager.com/..."
                 value={bookingUrl}
                 onChange={(e) => setBookingUrl(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-amber-400 bg-amber-50/10 text-slate-850 rounded-none focus:outline-none focus:ring-2 focus:ring-[#022e5f] font-mono"
+                className="w-full px-3 py-2 text-xs border border-amber-400 bg-amber-50/10 text-slate-850 rounded-none focus:outline-none focus:ring-2 focus:ring-[#1d3d4c] font-mono"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs text-[#022e5f] font-extrabold uppercase">Motor de Reserves (Sistema)</label>
+              <label className="text-xs text-[#1d3d4c] font-extrabold uppercase">Motor de Reserves (Sistema)</label>
               <select
                 value={bookingSystem}
                 onChange={(e) => setBookingSystem(e.target.value)}
@@ -1996,7 +1996,7 @@ export default function GolfAdminDashboard({
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center gap-0.5">
-                          <span className="font-mono text-[9px] font-extrabold uppercase py-0.5 px-2 bg-blue-100 text-[#022e5f] border border-blue-200">
+                          <span className="font-mono text-[9px] font-extrabold uppercase py-0.5 px-2 bg-blue-100 text-[#1d3d4c] border border-blue-200">
                             {course.bookingSystem || "Golf Manager"}
                           </span>
                           {course.bookingUrl ? (
@@ -2031,7 +2031,7 @@ export default function GolfAdminDashboard({
                           <option value={12}>12 minuts</option>
                         </select>
                       ) : (
-                        <span className="font-sans font-extrabold text-[#022e5f] dark:text-amber-300 bg-blue-50 dark:bg-blue-950/25 px-2.5 py-1 text-xs inline-block rounded-none border border-blue-100 dark:border-blue-900/40">
+                        <span className="font-sans font-extrabold text-[#1d3d4c] dark:text-amber-300 bg-blue-50 dark:bg-blue-950/25 px-2.5 py-1 text-xs inline-block rounded-none border border-blue-100 dark:border-blue-900/40">
                           {course.teeTimeInterval ?? 10} min
                         </span>
                       )}
@@ -2121,7 +2121,7 @@ export default function GolfAdminDashboard({
                           className="w-16 px-1 py-0.5 border border-blue-500 bg-white rounded-none font-bold text-center font-sans"
                         />
                       ) : (
-                        <span className="font-semibold text-[#022e5f] font-sans bg-slate-105 px-2 py-0.5 rounded-none text-xs border border-slate-200 dark:border-slate-700">
+                        <span className="font-semibold text-[#1d3d4c] font-sans bg-slate-105 px-2 py-0.5 rounded-none text-xs border border-slate-200 dark:border-slate-700">
                           {course.greenFeeHigh} €
                         </span>
                       )}

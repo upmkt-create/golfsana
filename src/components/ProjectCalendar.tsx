@@ -319,7 +319,7 @@ export default function ProjectCalendar({
           </div>
           <button
             onClick={() => { setNewTaskDate(currentDate); setShowAddForm(!showAddForm); }}
-            className="bg-[#022e5f] hover:bg-[#033b7a] text-white font-bold text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
+            className="bg-[#1d3d4c] hover:bg-[#1d3d4c] text-white font-bold text-xs py-1.5 px-3 flex items-center gap-1.5 shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{showAddForm ? "Tancar" : "Nova Tasca"}</span>

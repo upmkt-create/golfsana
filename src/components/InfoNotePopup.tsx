@@ -54,7 +54,7 @@ export default function InfoNotePopup({ note, authorName, onAccept }: InfoNotePo
             exit={{ opacity: 0, scale: 0.95 }}
             className="relative w-full max-w-lg bg-white shadow-2xl border border-slate-200 flex flex-col max-h-[85vh]"
           >
-            <div className="bg-[#033b7a] px-6 py-4 flex items-start gap-3">
+            <div className="bg-[#1d3d4c] px-6 py-4 flex items-start gap-3">
               <Megaphone className="w-5 h-5 text-blue-200 shrink-0 mt-0.5" />
               <div className="min-w-0">
                 <p className="text-[9px] uppercase tracking-wider font-mono text-blue-200 font-bold">
@@ -114,7 +114,7 @@ export default function InfoNotePopup({ note, authorName, onAccept }: InfoNotePo
                 disabled={!hasScrolledToEnd}
                 className={`w-full py-2.5 text-sm font-bold flex items-center justify-center gap-2 transition-all ${
                   hasScrolledToEnd
-                    ? "bg-[#033b7a] text-white hover:bg-[#044a99] cursor-pointer"
+                    ? "bg-[#1d3d4c] text-white hover:bg-[#1d3d4c] cursor-pointer"
                     : "bg-slate-200 text-slate-400 cursor-not-allowed"
                 }`}
               >

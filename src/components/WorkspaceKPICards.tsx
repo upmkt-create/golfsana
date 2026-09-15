@@ -32,7 +32,7 @@ export default function WorkspaceKPICards({
   return (
     <div className="space-y-6 mb-6">
       {/* Greetings header */}
-      <div className="bg-gradient-to-r from-[#022e5f] to-[#033b7a] p-6 text-white border border-[#022e5f] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-gradient-to-r from-[#1d3d4c] to-[#1d3d4c] p-6 text-white border border-[#1d3d4c] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h3 className="text-lg font-bold tracking-tight uppercase">
             {activeProjectObj ? (
@@ -53,7 +53,7 @@ export default function WorkspaceKPICards({
             )}
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-[#012042] px-3 py-1.5 border border-[#033b7a] shrink-0">
+        <div className="flex items-center gap-2 bg-[#1d3d4c] px-3 py-1.5 border border-[#1d3d4c] shrink-0">
           <Activity className="w-3.5 h-3.5 text-blue-300 animate-pulse" />
           <span className="text-[10px] uppercase font-mono tracking-wider">{activeProjectObj ? "Projecte Actiu" : "Espai Actiu"}</span>
         </div>

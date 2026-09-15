@@ -272,7 +272,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
           </div>
 
           {/* Quick interactive roles cheatsheet widget */}
-          <div className="bg-gradient-to-br from-[#022e5f] to-indigo-950 text-white p-4 border border-indigo-900 shadow-sm">
+          <div className="bg-gradient-to-br from-[#1d3d4c] to-indigo-950 text-white p-4 border border-indigo-900 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <User className="w-4 h-4 text-emerald-400" />
               <span className="text-[10px] font-mono tracking-wider font-extrabold text-blue-200 uppercase">

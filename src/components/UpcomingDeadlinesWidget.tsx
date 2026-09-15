@@ -79,7 +79,7 @@ export default function UpcomingDeadlinesWidget({
                 className="w-full flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 text-slate-600 font-bold flex items-center justify-center text-[10px] shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-brand-blue/10 border border-brand-blue/20 text-brand-blue font-bold flex items-center justify-center text-[10px] shrink-0">
                     {memberUser!.avatar}
                   </div>
                   <span className="text-xs font-semibold text-slate-800 truncate">{memberUser!.name}</span>

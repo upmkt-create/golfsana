@@ -17,7 +17,8 @@ import {
   TrendingUp,
   Clock,
   Briefcase,
-  Users
+  Users,
+  Smartphone
 } from "lucide-react";
 
 interface UserManualDashboardProps {
@@ -32,6 +33,7 @@ export default function UserManualDashboard({ currentUser }: UserManualDashboard
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSection, setSelectedSection] = useState<string>("intro");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [selectedRoleGuide, setSelectedRoleGuide] = useState<string>(
     currentUser.role === "admin" ? "admin" : "member"
   );
@@ -124,6 +126,28 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
 • Execució Local Sandbox: Si la xarxa no té prou potència, l'aplicació manté els canvis funcionals de manera local (local storage) de forma blindada.
 • Sincronització en Temps Real: Un cop la connexió és estable, el canal dinàmic amb Firestore (Cloud) actualitza el flux d'activitat i actualitza els canvis a les pantalles de la resta de membres de l'equip.
 • Polítiques de Registres i Audit: Cada inici de sessió, canvi de tasca o descàrrega de dades és degudament gravada i identificada de forma immutable per complir amb les directrius d'auditories enterprise.`
+    },
+    {
+      id: "mobile-install",
+      title: "8. Instal·lació com a App al Mòbil",
+      category: "general",
+      icon: Smartphone,
+      content: `GolfSana es pot instal·lar al mòbil com si fos una aplicació real, amb icona pròpia a la pantalla d'inici i sense la barra del navegador.
+
+Android (Chrome):
+1. Obre l'adreça de GolfSana amb Chrome (ha de ser Chrome).
+2. Sovint surt sol un avís a baix de la pantalla: "Afegir GolfSana a la pantalla d'inici" — toca-hi.
+3. Si no surt sol: toca els tres puntets (⋮) a dalt a la dreta → "Instal·lar aplicació" o "Afegir a la pantalla d'inici" → "Instal·lar".
+
+iPhone (Safari):
+1. Obre l'adreça de GolfSana amb Safari (ha de ser Safari, no Chrome — a iPhone només Safari permet instal·lar-ho bé).
+2. Toca la icona de Compartir (el quadrat amb la fletxa cap amunt) a la barra inferior.
+3. Desplaça't avall i toca "Afegir a la pantalla d'inici" → confirma el nom → "Afegir".
+
+Actualitzacions — mai cal desinstal·lar: cada millora que es publica a GolfSana arriba sola la propera vegada que s'obre l'app, sense haver de desinstal·lar-la ni tornar-la a instal·lar.
+• Si alguna vegada sembla que no s'ha actualitzat (una pantalla que no quadra amb el que s'ha anunciat a Novetats), el primer pas és sempre tancar l'app del tot (no només posar-la en segon pla, sinó fer-la fora de la llista d'apps recents) i tornar-la a obrir.
+• Si això no n'hi ha prou (poc habitual): a Android, es pot buidar la memòria cau sense perdre la sessió des de Configuració del mòbil → Apps → GolfSana → Emmagatzematge → "Esborrar memòria cau" (mai "Esborrar dades", això sí que tancaria la sessió).
+• Desinstal·lar i tornar a instal·lar només hauria de fer falta com a últim recurs.`
     }
   ], []);
 
@@ -191,6 +215,105 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
         section.content.toLowerCase().includes(query)
     );
   }, [searchQuery, manualSections]);
+
+  // Converteix el text pla d'una secció (línies amb •, sub-punts amb "  -",
+  // llistes numerades, i paràgrafs) en una llista ben formatada — amb les
+  // etiquetes ("Nom:") en negreta i espaiat real entre punts — en lloc d'un
+  // bloc de text pla. El text de l'explicació: Asap 14px, interlineat 1,5,
+  // justificat (demanat expressament) — només el text normal, no les
+  // etiquetes ni els mini-titulars, que es queden petits per distingir-se.
+  const BODY_TEXT_CLASS = "text-[14px] leading-[1.5] text-justify text-slate-650 font-sans";
+
+  function renderManualContent(content: string) {
+    const lines = content.split("\n");
+    type Item = { main: string; sub: string[] };
+    const blocks: React.ReactNode[] = [];
+    let current: { type: "ul" | "ol"; items: Item[] } | null = null;
+    let key = 0;
+
+    const renderLabelled = (text: string, maxLabelLen: number, labelClass: string) => {
+      const colonIdx = text.indexOf(":");
+      if (colonIdx > 0 && colonIdx < maxLabelLen) {
+        return (
+          <>
+            <span className={labelClass}>{text.slice(0, colonIdx + 1)}</span>
+            <span className={BODY_TEXT_CLASS}>{text.slice(colonIdx + 1)}</span>
+          </>
+        );
+      }
+      return <span className={BODY_TEXT_CLASS}>{text}</span>;
+    };
+
+    const flush = () => {
+      if (!current) return;
+      const items = current.items;
+      const ordered = current.type === "ol";
+      blocks.push(
+        <ul key={key++} className="space-y-3 my-2.5">
+          {items.map((item, i) => (
+            <li key={i} className="flex gap-2">
+              <span className={`shrink-0 font-bold text-[11px] mt-0.5 ${ordered ? "text-brand-blue font-mono" : "text-brand-gold"}`}>
+                {ordered ? `${i + 1}.` : "●"}
+              </span>
+              <div className={BODY_TEXT_CLASS}>
+                {renderLabelled(item.main, 60, "font-bold text-brand-blue")}
+                {item.sub.length > 0 && (
+                  <ul className="mt-2 space-y-2 pl-1">
+                    {item.sub.map((s, si) => (
+                      <li key={si} className="flex gap-1.5">
+                        <span className="text-slate-300 shrink-0">–</span>
+                        <div className={BODY_TEXT_CLASS}>{renderLabelled(s, 50, "font-semibold text-slate-700")}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      );
+      current = null;
+    };
+
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+      if (line.trim() === "") continue;
+
+      const subMatch = line.match(/^\s{2,}-\s+(.*)$/);
+      if (subMatch && current && current.items.length > 0) {
+        current.items[current.items.length - 1].sub.push(subMatch[1]);
+        continue;
+      }
+
+      const bulletMatch = line.match(/^•\s+(.*)$/);
+      if (bulletMatch) {
+        if (!current || current.type !== "ul") { flush(); current = { type: "ul", items: [] }; }
+        current.items.push({ main: bulletMatch[1], sub: [] });
+        continue;
+      }
+
+      const numMatch = line.match(/^\d+\.\s+(.*)$/);
+      if (numMatch) {
+        if (!current || current.type !== "ol") { flush(); current = { type: "ol", items: [] }; }
+        current.items.push({ main: numMatch[1], sub: [] });
+        continue;
+      }
+
+      // Paràgraf normal, o mini-titular si acaba en ":" i és curt
+      flush();
+      const isMiniHeader = line.trim().endsWith(":") && line.trim().length < 45;
+      blocks.push(
+        <p key={key++} className={isMiniHeader
+          ? "text-[11px] font-black uppercase tracking-wide text-brand-blue mt-4 mb-1.5"
+          : `${BODY_TEXT_CLASS} mb-2.5`
+        }>
+          {line.trim()}
+        </p>
+      );
+    }
+    flush();
+    return <div>{blocks}</div>;
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 font-sans text-slate-800" id="user-manual-view">
@@ -328,7 +451,16 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
 
           {/* Quick trigger to open browser print */}
           <button
-            onClick={() => window.print()}
+            onClick={() => {
+              // Despleguem totes les seccions abans d'imprimir (si no,
+              // l'acordió deixaria el PDF/imprès incomplet) i ho tornem a
+              // plegar just després.
+              setIsPrinting(true);
+              setTimeout(() => {
+                window.print();
+                setIsPrinting(false);
+              }, 50);
+            }}
             className="w-full py-2 border border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-900 bg-white font-bold text-xs uppercase flex items-center justify-center gap-2 transition-all shadow-sm"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -350,24 +482,32 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
             ) : (
               filteredSections.map((sec) => {
                 const SecIcon = sec.icon;
+                const isExpanded = isPrinting || searchQuery.trim() !== "" || selectedSection === sec.id;
                 return (
                   <div 
                     id={`section-${sec.id}`}
                     key={sec.id}
                     className="space-y-3.5 scroll-mt-24 border-b border-slate-100 last:border-0 pb-6 last:pb-0"
                   >
-                    <div className="flex items-center gap-2.5 pb-2 border-b border-brand-light">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSection(isExpanded && searchQuery.trim() === "" ? "" : sec.id)}
+                      className="w-full flex items-center gap-2.5 pb-2 border-b border-brand-light text-left"
+                    >
                       <div className="w-8 h-8 rounded-none bg-brand-light flex items-center justify-center text-brand-blue shrink-0">
                         <SecIcon className="w-4.5 h-4.5" />
                       </div>
-                      <h3 className="text-sm font-black uppercase text-slate-900 tracking-wide">
+                      <h3 className="text-sm font-black uppercase text-slate-900 tracking-wide flex-1">
                         {sec.title}
                       </h3>
-                    </div>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                    </button>
 
-                    <div className="text-xs text-slate-650 leading-relaxed whitespace-pre-wrap font-sans">
-                      {sec.content}
-                    </div>
+                    {isExpanded && (
+                      <div>
+                        {renderManualContent(sec.content)}
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -404,7 +544,7 @@ L'objectiu principal és assegurar que tot l'equip estigui sincronitzat en temps
                       )}
                     </button>
                     {isOpen && (
-                      <div className="p-4 px-5 bg-white text-xs text-slate-600 leading-relaxed border-t border-slate-100">
+                      <div className="p-4 px-5 bg-white text-[14px] leading-[1.5] text-justify text-slate-650 font-sans border-t border-slate-100">
                         {faq.answer}
                       </div>
                     )}

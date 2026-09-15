@@ -134,10 +134,10 @@ export default function TaskBoard({
               onDragOver={(e) => { e.preventDefault(); setDragOverColId(col.id); }}
               onDragLeave={() => setDragOverColId((cur) => (cur === col.id ? null : cur))}
               onDrop={() => handleDropOnColumn(col.id)}
-              className={`rounded-xl border flex flex-col transition-all shrink-0 w-[300px] ${col.bg} ${
+              className={`rounded-xl border flex flex-col transition-all flex-1 min-w-[280px] sm:min-w-[320px] lg:min-w-[360px] ${col.bg} ${
                 dragOverColId === col.id ? "border-blue-400 bg-blue-50/40 ring-2 ring-blue-200" : "border-slate-200/80"
               } ${
-                isCompactView ? "p-2.5 min-h-[400px]" : "p-4 min-h-[550px]"
+                isCompactView ? "p-2.5 min-h-[50vh]" : "p-4 min-h-[70vh]"
               }`}
             >
               {/* Column Header */}
@@ -155,7 +155,7 @@ export default function TaskBoard({
               </div>
 
               {/* Column Body / Card collection */}
-              <div className={`flex-1 overflow-y-auto max-h-[650px] pr-1 scrollbar-thin ${
+              <div className={`flex-1 overflow-y-auto max-h-[75vh] pr-1 scrollbar-thin ${
                 isCompactView ? "space-y-2" : "space-y-3.5"
               }`}>
                 {colTasks.length === 0 ? (

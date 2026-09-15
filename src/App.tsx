@@ -2963,8 +2963,7 @@ export default function App() {
         />
         {/* HEADER BAR */}
         <header className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 sm:px-6 z-10 shrink-0">
-          <div className="flex items-center gap-3 md:gap-4 truncate">
-            {/* Hamburger menu button for mobile screens (Improvement 1) */}
+          <div className="flex items-center gap-3 md:gap-4 truncate min-w-0 flex-1">
             <button
               onClick={() => setIsMobileSidebarOpen(true)}
               className="p-2 -ml-2 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 md:hidden block focus:outline-none shrink-0"
@@ -2973,7 +2972,7 @@ export default function App() {
               <Menu className="w-5 h-5" />
             </button>
 
-            <div className="space-y-0.5 truncate">
+            <div className="space-y-0.5 truncate min-w-0">
               <div className="flex items-center gap-2 text-slate-800 font-bold text-sm sm:text-base truncate">
                 {activeTab === "inici" ? (
                   <span className="text-blue-900 flex items-center gap-1.5 truncate">
@@ -3053,7 +3052,7 @@ export default function App() {
                 localStorage.setItem("golfsana_compact_view", String(newVal));
                 addToast(newVal ? "S'ha activat la Vista Compacta de densitat alta" : "S'ha restaurat la Vista Normal", "info");
               }}
-              className={`p-1.5 border font-mono text-[9px] font-bold uppercase transition-all tracking-tight shrink-0 flex items-center gap-1 leading-none ${
+              className={`p-1.5 border font-mono text-[9px] font-bold uppercase transition-all tracking-tight shrink-0 items-center gap-1 leading-none hidden sm:flex ${
                 isCompactView
                   ? "bg-indigo-600 text-white border-indigo-700 shadow-inner animate-pulse"
                   : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900"
@@ -3064,10 +3063,10 @@ export default function App() {
               <span className="hidden sm:inline">{isCompactView ? "Compacte" : "Normal"}</span>
             </button>
 
-            {/* Onboarding Guide "?" Button (Improvement 2) */}
+            {/* Onboarding Guide "?" Button (Improvement 2) — amagat en mòbil, hi ha poc espai i no és crític */}
             <button
               onClick={() => setShowHelpGuide(true)}
-              className="p-1.5 bg-slate-150 hover:bg-indigo-100 border border-slate-200 hover:border-indigo-300 rounded text-slate-500 hover:text-indigo-600 transition-all focus:outline-none shrink-0"
+              className="p-1.5 bg-slate-150 hover:bg-indigo-100 border border-slate-200 hover:border-indigo-300 rounded text-slate-500 hover:text-indigo-600 transition-all focus:outline-none shrink-0 hidden sm:block"
               title="Guia d'ajuda interactiva de la plataforma"
             >
               <HelpCircle className="w-4 h-4 text-slate-600" />

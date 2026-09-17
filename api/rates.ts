@@ -565,60 +565,82 @@ async function fetchWithRetry(
   return { resp: null, lastErr, attempts: maxAttempts };
 }
 
-async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<ScrapeResult> {
-  const targetUrl = `${ep.base}/availability.json?date=${dateStr}`;
+interface ProxyFetchResult {
+  resp: Response | null;
+  lastErr: any;
+  attempts: number;
+  proxyLabel: string;
+}
 
-  // Si hi ha una clau de ScraperAPI configurada (variable d'entorn
-  // SCRAPERAPI_KEY a Vercel), la petició es fa a través del seu servei en
-  // lloc de directament — GolfManager bloqueja amb 403 les peticions fetes
-  // directament des del nostre servidor (confirmat), i ScraperAPI evita
-  // aquest bloqueig fent la petició des dels seus propis servidors.
-  // Sense la clau configurada, es manté l'intent directe (que seguirà
-  // caient al model, tal com fins ara) perquè res es trenqui mentre
-  // s'acaba de configurar.
-  // Prioritat de proxy: ScrapingBee (si està configurat) permet fer servir
-  // proxies premium/residencials des del seu PLA GRATUÏT — a diferència de
-  // ScraperAPI, on el premium només és per a comptes de pagament. Per això
-  // es prova primer, si hi ha clau configurada. ScraperAPI es manté com a
-  // alternativa (per exemple si en algun moment es passa a un pla de
-  // pagament seu). Sense cap clau, es manté l'intent directe.
+// Tria automàticament quin proxy fer servir, segons quines variables
+// d'entorn hi ha configurades a Vercel — Bright Data (Web Unlocker) és ara
+// la PRIMERA opció (crèdits gratuïts recurrents cada mes, a diferència de
+// ScrapingBee, que ja es va esgotar i és un regal d'un sol ús). ScrapingBee
+// i ScraperAPI es mantenen com a reserva per si mai es tornen a activar.
+async function fetchViaBestProxy(
+  targetUrl: string,
+  directHeaders: Record<string, string>
+): Promise<ProxyFetchResult> {
+  const brightDataKey = process.env.BRIGHTDATA_API_KEY;
+  const brightDataZone = process.env.BRIGHTDATA_ZONE;
   const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
   const scraperApiKey = process.env.SCRAPERAPI_KEY;
   const usePremium = process.env.SCRAPERAPI_PREMIUM === "true";
 
-  let url = targetUrl;
-  let proxyLabel = "";
-  if (scrapingBeeKey) {
-    url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true&render_js=false`;
-    proxyLabel = "via ScrapingBee (premium)";
-  } else if (scraperApiKey) {
-    url = `https://api.scraperapi.com/?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}${usePremium ? "&premium=true" : ""}`;
-    proxyLabel = `via ScraperAPI${usePremium ? " premium" : " standard"}`;
-  }
-  const usingProxy = !!(scrapingBeeKey || scraperApiKey);
-
-  try {
+  if (brightDataKey && brightDataZone) {
     const { resp, lastErr, attempts } = await fetchWithRetry(
-      url,
+      "https://api.brightdata.com/request",
       {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-          "Accept": "application/json, text/plain, */*",
-          "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
-          "Accept-Encoding": "gzip, deflate, br",
-          "Referer": `${ep.base}/book?date=${dateStr}`,
-          "Origin": ep.base.replace(/\/consumer$/, ""),
-          "Sec-Fetch-Dest": "empty",
-          "Sec-Fetch-Mode": "cors",
-          "Sec-Fetch-Site": "same-origin",
-          "sec-ch-ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
-          "sec-ch-ua-mobile": "?0",
-          "sec-ch-ua-platform": '"Windows"',
-        },
-        signal: AbortSignal.timeout(usingProxy ? 20000 : 8000), // marge reduït perquè hi pot haver fins a 3 intents dins del límit de 60s de Vercel
+        method: "POST",
+        headers: { "Authorization": `Bearer ${brightDataKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ zone: brightDataZone, url: targetUrl, format: "raw" }),
+        signal: AbortSignal.timeout(20000),
       },
-      usingProxy ? 3 : 1
+      3
     );
+    return { resp, lastErr, attempts, proxyLabel: "via Bright Data (Web Unlocker)" };
+  }
+
+  if (scrapingBeeKey) {
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true&render_js=false`;
+    const { resp, lastErr, attempts } = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(20000) }, 3);
+    return { resp, lastErr, attempts, proxyLabel: "via ScrapingBee (premium)" };
+  }
+
+  if (scraperApiKey) {
+    const url = `https://api.scraperapi.com/?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}${usePremium ? "&premium=true" : ""}`;
+    const { resp, lastErr, attempts } = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(20000) }, 3);
+    return { resp, lastErr, attempts, proxyLabel: `via ScraperAPI${usePremium ? " premium" : " standard"}` };
+  }
+
+  const { resp, lastErr, attempts } = await fetchWithRetry(targetUrl, { headers: directHeaders, signal: AbortSignal.timeout(8000) }, 1);
+  return { resp, lastErr, attempts, proxyLabel: "" };
+}
+
+async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<ScrapeResult> {
+  const targetUrl = `${ep.base}/availability.json?date=${dateStr}`;
+
+  const directHeaders = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Referer": `${ep.base}/book?date=${dateStr}`,
+    "Origin": ep.base.replace(/\/consumer$/, ""),
+    "Sec-Fetch-Dest": "empty",
+    "Sec-Fetch-Mode": "cors",
+    "Sec-Fetch-Site": "same-origin",
+    "sec-ch-ua": '"Chromium";v="125", "Not.A/Brand";v="24", "Google Chrome";v="125"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+  };
+
+  let proxyLabel = "";
+  try {
+    const proxyResult = await fetchViaBestProxy(targetUrl, directHeaders);
+    const { resp, lastErr, attempts } = proxyResult;
+    proxyLabel = proxyResult.proxyLabel;
+    const usingProxy = !!proxyLabel;
 
     if (!resp) {
       const isTimeout = lastErr?.name === "TimeoutError" || lastErr?.name === "AbortError";
@@ -669,7 +691,7 @@ async function scrapeGolfManager(ep: CourseEndpoint, dateStr: string): Promise<S
     return { teeTimes, debug: "ok" };
   } catch (err: any) {
     const isTimeout = err?.name === "TimeoutError" || err?.name === "AbortError";
-    return { teeTimes: null, debug: isTimeout ? `Timeout connectant a ${targetUrl}${usingProxy ? ` (${proxyLabel})` : ""}` : `Error de xarxa: ${String(err?.message || err)}` };
+    return { teeTimes: null, debug: isTimeout ? `Timeout connectant a ${targetUrl}${proxyLabel ? ` (${proxyLabel})` : ""}` : `Error de xarxa: ${String(err?.message || err)}` };
   }
 }
 
@@ -716,26 +738,14 @@ function extractHiddenValue(html: string, id: string): string | null {
 
 async function fetchTeeOnePage(ep: CourseEndpoint): Promise<{ html: string | null; debug: string }> {
   const targetUrl = `${ep.base}/disponibilidad`;
-  // Mateixa estratègia de proxy que GolfManager: ScrapingBee premium si hi
-  // ha clau configurada, si no intent directe.
-  const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
-  const url = scrapingBeeKey
-    ? `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true&render_js=false`
-    : targetUrl;
+  const directHeaders = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
+  };
 
   try {
-    const { resp, lastErr, attempts } = await fetchWithRetry(
-      url,
-      {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
-        },
-        signal: AbortSignal.timeout(scrapingBeeKey ? 20000 : 8000),
-      },
-      scrapingBeeKey ? 3 : 1
-    );
+    const { resp, lastErr, attempts } = await fetchViaBestProxy(targetUrl, directHeaders);
     if (!resp) {
       const isTimeout = lastErr?.name === "TimeoutError" || lastErr?.name === "AbortError";
       return {

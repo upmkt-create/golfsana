@@ -2083,12 +2083,17 @@ export default function App() {
     localStorage.setItem("golfsana_users", JSON.stringify(updated));
     const target = updated.find((u) => u.id === userId);
     logEnterpriseAction(`Perfil actualitzat per a ${target?.name || userId}`);
-    addToast("Perfil del membre actualitzat", "success");
 
+    // Aquest canvi és sensible per a la seguretat (departament i accés
+    // restringit), així que si la desada a Firestore falla de veritat,
+    // cal que es vegi amb un avís d'error real — abans es mostrava sempre
+    // "Perfil actualitzat" encara que la desada fallés en silenci.
     try {
       await saveDoc(doc(db, "users", userId), updates, { merge: true });
+      addToast("Perfil del membre actualitzat", "success");
     } catch (err) {
-      console.warn("[Firestore Write Warning] user profile: saved in client sandbox", err);
+      console.warn("[Firestore Write Warning] user profile update failed", err);
+      addToast("No s'ha pogut desar el canvi a Firestore. Torna-ho a provar.", "warning");
     }
   };
 

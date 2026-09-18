@@ -333,7 +333,15 @@ export default function MemberDashboard({
                       onClick={() => {
                         const current = member.departmentIds || (member.departmentId ? [member.departmentId] : []);
                         const next = current.includes(d.id) ? current.filter((id) => id !== d.id) : [...current, d.id];
-                        onUpdateUserProfile(member.id, { departmentIds: next, departmentId: next[0] });
+                        // Firestore rebutja escriptures amb camps a "undefined"
+                        // (per exemple, si es treu l'últim departament i
+                        // next[0] queda buit) — abans això feia fallar la
+                        // desada en silenci, tot i que la pantalla mostrava
+                        // "Perfil actualitzat".
+                        onUpdateUserProfile(member.id, next.length > 0
+                          ? { departmentIds: next, departmentId: next[0] }
+                          : { departmentIds: [], departmentId: "" }
+                        );
                       }}
                       className={`px-2.5 py-1 text-[11px] font-semibold border transition-all ${
                         active ? "text-white border-transparent" : "text-slate-600 border-slate-300 hover:bg-slate-50"

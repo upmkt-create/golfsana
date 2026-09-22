@@ -1,17 +1,31 @@
 // ============================================================================
 // VERCEL API ROUTE — /api/reputation
 // ============================================================================
-// Llegeix, des de la fitxa pública de Google Maps del club, la puntuació
-// global, el nombre de ressenyes i el desglossament per estrelles (5→1).
-// NO llegeix el text de les ressenyes individuals: Google Maps és una app
-// 100% JavaScript on les ressenyes es carreguen amb scroll/clics i Google
-// bloqueja agressivament els bots que ho intenten (vist en documentació i
-// fòrums reals) — intentar-ho seria repetir l'error de prometre una dada
-// que després no arriba de fiar. La puntuació i el desglossament, en canvi,
-// carreguen amb la pàgina inicial i sí que es poden llegir amb fiabilitat.
+// Llegeix la puntuació i el nombre de ressenyes reals del club a Google Maps.
 //
-// Per a qui vulgui llegir les ressenyes senceres: `mapsUrl` porta
-// directament a la fitxa real — no cal reproduir-les dins GolfSana.
+// ABANS es feia amb scraping (ScrapingBee + render_js=true). Es va abandonar
+// perquè Google Maps és una app 100% JavaScript i detecta trànsit de bots
+// encara que es renderitzi amb un navegador real via proxy — sovint retorna
+// una pàgina "preview" buida sense dades, de manera intermitent i
+// impredictible. No és un problema de format a corregir amb un millor
+// parser: és protecció anti-bot deliberada.
+//
+// ARA es fa servir la Places API (New) oficial de Google — l'endpoint que
+// Google mateix ofereix per llegir exactament aquesta dada (puntuació i
+// nombre de ressenyes), sense necessitat de cap proxy ni de simular un
+// navegador. Necessita una clau (GOOGLE_PLACES_API_KEY) d'un projecte de
+// Google Cloud amb la "Places API (New)" activada — Google dona 200$ de
+// crèdit gratuït cada mes, i sincronitzar aquest club unes poques vegades
+// costa cèntims, així que hi cap còmodament dins del crèdit gratuït.
+//
+// LIMITACIÓ HONESTA: aquesta API oficial NO exposa el desglossament per
+// estrelles (5→1) — Google només el mostra dins la pròpia fitxa de Maps, no
+// via cap API pública. Per tenir-lo caldria l'API de Business Profile
+// (Google Business Profile / antic "Google My Business"), només accessible
+// si Isabel/Rocío són administradores verificades de la fitxa i Google
+// aprova l'accés a l'API (procés d'aprovació manual, no immediat) — es
+// deixa fora per ara; la puntuació global i el nombre de ressenyes sí que
+// queden coberts.
 //
 // ús: GET /api/reputation
 // ============================================================================
@@ -25,10 +39,10 @@ interface VercelResponse {
   json(body: unknown): void;
 }
 
-// Fitxa oficial del Club Golf d'Aro a Google Maps (confirmada per Isabel,
-// 18/08/2026). CID: 0xf00fae11f515a50
-const CLUB_MAPS_URL =
-  "https://www.google.com/maps/place/Club+Golf+d'Aro/@41.8359843,3.0158665,17z/data=!3m1!4b1!4m6!3m5!1s0x12bb03d6164f5033:0xf00fae11f515a50!8m2!3d41.8359803!4d3.0184414!16s%2Fg%2F1tgn6tgz";
+// Place ID confirmat (22/09/2026) via cerca de llocs de Google — mateixa
+// fitxa que abans es llegia per CID a Google Maps (0xf00fae11f515a50):
+// "Club Golf d'Aro - Mas Nou", Urbanització Mas Nou, s/n, 17250 Platja d'Aro.
+const CLUB_PLACE_ID = "ChIJM1BPFtYDuxIRUFpRH-H6AA8";
 const CLUB_SHORT_URL = "https://maps.app.goo.gl/bTKghBEpCyzqyHtP6";
 
 interface RatingBreakdown {
@@ -44,152 +58,25 @@ interface ReputationResult {
   mapsUrl: string;
   overallRating: number | null;
   reviewCount: number | null;
-  ratingBreakdown: RatingBreakdown | null;
+  ratingBreakdown: RatingBreakdown | null; // sempre null amb aquesta font — vegeu nota de dalt
   source: "live" | "error";
   scrapeDebug?: string;
 }
 
-async function fetchWithRetry(
-  url: string,
-  init: RequestInit,
-  maxAttempts: number = 3
-): Promise<{ resp: Response | null; lastErr: any; attempts: number }> {
-  let lastErr: any = null;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const resp = await fetch(url, init);
-      if (resp.status === 500 && attempt < maxAttempts) {
-        const clone = resp.clone();
-        const bodyText = await clone.text().catch(() => "");
-        if (/try again|scrapingbee/i.test(bodyText)) {
-          await new Promise((r) => setTimeout(r, 900 * attempt));
-          continue;
-        }
-      }
-      return { resp, lastErr: null, attempts: attempt };
-    } catch (err) {
-      lastErr = err;
-      if ((err as any)?.name === "TimeoutError" || (err as any)?.name === "AbortError") {
-        return { resp: null, lastErr, attempts: attempt };
-      }
-      if (attempt < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 900 * attempt));
-        continue;
-      }
-    }
-  }
-  return { resp: null, lastErr, attempts: maxAttempts };
-}
-
-// Extreu puntuació/nombre de ressenyes/desglossament del HTML ja renderitzat
-// (render_js=true a ScrapingBee). Google no exposa un format estable
-// documentat per a això, així que es proven diversos patrons coneguts
-// (aria-label és el més estable perquè Google el fa servir per accessibilitat
-// i canvia molt menys que les classes CSS internes).
-function parseReputationFromHtml(html: string): {
-  overallRating: number | null;
-  reviewCount: number | null;
-  ratingBreakdown: RatingBreakdown | null;
-  placeName: string | null;
-} {
-  let overallRating: number | null = null;
-  let reviewCount: number | null = null;
-  let placeName: string | null = null;
-
-  // Patró típic: aria-label="4,3 estrelles" o "4.3 stars"
-  const ratingMatch =
-    html.match(/aria-label="(\d[.,]\d)\s*(?:estrell[ae]s?|stars?|étoiles?)"/i) ||
-    html.match(/"ratingValue"\s*:\s*"?(\d[.,]?\d?)"?/i);
-  if (ratingMatch) {
-    overallRating = parseFloat(ratingMatch[1].replace(",", "."));
-  }
-
-  // Patró típic: aria-label="128 ressenyes" o "(128)" al costat de la puntuació
-  const countMatch =
-    html.match(/aria-label="(\d[\d.,]*)\s*(?:ressenyes|reviews|avis|opiniones)"/i) ||
-    html.match(/"reviewCount"\s*:\s*"?(\d[\d.,]*)"?/i);
-  if (countMatch) {
-    reviewCount = parseInt(countMatch[1].replace(/[.,]/g, ""), 10);
-  }
-
-  // Nom del lloc, per confirmar que hem llegit la fitxa correcta
-  const nameMatch = html.match(/<meta content="([^"]+)"\s+itemprop="name"/i) || html.match(/<title>([^<|]+)/i);
-  if (nameMatch) {
-    placeName = nameMatch[1].trim();
-  }
-
-  // Desglossament per estrelles: Google el mostra com 5 barres, cadascuna amb
-  // un aria-label del tipus "5 estrelles, 90 ressenyes". Es busquen les 5.
-  let ratingBreakdown: RatingBreakdown | null = null;
-  const breakdown: Partial<RatingBreakdown> = {};
-  const starRegex = /aria-label="(\d)\s*(?:estrell[ae]s?|stars?),\s*(\d[\d.,]*)\s*(?:ressenyes|reviews|avis|opiniones)"/gi;
-  let m: RegExpExecArray | null;
-  while ((m = starRegex.exec(html)) !== null) {
-    const star = parseInt(m[1], 10) as 1 | 2 | 3 | 4 | 5;
-    const count = parseInt(m[2].replace(/[.,]/g, ""), 10);
-    if (star >= 1 && star <= 5) breakdown[star] = count;
-  }
-  if (Object.keys(breakdown).length === 5) {
-    ratingBreakdown = breakdown as RatingBreakdown;
-  }
-
-  return { overallRating, reviewCount, ratingBreakdown, placeName };
-}
-
-async function scrapeReputation(rawDebug: boolean = false): Promise<ReputationResult | { rawHtml: string; httpStatus: number }> {
-  const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
-
-  if (!scrapingBeeKey) {
-    return {
-      placeName: "Club Golf d'Aro",
-      mapsUrl: CLUB_SHORT_URL,
-      overallRating: null,
-      reviewCount: null,
-      ratingBreakdown: null,
-      source: "error",
-      scrapeDebug: "Falta la variable d'entorn SCRAPINGBEE_KEY a Vercel (la mateixa que ja es fa servir pel comparador de tarifes).",
-    };
-  }
-
-  // Google Maps és 100% JavaScript: cal render_js=true (a diferència de
-  // GolfManager, que és una API JSON i no en necessita). A més, ScrapingBee
-  // exigeix el paràmetre custom_google=True per a qualsevol domini de
-  // Google (confirmat amb un error real: sense això, respon HTTP 400) —
-  // aquest mode cobra 20 crèdits per petició (molt més que un scraping
-  // normal), per això la sincronització és manual, no automàtica.
-  const url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(
-    CLUB_MAPS_URL
-  )}&premium_proxy=true&render_js=true&wait=2500&custom_google=True`;
+async function fetchPlaceDetails(apiKey: string): Promise<ReputationResult> {
+  const url = `https://places.googleapis.com/v1/places/${CLUB_PLACE_ID}`;
 
   try {
-    const { resp, lastErr, attempts } = await fetchWithRetry(
-      url,
-      {
-        headers: {
-          "Accept-Language": "ca-ES,ca;q=0.9,es-ES;q=0.8,es;q=0.7,en;q=0.6",
-        },
-        signal: AbortSignal.timeout(45000),
+    const resp = await fetch(url, {
+      headers: {
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "displayName,rating,userRatingCount,googleMapsUri",
       },
-      2 // menys reintents que rates.ts perquè render_js=true ja és lent i car
-    );
-
-    if (!resp) {
-      const isTimeout = lastErr?.name === "TimeoutError" || lastErr?.name === "AbortError";
-      return {
-        placeName: "Club Golf d'Aro",
-        mapsUrl: CLUB_SHORT_URL,
-        overallRating: null,
-        reviewCount: null,
-        ratingBreakdown: null,
-        source: "error",
-        scrapeDebug: isTimeout
-          ? `Timeout connectant a Google Maps (via ScrapingBee, ${attempts} intent${attempts > 1 ? "s" : ""})`
-          : `Error de xarxa: ${String(lastErr?.message || lastErr)}`,
-      };
-    }
+      signal: AbortSignal.timeout(15000),
+    });
 
     if (!resp.ok) {
-      const bodySnippet = (await resp.text().catch(() => "")).slice(0, 200);
+      const bodySnippet = (await resp.text().catch(() => "")).slice(0, 300);
       return {
         placeName: "Club Golf d'Aro",
         mapsUrl: CLUB_SHORT_URL,
@@ -197,40 +84,18 @@ async function scrapeReputation(rawDebug: boolean = false): Promise<ReputationRe
         reviewCount: null,
         ratingBreakdown: null,
         source: "error",
-        scrapeDebug: `HTTP ${resp.status} ${resp.statusText} via ScrapingBee${bodySnippet ? ` — cos: ${bodySnippet}` : ""}`,
+        scrapeDebug: `HTTP ${resp.status} ${resp.statusText} (Google Places API)${bodySnippet ? ` — cos: ${bodySnippet}` : ""}`,
       };
     }
 
-    const html = await resp.text();
-
-    // Mode diagnòstic: retorna el HTML cru tal qual, sense intentar
-    // interpretar-lo — es fa servir només puntualment per veure exactament
-    // què respon Google a través de ScrapingBee, per construir l'extractor
-    // sobre dades reals en lloc de suposicions (?debug=true a la URL).
-    if (rawDebug) {
-      return { rawHtml: html, httpStatus: resp.status };
-    }
-
-    const parsed = parseReputationFromHtml(html);
-
-    if (parsed.overallRating === null && parsed.reviewCount === null) {
-      return {
-        placeName: parsed.placeName || "Club Golf d'Aro",
-        mapsUrl: CLUB_SHORT_URL,
-        overallRating: null,
-        reviewCount: null,
-        ratingBreakdown: null,
-        source: "error",
-        scrapeDebug: "Format de la pàgina de Google Maps no reconegut (pot haver canviat l'estructura, o Google ha mostrat una pàgina de verificació en lloc de la fitxa).",
-      };
-    }
+    const data = await resp.json();
 
     return {
-      placeName: parsed.placeName || "Club Golf d'Aro",
-      mapsUrl: CLUB_SHORT_URL,
-      overallRating: parsed.overallRating,
-      reviewCount: parsed.reviewCount,
-      ratingBreakdown: parsed.ratingBreakdown,
+      placeName: data?.displayName?.text || "Club Golf d'Aro",
+      mapsUrl: data?.googleMapsUri || CLUB_SHORT_URL,
+      overallRating: typeof data?.rating === "number" ? data.rating : null,
+      reviewCount: typeof data?.userRatingCount === "number" ? data.userRatingCount : null,
+      ratingBreakdown: null,
       source: "live",
     };
   } catch (err: any) {
@@ -242,21 +107,40 @@ async function scrapeReputation(rawDebug: boolean = false): Promise<ReputationRe
       reviewCount: null,
       ratingBreakdown: null,
       source: "error",
-      scrapeDebug: isTimeout ? "Timeout connectant a Google Maps" : `Error de xarxa: ${String(err?.message || err)}`,
+      scrapeDebug: isTimeout ? "Timeout connectant a la Places API de Google" : `Error de xarxa: ${String(err?.message || err)}`,
     };
   }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  const isDebug = req.query.debug === "true" || req.query.debug === "1";
-  try {
-    const result = await scrapeReputation(isDebug);
 
-    if (isDebug && "rawHtml" in result) {
-      // Retorna el HTML cru (com a text JSON) perquè es pugui llegir
-      // directament — només per a diagnòstic puntual.
-      return res.status(200).json({ rawHtml: result.rawHtml.slice(0, 400000), httpStatus: result.httpStatus });
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) {
+    return res.status(200).json({
+      placeName: "Club Golf d'Aro",
+      mapsUrl: CLUB_SHORT_URL,
+      overallRating: null,
+      reviewCount: null,
+      ratingBreakdown: null,
+      source: "error",
+      scrapeDebug:
+        "Falta la variable d'entorn GOOGLE_PLACES_API_KEY a Vercel (clau d'un projecte de Google Cloud amb la 'Places API (New)' activada).",
+    } as ReputationResult);
+  }
+
+  try {
+    const result = await fetchPlaceDetails(apiKey);
+
+    // Mode diagnòstic: ?debug=true retorna la resposta crua de la Places
+    // API, per si algun dia canvia el format dels camps.
+    if (req.query.debug === "true" || req.query.debug === "1") {
+      const rawResp = await fetch(`https://places.googleapis.com/v1/places/${CLUB_PLACE_ID}`, {
+        headers: { "X-Goog-Api-Key": apiKey, "X-Goog-FieldMask": "*" },
+        signal: AbortSignal.timeout(15000),
+      });
+      const rawBody = await rawResp.text();
+      return res.status(200).json({ parsed: result, httpStatus: rawResp.status, rawBody: rawBody.slice(0, 20000) });
     }
 
     return res.status(200).json(result);
@@ -270,7 +154,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ratingBreakdown: null,
         source: "error",
         scrapeDebug: `Excepció no capturada: ${String(err?.message || err)}`,
-      });
+      } as ReputationResult);
     } catch {
       return;
     }

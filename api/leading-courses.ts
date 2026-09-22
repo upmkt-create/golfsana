@@ -84,12 +84,23 @@ const TARGETS: ClubTarget[] = [
   },
 ];
 
+interface LeadingCoursesCategoryScores {
+  maintenance: number | null;
+  facilities: number | null;
+  clubhouse: number | null;
+  valueForMoney: number | null;
+  hospitality: number | null;
+  surroundings: number | null;
+  restaurant: number | null;
+}
+
 interface ReviewSourceResult {
   rating: number | null;
   scale: 5 | 10;
   reviewCount: number | null;
   source: "live" | "error";
   scrapeDebug?: string;
+  categoryScores?: LeadingCoursesCategoryScores | null;
 }
 
 interface ClubResult {
@@ -165,6 +176,47 @@ function parseLeadingCourses(html: string): { rating: number | null; reviewCount
   return { rating: null, reviewCount: null };
 }
 
+// Confirmat manualment el 22/09/2026: a la fitxa de cada club, Leading
+// Courses mostra un bloc "Total score" amb 7 puntuacions per categoria com a
+// TEXT PLA (no dins de JSON ni de cap taula amb classes identificables):
+// "Total score • course maintenance7.3 • facilities7.7 • clubhouse7.6 •
+// Value for money7.0 • hospitality8.1 • surroundings9.1 • restaurant7.6"
+// — l'etiqueta i el número van enganxats, sense espai ni separador.
+// Per això s'elimina primer tot el markup (scripts, estils, etiquetes) i es
+// busca cada etiqueta seguida de prop per un número decimal.
+const CATEGORY_LABELS: { key: keyof LeadingCoursesCategoryScores; label: string }[] = [
+  { key: "maintenance", label: "course\\s*maintenance" },
+  { key: "facilities", label: "facilities" },
+  { key: "clubhouse", label: "clubhouse" },
+  { key: "valueForMoney", label: "value\\s*for\\s*money" },
+  { key: "hospitality", label: "hospitality" },
+  { key: "surroundings", label: "surroundings" },
+  { key: "restaurant", label: "restaurant" },
+];
+
+function parseCategoryScores(html: string): LeadingCoursesCategoryScores | null {
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ");
+
+  const result: Partial<LeadingCoursesCategoryScores> = {};
+  let foundAny = false;
+  for (const { key, label } of CATEGORY_LABELS) {
+    const re = new RegExp(label + "\\D{0,6}(\\d[.,]\\d)", "i");
+    const m = text.match(re);
+    if (m) {
+      result[key] = parseFloat(m[1].replace(",", "."));
+      foundAny = true;
+    } else {
+      result[key] = null;
+    }
+  }
+  return foundAny ? (result as LeadingCoursesCategoryScores) : null;
+}
+
 // Confirmat manualment el 21/08/2026: la pàgina porta una etiqueta
 // <meta name="description" content="Read 38 reviews for Club Golf
 // d'Aro-Mas Nou in Platja d'Aro, España, rated 3.6 from 5 by our users."/>
@@ -223,7 +275,8 @@ async function scrapeSource(
   url: string,
   scale: 5 | 10,
   parser: (html: string) => { rating: number | null; reviewCount: number | null },
-  scrapingBeeKey: string | undefined
+  scrapingBeeKey: string | undefined,
+  withCategoryScores: boolean = false
 ): Promise<ReviewSourceResult> {
   try {
     const { html, scrapeDebug } = await fetchSource(url, scrapingBeeKey);
@@ -234,14 +287,15 @@ async function scrapeSource(
     if (parsed.rating === null) {
       return { rating: null, scale, reviewCount: null, source: "error", scrapeDebug: "Format de la pàgina no reconegut." };
     }
-    return { rating: parsed.rating, scale, reviewCount: parsed.reviewCount, source: "live" };
+    const categoryScores = withCategoryScores ? parseCategoryScores(html) : undefined;
+    return { rating: parsed.rating, scale, reviewCount: parsed.reviewCount, source: "live", categoryScores };
   } catch (err: any) {
     return { rating: null, scale, reviewCount: null, source: "error", scrapeDebug: `Error: ${String(err?.message || err)}` };
   }
 }
 
 async function scrapeClub(target: ClubTarget, scrapingBeeKey: string | undefined): Promise<ClubResult> {
-  const leadingCourses = await scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, scrapingBeeKey);
+  const leadingCourses = await scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, scrapingBeeKey, true);
   const oneGolf = await scrapeSource(target.oneGolfUrl, 5, parseOneGolf, scrapingBeeKey);
 
   return {

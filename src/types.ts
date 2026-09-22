@@ -271,8 +271,10 @@ export interface ReputationSnapshot {
 // aquesta font — 1golf.eu no en publica). Confirmat manualment (22/09/2026)
 // que apareixen com a text pla a la fitxa de cada club ("Total score •
 // course maintenance7.3 • facilities7.7 • ..."), no dins de cap bloc JSON.
+// "maintenance" es va treure (22/09/2026) — mai va donar cap valor per a
+// cap dels 7 clubs, sempre null, es descarta en lloc de seguir mostrant-la
+// buida.
 export interface LeadingCoursesCategoryScores {
-  maintenance: number | null;    // "Course maintenance"
   facilities: number | null;     // "Facilities"
   clubhouse: number | null;      // "Clubhouse"
   valueForMoney: number | null;  // "Value for money"
@@ -288,6 +290,7 @@ export interface ReviewSourceResult {
   source: "live" | "error";
   scrapeDebug?: string;
   categoryScores?: LeadingCoursesCategoryScores | null; // només present a leadingCourses
+  mapsUrl?: string | null; // només present a google — enllaç directe a la fitxa de Google Maps del club
 }
 
 export interface LeadingCoursesClub {

@@ -15,24 +15,29 @@ import {
 import {
   TrendingUp,
   MapPin,
-  DollarSign,
   Plus,
   Trash2,
   Edit3,
   Check,
   RefreshCw,
-  Sparkles,
   Search,
   ExternalLink,
   Clock,
   Calendar,
-  Layers,
-  ArrowRight,
   X,
   ChevronLeft,
   ChevronRight,
-  RotateCcw
+  RotateCcw,
+  Radar,
+  Flag,
+  Info,
 } from "lucide-react";
+
+// Verd esmeralda — mateix accent que ja fa servir la capçalera de Golfradar
+// a App.tsx (border/icona), per tenir un únic color d'identitat de mòdul en
+// lloc del blau corporatiu genèric que portava tota aquesta pantalla.
+const EMERALD = "#059669";
+const NAVY = "#033b7a";
 
 interface GolfAdminDashboardProps {
   golfCourses: GolfCourse[];
@@ -668,79 +673,77 @@ export default function GolfAdminDashboard({
   return (
     <div className="space-y-6" id="golf-analysis-panel">
       
-      {/* Admin Header Disclaimer */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 p-6 text-white shadow-none border-b-2 border-blue-800 rounded-none">
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="bg-white text-blue-900 text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-none flex items-center gap-1.5 shadow-none">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Comparador de Competència</span>
-              </span>
-              <span className="text-[10px] text-white/85 font-mono bg-white/10 px-2 py-0.5 rounded-none border border-white/20">GolfSana Enterprise Suite</span>
-            </div>
-            <h2 className="text-xl font-bold tracking-tight font-sans text-white">
-              Monitor Executiu de Competència del Green Fee
-            </h2>
-            <p className="text-xs text-blue-100 max-w-2xl leading-relaxed">
-              Superviseu en temps real els preus de reserva del nostre club (<strong className="underline">Club Golf d'Aro - Mas Nou</strong>) contra els nostres grans competidors distingits a Pals, Empordà, Costa Brava, Camiral, Torremirona, entre d'altres. Afegeix, modifica i elimina clubs de golf i canvia els preus de cada franja horària.
+      {/* Capçalera del mòdul — mateix llenguatge visual net que Golfrepu:
+          icona d'identitat en cercle + títol, sense banner ple de color. */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: EMERALD }}>
+            <Radar className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider">
+              Comparador de Green Fee
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5 max-w-2xl">
+              Golf d'Aro comparat amb Pals, Empordà, Costa Brava, Camiral, Torremirona i Perelada.
             </p>
           </div>
-
-          <div className="flex gap-2 shrink-0">
-            {isAdmin && !showAddForm && (
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="bg-white hover:bg-slate-50 text-blue-900 border border-slate-200 font-bold text-xs px-4 py-2.5 rounded-none transition-all shadow-none active:scale-95 flex items-center gap-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Afegir Nou Competidor</span>
-              </button>
-            )}
-          </div>
         </div>
+
+        {isAdmin && !showAddForm && (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white transition-all shrink-0"
+            style={{ backgroundColor: NAVY }}
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Afegir competidor</span>
+          </button>
+        )}
       </div>
 
-      {/* Analytical Cards - Fully Square (rounded-none) */}
+      {/* Targetes resum — mateix estil pla (blanc + vora fina) que Golfrepu */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="insights-grid">
         {/* Card 1: Mitjana Temporada Alta */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-none p-4 shadow-none relative overflow-hidden flex flex-col justify-between min-h-[110px]">
+        <div className="bg-white border border-slate-200 p-4 flex flex-col justify-between min-h-[110px]">
           <div>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Mitjana Green Fee Alta</p>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1.5 font-sans">
+            <h3 className="text-2xl font-black text-slate-900 mt-1.5 font-mono">
               {avgHigh} €
             </h3>
           </div>
-          <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-2 font-mono">
-            <TrendingUp className="w-3 h-3 text-blue-600" />
+          <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-2">
+            <TrendingUp className="w-3 h-3 text-slate-400" />
             <span>Tarifa estàndard de referència</span>
           </p>
         </div>
 
         {/* Card 2: Mitjana Temporada Baixa */}
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-none p-4 shadow-none relative overflow-hidden flex flex-col justify-between min-h-[110px]">
+        <div className="bg-white border border-slate-200 p-4 flex flex-col justify-between min-h-[110px]">
           <div>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Mitjana Green Fee Baixa</p>
-            <h3 className="text-2xl font-black text-slate-900 dark:text-white mt-1.5 font-sans">
+            <h3 className="text-2xl font-black text-slate-900 mt-1.5 font-mono">
               {avgLow} €
             </h3>
           </div>
-          <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-2 font-mono">
-            <TrendingUp className="w-3 h-3 text-blue-600" />
+          <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-2">
+            <TrendingUp className="w-3 h-3 text-slate-400" />
             <span>Marge promocional d'hivern</span>
           </p>
         </div>
 
-        {/* Card 3: El nostre club */}
-        <div className="bg-blue-50/50 dark:bg-blue-950/10 border border-blue-200 dark:border-blue-900/40 rounded-none p-4 shadow-none flex flex-col justify-between min-h-[110px]">
+        {/* Card 3: El nostre club — destacat en groc, com a Golfrepu */}
+        <div className="bg-amber-50/60 border border-amber-200 p-4 flex flex-col justify-between min-h-[110px]">
           <div>
-            <p className="text-[10px] text-blue-800 dark:text-blue-400 font-bold uppercase tracking-wider">Golf d'Aro (Nostre)</p>
+            <p className="text-[10px] text-amber-700 font-bold uppercase tracking-wider flex items-center gap-1">
+              <Flag className="w-3 h-3" /> Golf d'Aro (nostre)
+            </p>
             {golfCourses.find(c => c.isOurClub) ? (
               <>
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1.5 truncate">
+                <h4 className="text-xs font-bold text-slate-900 mt-1.5 truncate">
                   {golfCourses.find(c => c.isOurClub)?.name}
                 </h4>
-                <p className="text-xl font-extrabold text-blue-700 dark:text-blue-400 mt-1">
+                <p className="text-xl font-extrabold text-slate-900 font-mono mt-1">
                   {golfCourses.find(c => c.isOurClub)?.greenFeeHigh} €
                 </p>
               </>
@@ -748,21 +751,18 @@ export default function GolfAdminDashboard({
               <p className="text-xs text-slate-500 mt-1.5">No detectat</p>
             )}
           </div>
-          <span className="text-[9px] font-mono text-blue-800/80 mt-1">
-            Club Promotors Catalans
-          </span>
         </div>
 
-        {/* Card 4: El més Premium de la competència */}
-        <div className="bg-rose-50/50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-900/40 rounded-none p-4 shadow-none flex flex-col justify-between min-h-[110px]">
+        {/* Card 4: El més car de la competència */}
+        <div className="bg-rose-50/50 border border-rose-200 p-4 flex flex-col justify-between min-h-[110px]">
           <div>
-            <p className="text-[10px] text-rose-800 dark:text-rose-400 font-bold uppercase tracking-wider">Líder de Preus</p>
+            <p className="text-[10px] text-rose-700 font-bold uppercase tracking-wider">Líder de preus</p>
             {premiumCourse ? (
               <>
-                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1.5 truncate">
+                <h4 className="text-xs font-bold text-slate-900 mt-1.5 truncate">
                   {premiumCourse.name}
                 </h4>
-                <p className="text-xl font-extrabold text-rose-700 dark:text-rose-400 mt-1">
+                <p className="text-xl font-extrabold text-rose-700 font-mono mt-1">
                   {premiumCourse.greenFeeHigh} €
                 </p>
               </>
@@ -770,70 +770,58 @@ export default function GolfAdminDashboard({
               <p className="text-xs text-slate-500 mt-1">Sense dades</p>
             )}
           </div>
-          <span className="text-[9px] font-mono text-rose-800/80 mt-1 truncate">
+          <span className="text-[9px] text-rose-700/70 mt-1 truncate">
             {premiumCourse?.location}
           </span>
         </div>
       </div>
 
       {/* Dynamic 24-Hour / Slot Booking comparative pricing matrix (CRITICAL USER REQUEST) */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-none p-5 shadow-none overflow-x-auto">
-        
-        {/* Avís sobre la veracitat dels preus mostrats - Sol·licitat pel client */}
-        <div className="mb-4 bg-blue-50 dark:bg-blue-950/20 p-4 border border-blue-300 dark:border-blue-911 border-l-4 border-l-blue-500 text-slate-800 dark:text-slate-200 text-xs rounded-none">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="bg-blue-500 text-white px-1.5 py-0.5 text-[8.5px] font-black uppercase font-mono tracking-wider">Sincronització Crawler de Fons</span>
-            <strong className="text-blue-700 dark:text-blue-400 font-bold">Preus Reals Sincronitzats Multidia Actiu</strong>
-          </div>
-          <p className="leading-relaxed text-[11px] text-slate-650 dark:text-slate-300">
-            El sistema té actiu el **crawler headless de fons multidia (dia actual i posteriors)**. Totes les dades dels nostres competidors (Golf de Pals, Empordà Golf Club, Golf Costa Brava, etc.) han estat obtingudes enllaçant directament els quadrants amb filtres de tarifes estrictes.
+      <div className="bg-white border border-slate-200 p-5">
+
+        {/* Avís curt: aquesta matriu és el MODEL de referència (editable per
+            l'admin), no la font de dades en directe — la secció "Camps
+            Analitzats" i "Sortides i tarifes per hora", més avall, són les
+            que mostren preus reals sincronitzats amb els quadrants. */}
+        <div className="mb-4 bg-slate-50 p-3 border-l-4 border-l-slate-300 text-slate-600 text-[11px] flex items-start gap-2">
+          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-slate-400" />
+          <p>
+            Aquesta matriu és el <strong>model de referència</strong> (preus estàndard per franja horària, editables per l'administradora). Per als preus <strong>reals sincronitzats avui</strong>, mira les seccions "Camps Analitzats" i "Sortides i tarifes per hora" més avall.
+            {isAdmin && (
+              <span className="block mt-1 text-slate-500">
+                Com a administradora: clica qualsevol preu de la graella per editar-lo, o la icona del llapis a la taula del final per als preus generals del club.
+              </span>
+            )}
           </p>
-          {isAdmin && (
-            <div className="mt-2.5 p-3 bg-blue-500/10 border border-blue-500/20 text-blue-800 dark:text-blue-300 rounded-none">
-              <p className="font-extrabold text-[11px] uppercase tracking-wider mb-1 flex items-center gap-1">
-                ⭐ ACCÉS D'ADMINISTRADORA ACTIU (info@up-mktdigital.com)
-              </p>
-              <p className="text-[10.5px] leading-relaxed">
-                Com a administradora de l'empresa, <strong>potes corregir i introduir els preus reals de qualsevol camp directament</strong>:
-              </p>
-              <ul className="list-disc pl-4 mt-1 space-y-1 text-[10.5px]">
-                <li>
-                  <strong>Per hores puntuals:</strong> Fes clic directament damunt de qualsevol casella de la graella de sota (per exemple, on posa <span className="font-semibold underline">110€</span>). S'obrirà un editor on podràs posar el preu i el nom de la tarifa verídica d'avui i prémer guardar (icona del "check").
-                </li>
-                <li>
-                  <strong>Preus generals, enllaços o dades del club:</strong> Al final de la pàgina, hi ha una taula amb el llistat de camps. Fes clic sobre la icona del llapis (editar) per ajustar els preus generals de Temporada Alta, Baixa o els preus dels serveis per a cada camp de golf competidor.
-                </li>
-              </ul>
-            </div>
-          )}
         </div>
 
-        <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="pb-4 border-b border-slate-200">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <h3 className="font-bold text-slate-900 dark:text-white text-sm uppercase tracking-wider flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-blue-600" />
-                <span>Matriu Completa de Preus del Green Fee per Hores (Tee Times)</span>
+              <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-slate-400" />
+                <span>Model de preus per franja horària</span>
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Aquesta matriu recull els preus reals sincronitzats tant del nostre club com de la competència gràcies al rastreig Puppeteer actiu. {isAdmin && <span className="text-blue-600 font-semibold">Clica sobre qualsevol preu per modificar-lo manualment.</span>}
+                {isAdmin && <span className="font-semibold">Clica sobre qualsevol preu per modificar-lo manualment.</span>}
               </p>
             </div>
 
             {/* Dropdown filter selector */}
             <div className="flex flex-col gap-1 w-full md:w-80 shrink-0">
-              <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono block">
-                Selecciona Camp / Competència:
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                Selecciona camp / competidor:
               </label>
               <select
                 value={selectedCourseId}
                 onChange={(e) => setSelectedCourseId(e.target.value)}
-                className="w-full text-xs p-1.5 border border-slate-200 dark:border-slate-705 outline-none focus:ring-1 focus:ring-blue-600 bg-white dark:bg-slate-800 text-slate-750 dark:text-slate-200"
+                className="w-full text-xs p-1.5 border border-slate-200 outline-none focus:ring-1 bg-white text-slate-700"
+                style={{ "--tw-ring-color": NAVY } as React.CSSProperties}
               >
-                <option value="all">Tots els Camps de Golf (Comparativa Completa)</option>
+                <option value="all">Tots els camps (comparativa completa)</option>
                 {sortedGolfCourses.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.isOurClub ? "⭐ [Nostre] " : ""}{c.name}
+                    {c.isOurClub ? "⛳ [Nostre] " : ""}{c.name}
                   </option>
                 ))}
               </select>
@@ -841,11 +829,11 @@ export default function GolfAdminDashboard({
           </div>
 
           {/* Calendari comparador: 30 dies des d'avui o mes natural navegable */}
-          <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
+          <div className="mt-4 border-t border-slate-100 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-              <label className="text-[10.5px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>📅 CALENDARI COMPARADOR</span>
+              <label className="text-[10.5px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span>Calendari comparador</span>
               </label>
 
               {/* Controls de vista */}
@@ -857,24 +845,25 @@ export default function GolfAdminDashboard({
                     setCalendarView("today");
                     setSelectedMatrixDate(new Date().toISOString().slice(0, 10));
                   }}
-                  className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-none border transition-all ${
+                  className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 border transition-all"
+                  style={
                     calendarView === "today"
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100"
-                  }`}
+                      ? { backgroundColor: NAVY, color: "white", borderColor: NAVY }
+                      : { backgroundColor: "#f8fafc", color: "#475569", borderColor: "#e2e8f0" }
+                  }
                 >
                   <RotateCcw className="w-3 h-3" /> Pròxims 30 dies
                 </button>
 
                 {/* Navegació per mes */}
-                <div className="flex items-center gap-1 border border-slate-200 dark:border-slate-700 rounded-none">
+                <div className="flex items-center gap-1 border border-slate-200">
                   <button
                     type="button"
                     onClick={() => {
                       setCalendarView("month");
                       setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1));
                     }}
-                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    className="p-1.5 hover:bg-slate-100 text-slate-600"
                     title="Mes anterior"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
@@ -882,11 +871,12 @@ export default function GolfAdminDashboard({
                   <button
                     type="button"
                     onClick={() => setCalendarView("month")}
-                    className={`text-[10px] font-bold px-2 py-1.5 min-w-[95px] text-center ${
+                    className="text-[10px] font-bold px-2 py-1.5 min-w-[95px] text-center"
+                    style={
                       calendarView === "month"
-                        ? "bg-blue-600 text-white"
-                        : "bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300"
-                    }`}
+                        ? { backgroundColor: NAVY, color: "white" }
+                        : { backgroundColor: "#f8fafc", color: "#475569" }
+                    }
                   >
                     {MONTH_NAMES[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
                   </button>
@@ -896,14 +886,14 @@ export default function GolfAdminDashboard({
                       setCalendarView("month");
                       setCalendarMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1));
                     }}
-                    className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    className="p-1.5 hover:bg-slate-100 text-slate-600"
                     title="Mes següent"
                   >
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <span className="text-[9px] bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded-none font-bold">
+                <span className="text-[9px] bg-slate-100 dark:bg-blue-900/40 text-slate-700 dark:text-blue-300 px-1.5 py-0.5 rounded-none font-bold">
                   {calendarView === "today" ? "30 DIES CONSECUTIUS" : `${new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate()} DIES`}
                 </span>
               </div>
@@ -921,7 +911,7 @@ export default function GolfAdminDashboard({
                     onClick={() => setSelectedMatrixDate(day.dateStr)}
                     className={`px-3 py-2 text-center text-xs font-sans tracking-tight shrink-0 transition-all border flex flex-col items-center justify-center min-w-[125px] rounded-none ${
                       isActive
-                        ? "bg-blue-600 text-white border-blue-600 font-extrabold shadow-sm"
+                        ? "bg-[#033b7a] text-white border-[#033b7a] font-extrabold shadow-sm"
                         : "bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 font-medium"
                     }`}
                     type="button"
@@ -947,7 +937,7 @@ export default function GolfAdminDashboard({
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
                 <h4 className="font-extrabold text-slate-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
+                  <TrendingUp className="w-4 h-4 text-[#033b7a]" />
                   <span>Evolució de Preus dels darrers 7 dies</span>
                 </h4>
                 <p className="text-[11px] text-slate-500">
@@ -962,7 +952,7 @@ export default function GolfAdminDashboard({
                   onClick={() => setChartMetric("avg")}
                   className={`px-3 py-1 text-[10px] font-bold uppercase transition-all rounded-none cursor-pointer ${
                     chartMetric === "avg"
-                      ? "bg-blue-600 text-white shadow-none"
+                      ? "bg-[#033b7a] text-white shadow-none"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
@@ -973,7 +963,7 @@ export default function GolfAdminDashboard({
                   onClick={() => setChartMetric("prime")}
                   className={`px-3 py-1 text-[10px] font-bold uppercase transition-all rounded-none cursor-pointer ${
                     chartMetric === "prime"
-                      ? "bg-blue-600 text-white shadow-none"
+                      ? "bg-[#033b7a] text-white shadow-none"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
@@ -984,7 +974,7 @@ export default function GolfAdminDashboard({
                   onClick={() => setChartMetric("twilight")}
                   className={`px-3 py-1 text-[10px] font-bold uppercase transition-all rounded-none cursor-pointer ${
                     chartMetric === "twilight"
-                      ? "bg-blue-600 text-white shadow-none"
+                      ? "bg-[#033b7a] text-white shadow-none"
                       : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
@@ -1128,33 +1118,25 @@ export default function GolfAdminDashboard({
             </div>
           </div>
 
-          {/* Pricing Heat Legend (User Request: Distinct contrast map & clear difference with solid vibrant colors) */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 bg-slate-50 dark:bg-slate-800/40 p-3 border border-slate-100 dark:border-slate-800 text-[10.5px]">
+          {/* Llegenda de preus — simplificada, sense prosa pseudo-tècnica */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 border border-slate-100 text-[10.5px]">
             <div className="flex items-center gap-3.5 flex-wrap">
-              <span className="font-semibold text-slate-700 dark:text-slate-300">Llegenda de Mapa de Calor de Preus (Números Blancs):</span>
-              <div className="flex items-center gap-1.5 font-sans font-normal">
-                <span className="inline-block w-3.5 h-3.5 border border-green-500 rounded-none shadow-sm" style={{ backgroundColor: "rgb(34, 197, 94)" }}></span>
-                <span className="text-green-700 dark:text-green-400">Econòmic (Verd Clar)</span>
+              <span className="font-semibold text-slate-600">Llegenda de preus:</span>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3" style={{ backgroundColor: "rgb(34, 197, 94)" }}></span>
+                <span className="text-slate-600">Econòmic</span>
               </div>
-              <div className="flex items-center gap-1.5 font-sans font-normal">
-                <span className="inline-block w-3.5 h-3.5 border border-green-700 rounded-none shadow-sm" style={{ backgroundColor: "rgb(21, 128, 61)" }}></span>
-                <span className="text-green-800 dark:text-green-500 font-bold">Moderat (Verd Fosc)</span>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3" style={{ backgroundColor: "rgb(245, 158, 11)" }}></span>
+                <span className="text-slate-600">Estàndard</span>
               </div>
-              <div className="flex items-center gap-1.5 font-sans font-normal">
-                <span className="inline-block w-3.5 h-3.5 border border-amber-600 rounded-none shadow-sm" style={{ backgroundColor: "rgb(245, 158, 11)" }}></span>
-                <span className="text-amber-700 dark:text-amber-400">Estàndard</span>
-              </div>
-              <div className="flex items-center gap-1.5 font-sans font-normal">
-                <span className="inline-block w-3.5 h-3.5 border border-orange-600 rounded-none shadow-sm" style={{ backgroundColor: "rgb(249, 115, 22)" }}></span>
-                <span className="text-orange-700 dark:text-orange-400">Premium</span>
-              </div>
-              <div className="flex items-center gap-1.5 font-sans font-normal">
-                <span className="inline-block w-3.5 h-3.5 border border-red-600 rounded-none shadow-sm" style={{ backgroundColor: "rgb(239, 68, 68)" }}></span>
-                <span className="text-rose-600 dark:text-rose-450">Peak / Crític</span>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-3" style={{ backgroundColor: "rgb(239, 68, 68)" }}></span>
+                <span className="text-slate-600">Premium / Peak</span>
               </div>
             </div>
-            <div className="text-slate-500 font-mono text-[9px] font-medium">
-              Esquema de Contrast d'Amplia Lluminositat: ({minPrice}€ - {maxPrice}€)
+            <div className="text-slate-400 font-mono text-[9px]">
+              Rang: {minPrice}€ – {maxPrice}€
             </div>
           </div>
         </div>
@@ -1168,7 +1150,7 @@ export default function GolfAdminDashboard({
           <button
             onClick={syncRatesNow}
             disabled={isLoadingAllRates}
-            className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 px-3 py-1.5 transition-colors"
+            className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-[#033b7a] hover:bg-[#022e5f] disabled:opacity-60 px-3 py-1.5 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAllRates ? "animate-spin" : ""}`} />
             {isLoadingAllRates ? "Sincronitzant..." : "Sincronitzar ara"}
@@ -1178,32 +1160,42 @@ export default function GolfAdminDashboard({
         <div className="mt-2 min-w-[900px] overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-100 dark:bg-slate-800 border-b border-slate-2050 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-                <th className="py-2.5 px-3 w-[260px] border-r border-slate-200 dark:border-slate-800">Camps Analitzats</th>
+              <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-medium text-slate-500 uppercase tracking-wider">
+                <th className="py-2.5 px-3 w-[260px] border-r border-slate-200">Camps analitzats</th>
                 <th className="py-2.5 px-3 text-left">
                   Trams de tarifa reals del dia (cada targeta = un canvi de preu real, no una hora fixa)
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredCourses.map(course => (
-                <tr key={course.id} className={`hover:bg-slate-50 dark:hover:bg-slate-800/25 ${course.isOurClub ? "bg-blue-50/20" : ""}`}>
-                  <td className="py-3 px-3 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-center">
+            <tbody className="divide-y divide-slate-100">
+              {filteredCourses.map(course => {
+                // Etiqueta "En directe"/"Referència" lligada a la SINCRONITZACIÓ
+                // REAL d'aquest camp per a aquesta data (allCoursesRates),
+                // no a camps estàtics del club — abans deia "Real Directe" de
+                // forma fixa i mai reflectia si la sincronització d'avui
+                // havia anat bé o havia caigut al model.
+                const courseSyncData = allCoursesRates?.courses.find((cd) => cd.course === course.name);
+                const isLiveForThisCourse = courseSyncData?.source === "live";
+                return (
+                <tr key={course.id} className={`hover:bg-slate-50 ${course.isOurClub ? "bg-amber-50/40" : ""}`}>
+                  <td className="py-3 px-3 border-r border-slate-200 flex flex-col justify-center">
                     <span className="flex items-center gap-1.5 justify-between">
-                      <span className="truncate max-w-[170px] text-xs font-bold text-slate-900 dark:text-white">{course.name}</span>
+                      <span className="truncate max-w-[170px] text-xs font-bold text-slate-900">{course.name}</span>
                       {course.isOurClub ? (
-                        <span className="bg-blue-600 text-white font-sans text-[8px] px-1 py-0.5 font-bold tracking-wider uppercase rounded-none shrink-0" title="La nostra marca">Nostre</span>
-                      ) : (course.syncStatus === "success" || course.updatedBy?.includes("Sincronitzat") || course.updatedBy?.includes("Scraper")) ? (
-                        <span className="bg-emerald-600 text-white font-sans text-[8px] px-1 py-0.5 font-bold tracking-wider uppercase rounded-none shrink-0 animate-pulse" title="Dades reals sincronitzades amb filtres estrictes">Real Directe</span>
+                        <span className="bg-amber-500 text-white text-[8px] px-1 py-0.5 font-bold tracking-wider uppercase shrink-0" title="La nostra marca">Nostre</span>
+                      ) : isLiveForThisCourse ? (
+                        <span className="bg-emerald-600 text-white text-[8px] px-1 py-0.5 font-bold tracking-wider uppercase shrink-0" title="Preu llegit en directe del quadrant del club, avui">En directe</span>
+                      ) : courseSyncData ? (
+                        <span className="bg-slate-200 text-slate-600 text-[8px] px-1 py-0.5 font-bold tracking-wider uppercase shrink-0" title={courseSyncData.scrapeDebug || "No s'ha pogut llegir en directe; es mostra el model de referència"}>Referència</span>
                       ) : (
-                        <span className="bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-955/30 dark:text-amber-400 dark:border-amber-900 text-[8px] px-1 py-0.5 font-extrabold tracking-tight uppercase rounded-none shrink-0" title="Dada de simulació de l'aplicació">Simulació</span>
+                        <span className="bg-slate-100 text-slate-400 text-[8px] px-1 py-0.5 font-bold tracking-wider uppercase shrink-0">Sense sincronitzar</span>
                       )}
                     </span>
                     
                     {/* Tee Time Interval indicator (User request: 9 min vs 10 min) */}
                     <span className="text-[10px] text-slate-500 dark:text-slate-400 font-sans font-semibold flex items-center gap-1 mt-0.5">
                       <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>Sortides cada <strong className="text-blue-700 dark:text-blue-400 font-medium">{course.teeTimeInterval ?? 10} min</strong></span>
+                      <span>Sortides cada <strong className="text-[#033b7a] dark:text-blue-400 font-medium">{course.teeTimeInterval ?? 10} min</strong></span>
                     </span>
 
                     {course.url ? (
@@ -1212,7 +1204,7 @@ export default function GolfAdminDashboard({
                         target="_blank" 
                         rel="noreferrer" 
                         referrerPolicy="no-referrer"
-                        className="text-[9.5px] text-blue-600 hover:underline flex items-center gap-0.5 mt-1 font-sans font-semibold"
+                        className="text-[9.5px] text-[#033b7a] hover:underline flex items-center gap-0.5 mt-1 font-sans font-semibold"
                       >
                         <span>Visitar Web Oficial</span>
                         <ExternalLink className="w-2.5 h-2.5" />
@@ -1277,24 +1269,25 @@ export default function GolfAdminDashboard({
                     })()}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* SECCIÓ DETALLADA: INSPECTOR CLÍNIC DE SORTIDES (TEE TIMES) SLOTS */}
-      <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-6 space-y-6 mt-8" id="inspector-clinic-sortides">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+      {/* Sortides i tarifes per hora — vista detallada d'un sol camp */}
+      <div className="bg-slate-50 border border-slate-200 p-6 space-y-6 mt-8" id="inspector-clinic-sortides">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-200 pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
-              <h3 className="font-extrabold text-slate-900 dark:text-white uppercase tracking-wider text-base">
-                🔎 Inspector Clínic de Sortides i Tarifes Detallades
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <h3 className="font-extrabold text-slate-900 uppercase tracking-wider text-base">
+                Sortides i tarifes per hora
               </h3>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Visualització interactiva sortida per sortida (Tee Time) interval·lat en funció de les regles de negoci i de la programació del club.
+              Totes les sortides (tee times) d'un camp, hora per hora, amb el preu real de cada franja.
             </p>
           </div>
           
@@ -1303,7 +1296,7 @@ export default function GolfAdminDashboard({
             <select
               value={selectedDetailCourseId || golfCourses.find(c => c.isOurClub)?.id || ""}
               onChange={(e) => setSelectedDetailCourseId(e.target.value)}
-              className="text-xs bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 px-3 py-1.5 focus:outline-none focus:border-blue-600 font-bold"
+              className="text-xs bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 px-3 py-1.5 focus:outline-none focus:border-[#033b7a] font-bold"
             >
               {golfCourses.map(c => (
                 <option key={c.id} value={c.id}>
@@ -1320,7 +1313,7 @@ export default function GolfAdminDashboard({
               placeholder="Cerca hora (Ex: 08:39, 12...)"
               value={detailFilterSearch}
               onChange={(e) => setDetailFilterSearch(e.target.value)}
-              className="text-xs bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 px-3 py-1.5 focus:outline-none focus:border-blue-600 font-medium placeholder-slate-400 w-44"
+              className="text-xs bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 px-3 py-1.5 focus:outline-none focus:border-[#033b7a] font-medium placeholder-slate-400 w-44"
             />
           </div>
         </div>
@@ -1450,7 +1443,7 @@ export default function GolfAdminDashboard({
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-2 py-0.5 font-bold uppercase">
+                    <span className="text-xs bg-slate-100 dark:bg-blue-900/40 text-slate-700 dark:text-blue-300 px-2 py-0.5 font-bold uppercase">
                       {activeCourse.bookingSystem || "Golf Manager"}
                     </span>
                     {activeCourse.isOurClub && (
@@ -1472,7 +1465,7 @@ export default function GolfAdminDashboard({
                         }
                         return activeCourse.teeTimeInterval || 10;
                       })()} minuts
-                    </span> • Total sortides visualitzades: <span className="font-extrabold text-blue-600">{slots.length} sortides</span>
+                    </span> • Total sortides visualitzades: <span className="font-extrabold text-[#033b7a]">{slots.length} sortides</span>
                     {!activeCourse.isOurClub && (
                       isLoadingLiveRates ? (
                         <span className="ml-2 text-amber-600 font-bold">• Carregant dades en directe...</span>
@@ -1503,53 +1496,53 @@ export default function GolfAdminDashboard({
 
               {/* Strict Catalan Pricing Rules Panel for our club */}
               {activeCourse.isOurClub && (
-                <div className="bg-blue-50/50 dark:bg-blue-950/20 border-l-4 border-blue-600 p-4 space-y-2">
-                  <h5 className="text-xs font-black text-blue-900 dark:text-blue-300 uppercase tracking-widest flex items-center gap-1.5">
+                <div className="bg-slate-50/50 dark:bg-blue-950/20 border-l-4 border-[#033b7a] p-4 space-y-2">
+                  <h5 className="text-xs font-black text-slate-900 dark:text-blue-300 uppercase tracking-widest flex items-center gap-1.5">
                     💡 Regles Estrictes de Tarifes Públiques (Canal Oficial)
                   </h5>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs text-blue-850 dark:text-blue-250 leading-relaxed font-sans">
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-300 block">🔴 07:27 a 07:54 (Matinal Earlybird)</strong>
+                      <strong className="text-slate-900 dark:text-blue-300 block">🔴 07:27 a 07:54 (Matinal Earlybird)</strong>
                       <span>Opcions de tarifa: <span className="font-semibold">GF 18 Forats (115€)</span> i promoció <span className="font-semibold text-emerald-700 dark:text-emerald-400">GF 18 - 4 players -20% (92€)</span>.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-300 block">🔴 08:12 i 08:21 (Matinal Premium)</strong>
+                      <strong className="text-slate-900 dark:text-blue-300 block">🔴 08:12 i 08:21 (Matinal Premium)</strong>
                       <span>Opcions de tarifa: <span className="font-semibold">GF 18 Forats (115€)</span> i promoció <span className="font-semibold text-emerald-700 dark:text-emerald-400">GF 18 - 4 players -20% (92€)</span>.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-300 block">🟢 Des de 08:39 a 09:45</strong>
+                      <strong className="text-slate-900 dark:text-blue-300 block">🟢 Des de 08:39 a 09:45</strong>
                       <span>Tarifa única estricta: <span className="font-semibold">GF 18 Forats (115€)</span>. No s'aplica cap promoció.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-300 block">🔴 09:51, 10:00 i 10:09</strong>
+                      <strong className="text-slate-900 dark:text-blue-300 block">🔴 09:51, 10:00 i 10:09</strong>
                       <span>Opcions coincidents: <span className="font-semibold">GF 18 Forats (115€)</span> i <span className="font-semibold text-emerald-700 dark:text-emerald-400 font-mono">GF 18 - 4 players (92€)</span>.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-300 block">🟢 Des de 10:18 a 11:12</strong>
+                      <strong className="text-slate-900 dark:text-blue-300 block">🟢 Des de 10:18 a 11:12</strong>
                       <span>Tarifa única estricta de <span className="font-semibold">115€ (GF 18 Forats)</span>.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-350 block">🔴 11:21 a 11:57</strong>
+                      <strong className="text-slate-900 dark:text-blue-350 block">🔴 11:21 a 11:57</strong>
                       <span>Doble opció disponible: <span className="font-semibold">GF 18 Forats a 115€</span> i <span className="font-semibold text-emerald-700 dark:text-emerald-450">GF 18 - 4 players a 92€</span>.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-350 block">🟠 Migdia 12:06 a 13:00 (-4% Promo)</strong>
+                      <strong className="text-slate-900 dark:text-blue-350 block">🟠 Migdia 12:06 a 13:00 (-4% Promo)</strong>
                       <span>Doble opció: <span className="font-semibold">GF 18 Forats a 110€</span> i <span className="font-semibold text-emerald-750 font-mono">GF 18 - 4 players a 92€</span>.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-355 block">🟠 Migdia 13:09 a 13:54 (-10% Promo)</strong>
+                      <strong className="text-slate-900 dark:text-blue-355 block">🟠 Migdia 13:09 a 13:54 (-10% Promo)</strong>
                       <span>Doble opció: <span className="font-semibold">GF 18 Forats a 104€</span> i <span className="font-semibold text-emerald-750 font-mono">GF 18 - 4 players a 92€</span>.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-355 block">🟠 Tarda 14:03 a 14:57 (-15% Promo)</strong>
+                      <strong className="text-slate-900 dark:text-blue-355 block">🟠 Tarda 14:03 a 14:57 (-15% Promo)</strong>
                       <span>Doble opció: <span className="font-semibold">GF 18 Forats a 98€</span> i <span className="font-semibold text-emerald-750 font-mono font-bold">GF 18 - 4 players a 92€</span>.</span>
                     </div>
                     <div>
-                      <strong className="text-blue-900 dark:text-blue-355 block">🟢 Tarda 15:06 a 15:51 (-20% Promo única)</strong>
-                      <span>Tarifa única promocional: <span className="font-extrabold text-blue-700 dark:text-blue-300">GF 18 Forats a 92€</span> (20% descompte).</span>
+                      <strong className="text-slate-900 dark:text-blue-355 block">🟢 Tarda 15:06 a 15:51 (-20% Promo única)</strong>
+                      <span>Tarifa única promocional: <span className="font-extrabold text-[#033b7a] dark:text-blue-300">GF 18 Forats a 92€</span> (20% descompte).</span>
                     </div>
                     <div className="col-span-1 md:col-span-2">
-                      <strong className="text-blue-900 dark:text-blue-355 block">🌕 Capvespre 16:00 a 20:48 (Tarifa Crepuscular Especial)</strong>
+                      <strong className="text-slate-900 dark:text-blue-355 block">🌕 Capvespre 16:00 a 20:48 (Tarifa Crepuscular Especial)</strong>
                       <span>Doble opció de capvespre: <span className="font-semibold text-indigo-700">All You Play (75€ - 35% desc)</span> i <span className="font-semibold text-sky-700">GF 18 Forats (86€ - 25% desc)</span>. <span className="font-bold underline">EXCEPCIÓ:</span> A les <span className="font-mono">17:39, 17:48</span> i després de les <span className="font-mono">18:06</span>, <span className="font-bold text-rose-700 dark:text-rose-450 uppercase text-[10px]">només s'ofereix GF All You Can Play a 75€</span>.</span>
                     </div>
                   </div>
@@ -1646,7 +1639,7 @@ export default function GolfAdminDashboard({
                                       el.scrollIntoView({ behavior: "smooth" });
                                     }
                                   }}
-                                  className="text-[10px] bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-blue-600 dark:hover:bg-blue-600 dark:hover:text-white px-2 py-1 font-bold uppercase transition-colors"
+                                  className="text-[10px] bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-[#033b7a] dark:hover:bg-[#033b7a] dark:hover:text-white px-2 py-1 font-bold uppercase transition-colors"
                                 >
                                   Editar bloc d'hores
                                 </button>
@@ -1670,7 +1663,7 @@ export default function GolfAdminDashboard({
       {showAddForm && (
         <form
           onSubmit={handleAddSubmit}
-          className="bg-white dark:bg-slate-900 border-2 border-blue-600 rounded-none p-6 shadow-none space-y-4"
+          className="bg-white dark:bg-slate-900 border-2 border-[#033b7a] rounded-none p-6 shadow-none space-y-4"
           id="add-golf-venue-form"
         >
           <div className="flex justify-between items-center pb-2 border-b border-slate-200 dark:border-slate-800">
@@ -1695,7 +1688,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. Pals Golf Club"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
               />
             </div>
 
@@ -1707,7 +1700,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. Gualta, Girona"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
               />
             </div>
 
@@ -1718,7 +1711,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. https://www.golfdepals.com/"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a]"
               />
             </div>
 
@@ -1738,7 +1731,7 @@ export default function GolfAdminDashboard({
               <select
                 value={bookingSystem}
                 onChange={(e) => setBookingSystem(e.target.value)}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-850 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-bold"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-850 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-bold"
               >
                 <option value="Golf Manager">Golf Manager API</option>
                 <option value="Tee One">Tee One (TeeOne Web)</option>
@@ -1770,7 +1763,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. 110"
                 value={greenFeeHigh}
                 onChange={(e) => setGreenFeeHigh(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-mono font-bold"
               />
             </div>
 
@@ -1783,7 +1776,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. 80"
                 value={greenFeeLow}
                 onChange={(e) => setGreenFeeLow(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-mono font-bold"
               />
             </div>
 
@@ -1795,7 +1788,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. 42"
                 value={buggyRental}
                 onChange={(e) => setBuggyRental(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono text-center"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-mono text-center"
               />
             </div>
 
@@ -1807,7 +1800,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. 45"
                 value={clubRental}
                 onChange={(e) => setClubRental(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono text-center"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-mono text-center"
               />
             </div>
 
@@ -1816,7 +1809,7 @@ export default function GolfAdminDashboard({
               <select
                 value={teeTimeInterval}
                 onChange={(e) => setTeeTimeInterval(Number(e.target.value) || 10)}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-bold font-sans"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-bold font-sans"
               >
                 <option value={9}>9 min (ex. mas nou)</option>
                 <option value={10}>10 min (ex. Pals/Empordà)</option>
@@ -1835,7 +1828,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. 61"
                 value={reservationsToday}
                 onChange={(e) => setReservationsToday(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-mono font-bold"
               />
             </div>
             <div className="space-y-1.5">
@@ -1848,7 +1841,7 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. 30.5"
                 value={occupancyToday}
                 onChange={(e) => setOccupancyToday(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-mono font-bold"
               />
             </div>
             <div className="space-y-1.5">
@@ -1859,14 +1852,14 @@ export default function GolfAdminDashboard({
                 placeholder="Ex. 139"
                 value={availableSlotsToday}
                 onChange={(e) => setAvailableSlotsToday(e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono text-center font-bold"
+                className="w-full px-3 py-2 text-xs border border-slate-200 dark:border-slate-700 bg-white text-slate-800 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] font-mono text-center font-bold"
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-none shadow-none transition-all flex items-center justify-center gap-1 text-xs uppercase tracking-wider"
+            className="w-full bg-[#033b7a] hover:bg-[#022e5f] text-white font-bold py-2.5 rounded-none shadow-none transition-all flex items-center justify-center gap-1 text-xs uppercase tracking-wider"
           >
             <Check className="w-4 h-4" />
             <span>Guardar i Registrar Nou Club</span>
@@ -1878,11 +1871,11 @@ export default function GolfAdminDashboard({
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-none p-5 shadow-none overflow-x-auto">
         <div className="flex flex-col md:flex-row items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800 gap-4">
           <div>
-            <h3 className="font-bold text-slate-900 dark:text-white text-sm uppercase tracking-wider">
-              Control General de Tarifes d'Abonaments Ampliat
+            <h3 className="font-bold text-slate-900 text-sm uppercase tracking-wider">
+              Gestió de camps i tarifes generals
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Taula directiva principal que recull tots els costos i preus agregats.
+              Dades base de cada club (preus, enllaços, interval de sortides) — edita amb la icona del llapis.
             </p>
           </div>
           
@@ -1893,7 +1886,7 @@ export default function GolfAdminDashboard({
               placeholder="Cerca per club o ubicació..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-none focus:outline-none focus:ring-1 focus:ring-blue-600 bg-white text-slate-800"
+              className="w-full pl-9 pr-4 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-none focus:outline-none focus:ring-1 focus:ring-[#033b7a] bg-white text-slate-800"
             />
           </div>
         </div>
@@ -1905,7 +1898,6 @@ export default function GolfAdminDashboard({
               <th className="py-2.5 px-3 text-left">Locatització</th>
               <th className="py-2.5 px-2">Motor & Quadrant Directe</th>
               <th className="py-2.5 px-2">Interval Sortides</th>
-              <th className="py-2.5 px-2">Estat Scraper</th>
               <th className="py-2.5 px-3">Ocupació Avui</th>
               <th className="py-2.5 px-3">Green Fee Alta</th>
               <th className="py-2.5 px-3">Green Fee Baixa</th>
@@ -1919,7 +1911,7 @@ export default function GolfAdminDashboard({
           <tbody className="divide-y divide-slate-100 dark:divide-slate-850 text-center font-medium">
             {filteredCourses.length === 0 ? (
               <tr>
-                <td colSpan={13} className="py-12 text-slate-400 text-center">
+                <td colSpan={12} className="py-12 text-slate-400 text-center">
                   Cap camp coincideix amb la cerca.
                 </td>
               </tr>
@@ -1933,7 +1925,7 @@ export default function GolfAdminDashboard({
                 return (
                   <tr
                     key={course.id}
-                    className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors ${course.isOurClub ? "bg-blue-50/10 font-bold" : ""}`}
+                    className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-colors ${course.isOurClub ? "bg-slate-50/10 font-bold" : ""}`}
                   >
                     {/* Name */}
                     <td className="py-3 px-3 text-left">
@@ -1942,7 +1934,7 @@ export default function GolfAdminDashboard({
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="w-full px-2 py-1 border border-blue-500 bg-white rounded-none font-semibold text-slate-800"
+                          className="w-full px-2 py-1 border border-[#033b7a] bg-white rounded-none font-semibold text-slate-800"
                         />
                       ) : (
                         <div className="flex items-center gap-1.5">
@@ -1963,7 +1955,7 @@ export default function GolfAdminDashboard({
                           type="text"
                           value={editLocation}
                           onChange={(e) => setEditLocation(e.target.value)}
-                          className="w-full px-2 py-1 border border-blue-500 bg-white rounded-none text-slate-800"
+                          className="w-full px-2 py-1 border border-[#033b7a] bg-white rounded-none text-slate-800"
                         />
                       ) : (
                         <div className="text-slate-500 flex items-center gap-1 font-sans">
@@ -1981,13 +1973,13 @@ export default function GolfAdminDashboard({
                             type="url"
                             value={editBookingUrl}
                             onChange={(e) => setEditBookingUrl(e.target.value)}
-                            className="px-1 py-0.5 border border-blue-500 bg-white rounded-none text-[10px]"
+                            className="px-1 py-0.5 border border-[#033b7a] bg-white rounded-none text-[10px]"
                             placeholder="Direct Quadrant URL"
                           />
                           <select
                             value={editBookingSystem}
                             onChange={(e) => setEditBookingSystem(e.target.value)}
-                            className="px-1 py-0.5 border border-blue-500 bg-white text-xs rounded-none"
+                            className="px-1 py-0.5 border border-[#033b7a] bg-white text-xs rounded-none"
                           >
                             <option value="Golf Manager">Golf Manager</option>
                             <option value="Tee One">Tee One</option>
@@ -1996,7 +1988,7 @@ export default function GolfAdminDashboard({
                         </div>
                       ) : (
                         <div className="flex flex-col items-center justify-center gap-0.5">
-                          <span className="font-mono text-[9px] font-extrabold uppercase py-0.5 px-2 bg-blue-100 text-[#1d3d4c] border border-blue-200">
+                          <span className="font-mono text-[9px] font-extrabold uppercase py-0.5 px-2 bg-slate-100 text-[#1d3d4c] border border-slate-200">
                             {course.bookingSystem || "Golf Manager"}
                           </span>
                           {course.bookingUrl ? (
@@ -2023,7 +2015,7 @@ export default function GolfAdminDashboard({
                         <select
                           value={editTeeTimeInterval}
                           onChange={(e) => setEditTeeTimeInterval(Number(e.target.value) || 10)}
-                          className="px-1 py-1 border border-blue-500 bg-white rounded-none font-bold text-xs font-sans text-slate-800"
+                          className="px-1 py-1 border border-[#033b7a] bg-white rounded-none font-bold text-xs font-sans text-slate-800"
                         >
                           <option value={9}>9 minuts</option>
                           <option value={10}>10 minuts</option>
@@ -2031,23 +2023,10 @@ export default function GolfAdminDashboard({
                           <option value={12}>12 minuts</option>
                         </select>
                       ) : (
-                        <span className="font-sans font-extrabold text-[#1d3d4c] dark:text-amber-300 bg-blue-50 dark:bg-blue-950/25 px-2.5 py-1 text-xs inline-block rounded-none border border-blue-100 dark:border-blue-900/40">
+                        <span className="font-sans font-extrabold text-[#1d3d4c] dark:text-amber-300 bg-slate-50 dark:bg-blue-950/25 px-2.5 py-1 text-xs inline-block rounded-none border border-slate-200 dark:border-blue-900/40">
                           {course.teeTimeInterval ?? 10} min
                         </span>
                       )}
-                    </td>
-
-                    {/* Estat Scraper */}
-                    <td className="py-3 px-2 text-center">
-                      <div className="flex flex-col items-center">
-                        <span className="inline-flex items-center gap-1 font-sans text-[9px] font-extrabold uppercase text-emerald-600">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
-                          <span>Actiu</span>
-                        </span>
-                        <span className="text-[8.5px] text-slate-500 font-sans font-bold bg-slate-100 px-1 py-0.5">
-                          {course.lastSyncTime || "Pendents"}
-                        </span>
-                      </div>
                     </td>
 
                     {/* Ocupació / Disponibilitat */}
@@ -2060,7 +2039,7 @@ export default function GolfAdminDashboard({
                               type="number"
                               value={editReservationsToday}
                               onChange={(e) => setEditReservationsToday(Number(e.target.value) || 0)}
-                              className="w-full px-1 py-0.5 border border-blue-500 bg-white dark:bg-slate-800 font-mono font-bold text-xs text-center text-slate-800 dark:text-white"
+                              className="w-full px-1 py-0.5 border border-[#033b7a] bg-white dark:bg-slate-800 font-mono font-bold text-xs text-center text-slate-800 dark:text-white"
                             />
                           </div>
                           <div className="flex items-center gap-1">
@@ -2070,7 +2049,7 @@ export default function GolfAdminDashboard({
                               step="0.1"
                               value={editOccupancyToday}
                               onChange={(e) => setEditOccupancyToday(Number(e.target.value) || 0)}
-                              className="w-full px-1 py-0.5 border border-blue-500 bg-white dark:bg-slate-800 font-mono font-bold text-xs text-center text-slate-800 dark:text-white"
+                              className="w-full px-1 py-0.5 border border-[#033b7a] bg-white dark:bg-slate-800 font-mono font-bold text-xs text-center text-slate-800 dark:text-white"
                             />
                           </div>
                           <div className="flex items-center gap-1">
@@ -2079,7 +2058,7 @@ export default function GolfAdminDashboard({
                               type="number"
                               value={editAvailableSlotsToday}
                               onChange={(e) => setEditAvailableSlotsToday(Number(e.target.value) || 0)}
-                              className="w-full px-1 py-0.5 border border-blue-500 bg-white dark:bg-slate-800 font-mono font-bold text-xs text-center text-slate-800 dark:text-white"
+                              className="w-full px-1 py-0.5 border border-[#033b7a] bg-white dark:bg-slate-800 font-mono font-bold text-xs text-center text-slate-800 dark:text-white"
                             />
                           </div>
                         </div>
@@ -2118,7 +2097,7 @@ export default function GolfAdminDashboard({
                           type="number"
                           value={editGreenFeeHigh}
                           onChange={(e) => setEditGreenFeeHigh(Number(e.target.value))}
-                          className="w-16 px-1 py-0.5 border border-blue-500 bg-white rounded-none font-bold text-center font-sans"
+                          className="w-16 px-1 py-0.5 border border-[#033b7a] bg-white rounded-none font-bold text-center font-sans"
                         />
                       ) : (
                         <span className="font-semibold text-[#1d3d4c] font-sans bg-slate-105 px-2 py-0.5 rounded-none text-xs border border-slate-200 dark:border-slate-700">
@@ -2134,7 +2113,7 @@ export default function GolfAdminDashboard({
                           type="number"
                           value={editGreenFeeLow}
                           onChange={(e) => setEditGreenFeeLow(Number(e.target.value))}
-                          className="w-16 px-1 py-0.5 border border-blue-500 bg-white rounded-none font-bold text-center font-sans"
+                          className="w-16 px-1 py-0.5 border border-[#033b7a] bg-white rounded-none font-bold text-center font-sans"
                         />
                       ) : (
                         <span className="font-medium text-slate-500 font-sans bg-slate-105 px-2 py-0.5 rounded-none text-xs border border-slate-200 dark:border-slate-700">
@@ -2150,7 +2129,7 @@ export default function GolfAdminDashboard({
                           type="number"
                           value={editBuggyRental}
                           onChange={(e) => setEditBuggyRental(Number(e.target.value))}
-                          className="w-16 px-1 py-0.5 border border-blue-500 bg-white rounded-none font-bold text-center font-sans"
+                          className="w-16 px-1 py-0.5 border border-[#033b7a] bg-white rounded-none font-bold text-center font-sans"
                         />
                       ) : (
                         <span className="text-slate-600 dark:text-slate-300 font-sans font-medium">{course.buggyRental} €</span>
@@ -2164,7 +2143,7 @@ export default function GolfAdminDashboard({
                           type="number"
                           value={editClubRental}
                           onChange={(e) => setEditClubRental(Number(e.target.value))}
-                          className="w-16 px-1 py-0.5 border border-blue-500 bg-white rounded-none font-bold text-center font-sans"
+                          className="w-16 px-1 py-0.5 border border-[#033b7a] bg-white rounded-none font-bold text-center font-sans"
                         />
                       ) : (
                         <span className="text-slate-600 dark:text-slate-300 font-sans font-medium">{course.clubRental} €</span>
@@ -2173,7 +2152,7 @@ export default function GolfAdminDashboard({
 
                     {/* Pack Total Est */}
                     <td className="py-3 px-3 text-center">
-                      <span className="font-semibold text-blue-700 dark:text-blue-400 font-sans bg-blue-100/40 dark:bg-blue-900/10 px-2 py-0.5 rounded-none text-xs border border-blue-200">
+                      <span className="font-semibold text-[#033b7a] dark:text-blue-400 font-sans bg-slate-100/40 dark:bg-blue-900/10 px-2 py-0.5 rounded-none text-xs border border-slate-200">
                         {totalPack} €
                       </span>
                     </td>
@@ -2185,7 +2164,7 @@ export default function GolfAdminDashboard({
                           type="url"
                           value={editUrl}
                           onChange={(e) => setEditUrl(e.target.value)}
-                          className="w-full px-2 py-0.5 border border-blue-500 bg-white rounded-none text-xs font-sans"
+                          className="w-full px-2 py-0.5 border border-[#033b7a] bg-white rounded-none text-xs font-sans"
                           placeholder="Link web"
                         />
                       ) : (
@@ -2195,7 +2174,7 @@ export default function GolfAdminDashboard({
                             target="_blank" 
                             rel="noreferrer" 
                             referrerPolicy="no-referrer"
-                            className="text-blue-600 hover:underline inline-flex items-center gap-1 hover:text-blue-705 font-semibold font-sans"
+                            className="text-[#033b7a] hover:underline inline-flex items-center gap-1 hover:text-[#033b7a] font-semibold font-sans"
                           >
                             <span>Visitar</span>
                             <ExternalLink className="w-3 h-3" />
@@ -2213,7 +2192,7 @@ export default function GolfAdminDashboard({
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleSaveEdit(course.id)}
-                              className="p-1 bg-blue-600 hover:bg-blue-700 rounded-none text-white font-bold"
+                              className="p-1 bg-[#033b7a] hover:bg-[#022e5f] rounded-none text-white font-bold"
                               title="Guardar"
                             >
                               <Check className="w-3.5 h-3.5" />
@@ -2229,7 +2208,7 @@ export default function GolfAdminDashboard({
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => handleStartEdit(course)}
-                              className="p-1 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-none"
+                              className="p-1 hover:bg-slate-100 text-slate-500 hover:text-[#033b7a] rounded-none"
                               title="Editar"
                             >
                               <Edit3 className="w-3.5 h-3.5" />

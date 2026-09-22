@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft, Trophy, Flag, ChevronDown } from "lucide-react";
+import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft, Trophy, Flag, ChevronDown, MapPin } from "lucide-react";
+import GolfClubsMap from "./GolfClubsMap";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { ReputationSnapshot, RatingBreakdown, LeadingCoursesSnapshot, LeadingCoursesClub, ReviewSourceResult } from "../types";
@@ -509,6 +510,20 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
             Actualitzat {formatDate(lcSnapshot.scrapedAt)}
           </p>
         )}
+      </div>
+
+      {/* Mapa dels camps — fent clic a un pin s'obre la web del club */}
+      <div className="space-y-3 pt-2">
+        <div>
+          <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-amber-500" />
+            Mapa dels camps
+          </h3>
+          <p className="text-xs text-slate-500 mt-1">
+            Golf d'Aro (destacat en groc) i els competidors. Fes clic a un pin per anar a la seva web.
+          </p>
+        </div>
+        <GolfClubsMap />
       </div>
       </div>
     </div>

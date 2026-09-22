@@ -300,7 +300,11 @@ export interface LeadingCoursesClub {
   source: "live" | "error";
   scrapeDebug?: string;
   leadingCourses: ReviewSourceResult;
-  oneGolf: ReviewSourceResult; // 1golf.eu (Albrecht Golf Guide)
+  // 1golf.eu es va treure del benchmark (22/09/2026) — bloquejava sempre
+  // les peticions directes i no acabava de donar dades fiables. Es manté
+  // com a camp opcional només perquè sincronitzacions antigues desades a
+  // Firestore encara el porten — mai s'hi torna a escriure.
+  oneGolf?: ReviewSourceResult;
 }
 
 export interface LeadingCoursesSnapshot {

@@ -267,12 +267,27 @@ export interface ReputationSnapshot {
 // ----------------------------------------------------------------------------
 // GOLFREPU — Benchmark amb Leading Courses + 1golf.eu (Golf d'Aro + competidors)
 // ----------------------------------------------------------------------------
+// Puntuacions per categoria de Leading Courses (només disponibles per a
+// aquesta font — 1golf.eu no en publica). Confirmat manualment (22/09/2026)
+// que apareixen com a text pla a la fitxa de cada club ("Total score •
+// course maintenance7.3 • facilities7.7 • ..."), no dins de cap bloc JSON.
+export interface LeadingCoursesCategoryScores {
+  maintenance: number | null;    // "Course maintenance"
+  facilities: number | null;     // "Facilities"
+  clubhouse: number | null;      // "Clubhouse"
+  valueForMoney: number | null;  // "Value for money"
+  hospitality: number | null;    // "Hospitality"
+  surroundings: number | null;   // "Surroundings"
+  restaurant: number | null;     // "Restaurant"
+}
+
 export interface ReviewSourceResult {
   rating: number | null;
   scale: 5 | 10;           // 1golf.eu puntua sobre 5, Leading Courses sobre 10 — es mostren per separat, no es barregen
   reviewCount: number | null;
   source: "live" | "error";
   scrapeDebug?: string;
+  categoryScores?: LeadingCoursesCategoryScores | null; // només present a leadingCourses
 }
 
 export interface LeadingCoursesClub {

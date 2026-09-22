@@ -18,12 +18,13 @@ function formatDate(iso?: string) {
   return new Date(iso).toLocaleDateString("ca-ES", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-// Font única de normalització: converteix qualsevol club rebut (nou format
-// amb leadingCourses/oneGolf, o format antic amb overallRating/reviewCount
-// plans, o fins i tot un objecte a mig fer) en un LeadingCoursesClub complet
-// i segur de renderitzar. Sense això, dades desades amb una versió anterior
-// del codi feien petar la pantalla en sencer (club.leadingCourses.rating
-// sobre un club sense leadingCourses).
+// Font única de normalització: converteix qualsevol club rebut (format
+// amb leadingCourses, format antic amb overallRating/reviewCount plans, o
+// fins i tot un objecte a mig fer, potser amb un oneGolf que ja no es fa
+// servir) en un LeadingCoursesClub complet i segur de renderitzar. Sense
+// això, dades desades amb una versió anterior del codi feien petar la
+// pantalla en sencer (club.leadingCourses.rating sobre un club sense
+// leadingCourses).
 function normalizeClub(raw: any): LeadingCoursesClub {
   const emptySource = (scale: 5 | 10): ReviewSourceResult => ({
     rating: null,
@@ -46,11 +47,6 @@ function normalizeClub(raw: any): LeadingCoursesClub {
         }
       : emptySource(10);
 
-  const oneGolf: ReviewSourceResult =
-    raw?.oneGolf && typeof raw.oneGolf === "object"
-      ? { scale: 5, rating: null, reviewCount: null, source: "error", ...raw.oneGolf }
-      : emptySource(5);
-
   return {
     slug: raw?.slug || "unknown",
     name: raw?.name || "Club desconegut",
@@ -61,7 +57,6 @@ function normalizeClub(raw: any): LeadingCoursesClub {
     source: leadingCourses.source,
     scrapeDebug: leadingCourses.scrapeDebug,
     leadingCourses,
-    oneGolf,
   };
 }
 
@@ -185,7 +180,7 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
       setLcSnapshot(newSnapshot);
       localStorage.setItem(LC_CACHE_KEY, JSON.stringify(newSnapshot));
 
-      if (newSnapshot.clubs.every((c) => c.leadingCourses.source === "error" && c.oneGolf.source === "error")) {
+      if (newSnapshot.clubs.every((c) => c.leadingCourses.source === "error")) {
         setLcError("No s'ha pogut llegir cap dels clubs. Comprova la connexió i torna-ho a provar.");
       }
 
@@ -427,28 +422,6 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
                         <span
                           className="text-xs text-rose-400 cursor-help"
                           title={club.leadingCourses.scrapeDebug}
-                        >
-                          — error
-                        </span>
-                      )}
-                    </div>
-                    {/* 1golf.eu */}
-                    <div className="text-right min-w-[70px]">
-                      <p className="text-[8px] uppercase tracking-wide text-slate-400 font-bold">1golf.eu</p>
-                      {club.oneGolf.rating !== null ? (
-                        <>
-                          <div className="flex items-baseline gap-1 justify-end">
-                            <span className="text-lg font-black text-slate-900 font-mono">{club.oneGolf.rating.toFixed(1)}</span>
-                            <span className="text-[9px] text-slate-400">/5</span>
-                          </div>
-                          {club.oneGolf.reviewCount !== null && (
-                            <p className="text-[9px] text-slate-400">{club.oneGolf.reviewCount} ressenyes</p>
-                          )}
-                        </>
-                      ) : (
-                        <span
-                          className="text-xs text-rose-400 cursor-help"
-                          title={club.oneGolf.scrapeDebug}
                         >
                           — error
                         </span>

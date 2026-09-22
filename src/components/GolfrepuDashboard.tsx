@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft, Trophy, Flag } from "lucide-react";
+import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft, Trophy, Flag, ChevronDown } from "lucide-react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import { ReputationSnapshot, RatingBreakdown, LeadingCoursesSnapshot, LeadingCoursesClub, ReviewSourceResult } from "../types";
@@ -80,6 +80,7 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
   const [lcSnapshot, setLcSnapshot] = useState<LeadingCoursesSnapshot | null>(null);
   const [isLcLoading, setIsLcLoading] = useState(false);
   const [lcError, setLcError] = useState<string | null>(null);
+  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
 
   // Carrega l'últim snapshot desat (Firestore, amb fallback a localStorage) en
   // obrir la pestanya — no fa cap petició nova a ScrapingBee només per mirar-ho.
@@ -381,10 +382,18 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
                 if (b.overallRating === null) return -1;
                 return b.overallRating - a.overallRating;
               })
-              .map((club) => (
+              .map((club) => {
+                const hasCategoryScores =
+                  club.leadingCourses.categoryScores &&
+                  Object.values(club.leadingCourses.categoryScores).some((v) => v !== null);
+                const isExpanded = expandedSlug === club.slug;
+                return (
                 <div
                   key={club.slug}
-                  className={`p-4 flex items-center justify-between gap-3 flex-wrap ${club.isOwnClub ? "bg-amber-50/60" : ""}`}
+                  className={club.isOwnClub ? "bg-amber-50/60" : ""}
+                >
+                <div
+                  className="p-4 flex items-center justify-between gap-3 flex-wrap"
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     {club.isOwnClub ? (
@@ -453,9 +462,46 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
+                    {hasCategoryScores && (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSlug(isExpanded ? null : club.slug)}
+                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                        title="Veure puntuacions per categoria"
+                      >
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))}
+                {isExpanded && hasCategoryScores && club.leadingCourses.categoryScores && (
+                  <div className="px-4 pb-4 pt-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(
+                      [
+                        ["maintenance", "Manteniment"],
+                        ["facilities", "Instal·lacions"],
+                        ["clubhouse", "Clubhouse"],
+                        ["valueForMoney", "Relació qualitat-preu"],
+                        ["hospitality", "Hospitalitat"],
+                        ["restaurant", "Restaurant"],
+                        ["surroundings", "Entorn"],
+                      ] as const
+                    ).map(([key, label]) => {
+                      const value = club.leadingCourses.categoryScores?.[key] ?? null;
+                      return (
+                        <div key={key} className="bg-slate-50 rounded-lg px-2.5 py-1.5">
+                          <p className="text-[9px] uppercase tracking-wide text-slate-400 font-bold truncate">{label}</p>
+                          <p className="text-sm font-black text-slate-800 font-mono">
+                            {value !== null ? value.toFixed(1) : "—"}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                </div>
+                );
+              })}
           </div>
         )}
         {lcSnapshot && (

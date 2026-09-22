@@ -395,12 +395,17 @@ const COURSE_ENDPOINTS: CourseEndpoint[] = [
   {
     slug: "costabrava", name: "Golf Costa Brava", system: "teeone", tenant: "costa-brava",
     base: "https://open.teeone.golf/en/costa-brava",
-    allowedTariffs: ["18 Holes", "18 Holes Sun Hour"],
+    // "18 Hoyos" confirmat en directe el 22/09/2026 — TeeOne li ha canviat
+    // el nom a la tarifa des de la captura original ("18 Holes"). Es
+    // mantenen totes dues per si el club torna a alternar el nom.
+    allowedTariffs: ["18 Holes", "18 Holes Sun Hour", "18 Hoyos"],
   },
   {
     slug: "perelada", name: "Camp de Golf Perelada", system: "teeone", tenant: "peralada",
     base: "https://open.teeone.golf/es/peralada",
-    allowedTariffs: ["GREEN FEE 18 Hoyos"],
+    // "GFEE 18 HOLES twilight" confirmat en directe el 22/09/2026 com a
+    // variant vàlida (tarda/twilight) de la tarifa original.
+    allowedTariffs: ["GREEN FEE 18 Hoyos", "GFEE 18 HOLES twilight"],
   },
 ];
 
@@ -826,11 +831,41 @@ interface TeeOneAvailabilityResponse {
   horasDisponibles: TeeOneAvailabilityItem[];
 }
 
+// Paraules que identifiquen un "extra" empaquetat amb el green fee (buggy,
+// carret, lliçons...) — mai s'han de fer servir com si fossin el preu net
+// d'un green fee sol, encara que sigui la tarifa més barata disponible.
+const BUNDLED_OR_EXTRA_KEYWORDS = [
+  "buggy", "carro", "cart", "trolley", "caddie",
+  "clase", "lecci", "escuela", "leccion",
+  "material", "seguro", "insurance", "fotograf", "photo",
+];
+function isBundledOrExtraTariff(name: string): boolean {
+  const n = name.toLowerCase();
+  return BUNDLED_OR_EXTRA_KEYWORDS.some((k) => n.includes(k));
+}
+
 function parseTeeOneItems(items: TeeOneAvailabilityItem[], allowedTariffs: string[]): TeeTime[] {
   const teeTimes: TeeTime[] = [];
   for (const item of items || []) {
-    const rates: TeeTimeRate[] = (item.tarifas || [])
-      .filter((t) => allowedTariffs.length === 0 || allowedTariffs.includes(t.nombre))
+    const candidateTariffs = item.tarifas || [];
+
+    // 1r intent: coincidència exacta amb la llista de noms ja confirmats
+    // per a aquest club (preferència, per mantenir compatibilitat).
+    let matched =
+      allowedTariffs.length === 0
+        ? candidateTariffs
+        : candidateTariffs.filter((t) => allowedTariffs.some((a) => a.trim().toLowerCase() === t.nombre.trim().toLowerCase()));
+
+    // 2n intent (resiliència, 22/09/2026): si el club ha renombrat la
+    // tarifa i cap coincideix, NO descartem la franja sencera (que és el
+    // que abans feia caure Costa Brava i Perelada sempre al model de
+    // referència encara que hi hagués dades reals disponibles) — agafem
+    // qualsevol tarifa que no sigui clarament un extra empaquetat.
+    if (matched.length === 0 && allowedTariffs.length > 0) {
+      matched = candidateTariffs.filter((t) => !isBundledOrExtraTariff(t.nombre));
+    }
+
+    const rates: TeeTimeRate[] = matched
       .map((t) => ({
         tariff: t.nombre,
         price: t.precio,
@@ -839,7 +874,8 @@ function parseTeeOneItems(items: TeeOneAvailabilityItem[], allowedTariffs: strin
           t.precioRack && t.precioRack > 0
             ? Math.round(((t.precioRack - t.precio) / t.precioRack) * 100)
             : undefined,
-      }));
+      }))
+      .sort((a, b) => a.price - b.price);
     if (rates.length === 0) continue;
 
     const timeMatch = (item.hora || "").match(/^(\d{1,2}):(\d{2})/);

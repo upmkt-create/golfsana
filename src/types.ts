@@ -305,6 +305,10 @@ export interface LeadingCoursesClub {
   // com a camp opcional només perquè sincronitzacions antigues desades a
   // Firestore encara el porten — mai s'hi torna a escriure.
   oneGolf?: ReviewSourceResult;
+  // Puntuació de Google Maps del club (via Places API oficial, no
+  // scraping) — afegit el 22/09/2026 perquè el benchmark també compari
+  // Google entre Golf d'Aro i els competidors, no només el propi club.
+  google?: ReviewSourceResult;
 }
 
 export interface LeadingCoursesSnapshot {

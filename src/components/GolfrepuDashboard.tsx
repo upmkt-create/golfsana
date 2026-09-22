@@ -86,6 +86,10 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
   // categories. sortDir "desc" = de més a menys (per defecte, com demanat).
   const [sortKey, setSortKey] = useState<"global" | keyof LeadingCoursesCategoryScores>("global");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  // Club (slug) sobre el qual es passa el punter al mapa — s'usa per
+  // il·luminar la seva targeta de reputació a Google Maps a la columna
+  // del costat.
+  const [hoveredClubSlug, setHoveredClubSlug] = useState<string | null>(null);
 
   // Carrega l'últim snapshot desat (Firestore, amb fallback a localStorage) en
   // obrir la pestanya — no fa cap petició nova a ScrapingBee només per mirar-ho.
@@ -553,77 +557,77 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
         )}
       </div>
 
-      {/* Reputació Google Maps — mateixa targeta que la de Golf d'Aro, per a tots els competidors */}
+      {/* Reputació Google Maps + Mapa dels camps — una sola secció en dues
+          columnes: passar el punter per un pin del mapa il·lumina la
+          targeta del club corresponent a la columna de l'esquerra. */}
       {lcSnapshot && lcSnapshot.clubs.length > 0 && (
         <div className="space-y-3 pt-2">
           <div>
             <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-              Reputació a Google Maps — comparativa
+              Reputació a Google Maps i mapa dels camps
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Puntuació i nombre de ressenyes reals a Google Maps de Golf d'Aro i els competidors.
+              Puntuació i ressenyes reals a Google Maps de Golf d'Aro i els competidors. Passa el punter per un pin del mapa per veure la seva targeta.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedByGoogle.map((club) => (
-              <div
-                key={club.slug}
-                className={`border p-5 flex flex-col items-center justify-center text-center ${
-                  club.isOwnClub ? "bg-amber-50/60 border-amber-200" : "bg-white border-slate-200"
-                }`}
-              >
-                <p className={`text-xs truncate max-w-full ${club.isOwnClub ? "font-black text-slate-900" : "font-semibold text-slate-600"}`}>
-                  {club.name}
-                  {club.isOwnClub && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-600 font-bold">(vosaltres)</span>}
-                </p>
-                <div className="flex items-baseline gap-1.5 mt-2">
-                  <span className="text-4xl font-black text-slate-900 font-mono">
-                    {club.google && club.google.rating !== null ? club.google.rating.toFixed(1) : "—"}
-                  </span>
-                  <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
-                </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  {club.google && club.google.reviewCount !== null
-                    ? `sobre ${club.google.reviewCount} ressenyes`
-                    : club.google?.rating === null
-                    ? "sense dades"
-                    : "nombre de ressenyes no disponible"}
-                </p>
-                {club.google?.mapsUrl ? (
-                  <a
-                    href={club.google.mapsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold border border-slate-300 text-slate-700 hover:bg-slate-50"
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 content-start">
+              {sortedByGoogle.map((club) => {
+                const isHovered = hoveredClubSlug === club.slug;
+                return (
+                  <div
+                    key={club.slug}
+                    className={`border p-5 flex flex-col items-center justify-center text-center transition-all ${
+                      club.isOwnClub ? "bg-amber-50/60 border-amber-200" : "bg-white border-slate-200"
+                    } ${isHovered ? "ring-2 ring-offset-2 ring-[#033b7a] border-[#033b7a] shadow-md scale-[1.02]" : ""}`}
                   >
-                    <ExternalLink className="w-3 h-3" />
-                    Veure a Google Maps
-                  </a>
-                ) : club.google?.scrapeDebug ? (
-                  <p className="text-[10px] text-rose-400 mt-3 cursor-help" title={club.google.scrapeDebug}>
-                    error en llegir Google
-                  </p>
-                ) : null}
-              </div>
-            ))}
+                    <p className={`text-xs truncate max-w-full ${club.isOwnClub ? "font-black text-slate-900" : "font-semibold text-slate-600"}`}>
+                      {club.name}
+                      {club.isOwnClub && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-600 font-bold">(vosaltres)</span>}
+                    </p>
+                    <div className="flex items-baseline gap-1.5 mt-2">
+                      <span className="text-4xl font-black text-slate-900 font-mono">
+                        {club.google && club.google.rating !== null ? club.google.rating.toFixed(1) : "—"}
+                      </span>
+                      <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {club.google && club.google.reviewCount !== null
+                        ? `sobre ${club.google.reviewCount} ressenyes`
+                        : club.google?.rating === null
+                        ? "sense dades"
+                        : "nombre de ressenyes no disponible"}
+                    </p>
+                    {club.google?.mapsUrl ? (
+                      <a
+                        href={club.google.mapsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold border border-slate-300 text-slate-700 hover:bg-slate-50"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Veure a Google Maps
+                      </a>
+                    ) : club.google?.scrapeDebug ? (
+                      <p className="text-[10px] text-rose-400 mt-3 cursor-help" title={club.google.scrapeDebug}>
+                        error en llegir Google
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-2">
+              <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                Golf d'Aro (destacat en groc) i els competidors. Clic a un pin per anar a la seva web.
+              </p>
+              <GolfClubsMap onHoverClub={setHoveredClubSlug} />
+            </div>
           </div>
         </div>
       )}
-
-      {/* Mapa dels camps — fent clic a un pin s'obre la web del club */}
-      <div className="space-y-3 pt-2">
-        <div>
-          <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-amber-500" />
-            Mapa dels camps
-          </h3>
-          <p className="text-xs text-slate-500 mt-1">
-            Golf d'Aro (destacat en groc) i els competidors. Fes clic a un pin per anar a la seva web.
-          </p>
-        </div>
-        <GolfClubsMap />
-      </div>
       </div>
     </div>
   );

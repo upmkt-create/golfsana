@@ -60,13 +60,22 @@ function buildPinIcon(isOwnClub: boolean): L.DivIcon {
 
 interface GolfClubsMapProps {
   points?: GolfClubMapPoint[];
+  // Notifica quin club (slug) té el punter per sobre — null quan es deixa
+  // d'estar-hi. Permet il·luminar la targeta corresponent a fora del mapa
+  // (p.ex. la de reputació a Google Maps) sense que el mapa en sàpiga res.
+  onHoverClub?: (slug: string | null) => void;
 }
 
-export default function GolfClubsMap({ points = GOLF_CLUBS_MAP_POINTS }: GolfClubsMapProps) {
+export default function GolfClubsMap({ points = GOLF_CLUBS_MAP_POINTS, onHoverClub }: GolfClubsMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const boundsRef = useRef<L.LatLngBounds | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // El callback pot canviar de referència entre renders (p.ex. un setState
+  // inline); es guarda en un ref perquè els listeners de Leaflet, creats un
+  // sol cop, sempre truquin a la versió més recent.
+  const onHoverClubRef = useRef(onHoverClub);
+  onHoverClubRef.current = onHoverClub;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -87,6 +96,12 @@ export default function GolfClubsMap({ points = GOLF_CLUBS_MAP_POINTS }: GolfClu
         .bindTooltip(club.name, { direction: "top", offset: [0, -28] });
       marker.on("click", () => {
         window.open(club.website, "_blank", "noopener,noreferrer");
+      });
+      marker.on("mouseover", () => {
+        onHoverClubRef.current?.(club.slug);
+      });
+      marker.on("mouseout", () => {
+        onHoverClubRef.current?.(null);
       });
       return marker;
     });

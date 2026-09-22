@@ -246,8 +246,16 @@ interface ProxyFetchResult {
 // ha configurades a Vercel. Bright Data (Web Unlocker) és la PRIMERA opció
 // (crèdits gratuïts recurrents cada mes); ScrapingBee i ScraperAPI es
 // mantenen com a reserva. 1golf.eu bloqueja les peticions directes (HTTP
-// 403) i necessita SEMPRE un proxy — per això aquest fitxer també prova
-// Bright Data abans de rendir-se, cosa que abans no feia.
+// 403) i necessita SEMPRE un proxy.
+//
+// IMPORTANT (après el 22/09/2026, timeout real vist als logs de Vercel):
+// aquest endpoint llegeix 7 clubs × 2 fonts = 14 peticions, i la funció de
+// Vercel talla als 60 segons (maxDuration del pla actual). Amb 3 reintents
+// de 20s cadascun per petició via proxy, UNA sola font que necessiti proxy
+// ja podia consumir els 60s sencers ella sola. Per això aquí els reintents
+// del proxy es limiten a 1 sol intent i 15s de marge — si Bright Data no
+// respon en 15s, es dona per error i es continua (millor un error puntual
+// que fer petar tot l'endpoint per una font penjada).
 async function fetchViaBestProxy(targetUrl: string, directHeaders: Record<string, string>): Promise<ProxyFetchResult> {
   const brightDataKey = process.env.BRIGHTDATA_API_KEY;
   const brightDataZone = process.env.BRIGHTDATA_ZONE;
@@ -262,22 +270,22 @@ async function fetchViaBestProxy(targetUrl: string, directHeaders: Record<string
         method: "POST",
         headers: { Authorization: `Bearer ${brightDataKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ zone: brightDataZone, url: targetUrl, format: "raw" }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(15000),
       },
-      3
+      1
     );
     return { resp, lastErr, attempts, proxyLabel: "via Bright Data (Web Unlocker)" };
   }
 
   if (scrapingBeeKey) {
     const url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true&render_js=false`;
-    const { resp, lastErr, attempts } = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(20000) }, 3);
+    const { resp, lastErr, attempts } = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(15000) }, 1);
     return { resp, lastErr, attempts, proxyLabel: "via ScrapingBee (premium)" };
   }
 
   if (scraperApiKey) {
     const url = `https://api.scraperapi.com/?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}${usePremium ? "&premium=true" : ""}`;
-    const { resp, lastErr, attempts } = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(20000) }, 3);
+    const { resp, lastErr, attempts } = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(15000) }, 1);
     return { resp, lastErr, attempts, proxyLabel: `via ScraperAPI${usePremium ? " premium" : " standard"}` };
   }
 
@@ -288,8 +296,11 @@ async function fetchViaBestProxy(targetUrl: string, directHeaders: Record<string
 async function fetchSource(url: string): Promise<{ html: string | null; scrapeDebug?: string }> {
   const directHeaders = { "Accept-Language": "en-US,en;q=0.9", "User-Agent": CHROME_UA };
 
-  // 1r intent: directe, sense proxy.
-  const direct = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(25000) }, 2);
+  // 1r intent: directe, sense proxy. Un sol intent (no 2): si falla no és
+  // per una errada puntual de xarxa (aquestes URLs o funcionen o donen 403
+  // a l'instant) — reintentar només allarga el temps total sense canviar
+  // el resultat.
+  const direct = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(10000) }, 1);
   if (direct.resp?.ok) {
     return { html: await direct.resp.text() };
   }
@@ -341,8 +352,12 @@ async function scrapeSource(
 }
 
 async function scrapeClub(target: ClubTarget): Promise<ClubResult> {
-  const leadingCourses = await scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, true);
-  const oneGolf = await scrapeSource(target.oneGolfUrl, 5, parseOneGolf);
+  // Les dues fonts d'un mateix club són independents — es demanen en
+  // paral·lel (abans eren seqüencials) per no duplicar el temps d'espera.
+  const [leadingCourses, oneGolf] = await Promise.all([
+    scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, true),
+    scrapeSource(target.oneGolfUrl, 5, parseOneGolf),
+  ]);
 
   return {
     slug: target.slug,
@@ -378,13 +393,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ htmlLength: html.length, htmlSnippet: html.slice(0, 3000), rawHtmlEnd: html.slice(-15000) });
   }
 
-  // Es llegeixen els 7 clubs D'UN EN UN (no en paral·lel) — el pla de
-  // ScrapingBee/Bright Data (usats només com a reserva) limita peticions
-  // simultànies.
+  // Es llegeixen els 7 clubs en blocs de 3 en paral·lel (no tots 7 alhora,
+  // per no arriscar-se a passar cap límit de concurrència del proxy que no
+  // tenim confirmat) — abans es feien D'UN EN UN i, combinat amb els
+  // reintents del proxy, l'endpoint podia superar els 60s que permet
+  // Vercel i acabar en timeout total (vist als logs el 22/09/2026).
+  const CONCURRENCY = 3;
   const clubs: ClubResult[] = [];
-  for (const target of TARGETS) {
-    const result = await scrapeClub(target);
-    clubs.push(result);
+  for (let i = 0; i < TARGETS.length; i += CONCURRENCY) {
+    const batch = TARGETS.slice(i, i + CONCURRENCY);
+    const results = await Promise.all(batch.map((target) => scrapeClub(target)));
+    clubs.push(...results);
   }
 
   return res.status(200).json({

@@ -360,6 +360,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!html) {
       return res.status(200).json({ error: scrapeDebug });
     }
+    // ?around=<text> retorna només el tros del HTML CRU al voltant de la
+    // primera aparició d'aquest text — més útil que el principi/final quan
+    // la dada que es busca (com "maintenance") és enmig d'un HTML d'1MB+.
+    const around = typeof req.query.around === "string" ? req.query.around : null;
+    if (around) {
+      const idx = html.toLowerCase().indexOf(around.toLowerCase());
+      if (idx === -1) {
+        return res.status(200).json({ error: `Text "${around}" no trobat a l'HTML (longitud total: ${html.length}).` });
+      }
+      return res.status(200).json({ context: html.slice(Math.max(0, idx - 600), idx + 600) });
+    }
     return res.status(200).json({ htmlLength: html.length, htmlSnippet: html.slice(0, 3000), rawHtmlEnd: html.slice(-15000) });
   }
 

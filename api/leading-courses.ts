@@ -81,7 +81,6 @@ const TARGETS: ClubTarget[] = [
 ];
 
 interface LeadingCoursesCategoryScores {
-  maintenance: number | null;
   facilities: number | null;
   clubhouse: number | null;
   valueForMoney: number | null;
@@ -172,15 +171,18 @@ function parseLeadingCourses(html: string): { rating: number | null; reviewCount
 }
 
 // Confirmat manualment el 22/09/2026: a la fitxa de cada club, Leading
-// Courses mostra un bloc "Total score" amb 7 puntuacions per categoria com a
+// Courses mostra un bloc "Total score" amb puntuacions per categoria com a
 // TEXT PLA (no dins de JSON ni de cap taula amb classes identificables):
 // "Total score • course maintenance7.3 • facilities7.7 • clubhouse7.6 •
 // Value for money7.0 • hospitality8.1 • surroundings9.1 • restaurant7.6"
 // — l'etiqueta i el número van enganxats, sense espai ni separador.
 // Per això s'elimina primer tot el markup (scripts, estils, etiquetes) i es
 // busca cada etiqueta seguida de prop per un número decimal.
+//
+// "course maintenance" es va treure (22/09/2026): mai va donar cap valor
+// per a cap dels 7 clubs (sempre null) — es manté descartada en lloc de
+// seguir intentant-la sense evidència de per què falla.
 const CATEGORY_LABELS: { key: keyof LeadingCoursesCategoryScores; label: string }[] = [
-  { key: "maintenance", label: "course\\s*maintenance" },
   { key: "facilities", label: "facilities" },
   { key: "clubhouse", label: "clubhouse" },
   { key: "valueForMoney", label: "value\\s*for\\s*money" },

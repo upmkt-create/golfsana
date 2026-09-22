@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft, Trophy, Flag, ChevronDown, MapPin } from "lucide-react";
+import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTriangle, ArrowLeft, Trophy, Flag, ChevronUp, ChevronDown, ChevronsUpDown, MapPin } from "lucide-react";
 import GolfClubsMap from "./GolfClubsMap";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { ReputationSnapshot, RatingBreakdown, LeadingCoursesSnapshot, LeadingCoursesClub, ReviewSourceResult } from "../types";
+import { ReputationSnapshot, RatingBreakdown, LeadingCoursesSnapshot, LeadingCoursesClub, ReviewSourceResult, LeadingCoursesCategoryScores } from "../types";
 
 const NAVY = "#033b7a";
 const CACHE_KEY = "golfsana_reputation_cache";
@@ -32,6 +32,7 @@ function normalizeClub(raw: any): LeadingCoursesClub {
     reviewCount: null,
     source: "error",
     scrapeDebug: "Dades antigues — torna a sincronitzar per veure aquesta font.",
+    mapsUrl: null,
   });
 
   const leadingCourses: ReviewSourceResult =
@@ -80,7 +81,11 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
   const [lcSnapshot, setLcSnapshot] = useState<LeadingCoursesSnapshot | null>(null);
   const [isLcLoading, setIsLcLoading] = useState(false);
   const [lcError, setLcError] = useState<string | null>(null);
-  const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
+  // Taula de puntuacions per categoria, sempre visible i ordenable —
+  // "global" és la puntuació total de Leading Courses; la resta són les
+  // categories. sortDir "desc" = de més a menys (per defecte, com demanat).
+  const [sortKey, setSortKey] = useState<"global" | keyof LeadingCoursesCategoryScores>("global");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   // Carrega l'últim snapshot desat (Firestore, amb fallback a localStorage) en
   // obrir la pestanya — no fa cap petició nova a ScrapingBee només per mirar-ho.
@@ -189,8 +194,8 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
         return {
           ...c,
           google: g
-            ? { rating: g.rating, scale: 5, reviewCount: g.reviewCount, source: g.source, scrapeDebug: g.scrapeDebug }
-            : { rating: null, scale: 5, reviewCount: null, source: "error", scrapeDebug: googleData?.error || "Sense resposta de Google." },
+            ? { rating: g.rating, scale: 5, reviewCount: g.reviewCount, source: g.source, scrapeDebug: g.scrapeDebug, mapsUrl: g.mapsUrl ?? null }
+            : { rating: null, scale: 5, reviewCount: null, source: "error", scrapeDebug: googleData?.error || "Sense resposta de Google.", mapsUrl: null },
         };
       });
 
@@ -229,6 +234,77 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
 
   const breakdown: RatingBreakdown | null = snapshot?.ratingBreakdown || null;
   const maxBreakdownCount = breakdown ? Math.max(breakdown[5], breakdown[4], breakdown[3], breakdown[2], breakdown[1], 1) : 1;
+
+  // Columnes de la taula de benchmark — "global" és leadingCourses.rating
+  // (sobre 10), la resta són les categories de Leading Courses (també sobre
+  // 10). Mateix ordre que abans es mostrava al desplegable.
+  const CATEGORY_COLUMNS: { key: keyof LeadingCoursesCategoryScores; label: string }[] = [
+    { key: "facilities", label: "Instal·lacions" },
+    { key: "clubhouse", label: "Clubhouse" },
+    { key: "valueForMoney", label: "Qualitat-preu" },
+    { key: "hospitality", label: "Hospitalitat" },
+    { key: "restaurant", label: "Restaurant" },
+    { key: "surroundings", label: "Entorn" },
+  ];
+
+  function getSortValue(club: LeadingCoursesClub, key: typeof sortKey): number | null {
+    if (key === "global") return club.leadingCourses.rating;
+    return club.leadingCourses.categoryScores?.[key] ?? null;
+  }
+
+  function toggleSort(key: typeof sortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "desc" ? "asc" : "desc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  }
+
+  const sortedClubs = lcSnapshot
+    ? lcSnapshot.clubs.slice().sort((a, b) => {
+        const va = getSortValue(a, sortKey);
+        const vb = getSortValue(b, sortKey);
+        // Els clubs sense dada per aquesta columna sempre van al final,
+        // sigui quin sigui el sentit d'ordenació.
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        return sortDir === "desc" ? vb - va : va - vb;
+      })
+    : [];
+
+  const sortedByGoogle = lcSnapshot
+    ? lcSnapshot.clubs.slice().sort((a, b) => {
+        const va = a.google?.rating ?? null;
+        const vb = b.google?.rating ?? null;
+        if (va === null && vb === null) return 0;
+        if (va === null) return 1;
+        if (vb === null) return -1;
+        return vb - va;
+      })
+    : [];
+
+  function SortHeader({ label, active, dir, onClick }: { label: string; active: boolean; dir: "asc" | "desc"; onClick: () => void }) {
+    return (
+      <th className="p-0">
+        <button
+          type="button"
+          onClick={onClick}
+          className={`w-full flex items-center justify-center gap-1 px-2 py-2 text-[9px] uppercase tracking-wide font-bold whitespace-nowrap transition-colors ${
+            active ? "text-slate-900" : "text-slate-400 hover:text-slate-600"
+          }`}
+        >
+          {label}
+          {active ? (
+            dir === "desc" ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />
+          ) : (
+            <ChevronsUpDown className="w-3 h-3 opacity-40" />
+          )}
+        </button>
+      </th>
+    );
+  }
 
   return (
     <div className="h-screen w-full flex flex-col bg-slate-50 text-slate-900 overflow-y-auto">
@@ -392,139 +468,139 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
         )}
 
         {lcSnapshot && lcSnapshot.clubs.length > 0 && (
-          <div className="bg-white border border-slate-200 divide-y divide-slate-100">
-            {lcSnapshot.clubs
-              .slice()
-              .sort((a, b) => {
-                if (a.overallRating === null) return 1;
-                if (b.overallRating === null) return -1;
-                return b.overallRating - a.overallRating;
-              })
-              .map((club) => {
-                const hasCategoryScores =
-                  club.leadingCourses.categoryScores &&
-                  Object.values(club.leadingCourses.categoryScores).some((v) => v !== null);
-                const isExpanded = expandedSlug === club.slug;
-                return (
-                <div
-                  key={club.slug}
-                  className={club.isOwnClub ? "bg-amber-50/60" : ""}
-                >
-                <div
-                  className="p-4 flex items-center justify-between gap-3 flex-wrap"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {club.isOwnClub ? (
-                      <Flag className="w-4 h-4 text-amber-500 shrink-0" />
-                    ) : (
-                      <span className="w-4 shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <p className={`text-sm truncate ${club.isOwnClub ? "font-black text-slate-900" : "font-semibold text-slate-700"}`}>
-                        {club.name}
-                        {club.isOwnClub && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-600 font-bold">(vosaltres)</span>}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {/* Leading Courses */}
-                    <div className="text-right min-w-[86px]">
-                      <p className="text-[8px] uppercase tracking-wide text-slate-400 font-bold">Leading Courses</p>
+          <div className="bg-white border border-slate-200 overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="p-0">
+                    <div className="px-3 py-2 text-[9px] uppercase tracking-wide font-bold text-slate-400 text-left">Club</div>
+                  </th>
+                  <SortHeader label="Global" active={sortKey === "global"} dir={sortDir} onClick={() => toggleSort("global")} />
+                  {CATEGORY_COLUMNS.map((col) => (
+                    <SortHeader
+                      key={col.key}
+                      label={col.label}
+                      active={sortKey === col.key}
+                      dir={sortDir}
+                      onClick={() => toggleSort(col.key)}
+                    />
+                  ))}
+                  <th className="p-0" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sortedClubs.map((club) => (
+                  <tr key={club.slug} className={club.isOwnClub ? "bg-amber-50/60" : ""}>
+                    <td className="px-3 py-2.5 min-w-[140px]">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {club.isOwnClub ? (
+                          <Flag className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        ) : (
+                          <span className="w-3.5 shrink-0" />
+                        )}
+                        <p className={`text-xs truncate ${club.isOwnClub ? "font-black text-slate-900" : "font-semibold text-slate-700"}`}>
+                          {club.name}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2.5 text-center">
                       {club.leadingCourses.rating !== null ? (
-                        <>
-                          <div className="flex items-baseline gap-1 justify-end">
-                            <span className="text-lg font-black text-slate-900 font-mono">{club.leadingCourses.rating.toFixed(1)}</span>
-                            <span className="text-[9px] text-slate-400">/10</span>
-                          </div>
-                          {club.leadingCourses.reviewCount !== null && (
-                            <p className="text-[9px] text-slate-400">{club.leadingCourses.reviewCount} ressenyes</p>
-                          )}
-                        </>
+                        <span className="text-sm font-black text-slate-900 font-mono">{club.leadingCourses.rating.toFixed(1)}</span>
                       ) : (
-                        <span
-                          className="text-xs text-rose-400 cursor-help"
-                          title={club.leadingCourses.scrapeDebug}
-                        >
-                          — error
-                        </span>
+                        <span className="text-xs text-rose-400 cursor-help" title={club.leadingCourses.scrapeDebug}>—</span>
                       )}
-                    </div>
-                    {/* Google Maps — via Places API oficial, no scraping */}
-                    <div className="text-right min-w-[70px]">
-                      <p className="text-[8px] uppercase tracking-wide text-slate-400 font-bold">Google Maps</p>
-                      {club.google && club.google.rating !== null ? (
-                        <>
-                          <div className="flex items-baseline gap-1 justify-end">
-                            <span className="text-lg font-black text-slate-900 font-mono">{club.google.rating.toFixed(1)}</span>
-                            <span className="text-[9px] text-slate-400">/5</span>
-                          </div>
-                          {club.google.reviewCount !== null && (
-                            <p className="text-[9px] text-slate-400">{club.google.reviewCount} ressenyes</p>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-xs text-rose-400 cursor-help" title={club.google?.scrapeDebug}>
-                          — error
-                        </span>
-                      )}
-                    </div>
-                    <a
-                      href={club.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                      title="Veure a Leading Courses"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                    {hasCategoryScores && (
-                      <button
-                        type="button"
-                        onClick={() => setExpandedSlug(isExpanded ? null : club.slug)}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
-                        title="Veure puntuacions per categoria"
-                      >
-                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {isExpanded && hasCategoryScores && club.leadingCourses.categoryScores && (
-                  <div className="px-4 pb-4 pt-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {(
-                      [
-                        ["maintenance", "Manteniment"],
-                        ["facilities", "Instal·lacions"],
-                        ["clubhouse", "Clubhouse"],
-                        ["valueForMoney", "Relació qualitat-preu"],
-                        ["hospitality", "Hospitalitat"],
-                        ["restaurant", "Restaurant"],
-                        ["surroundings", "Entorn"],
-                      ] as const
-                    ).map(([key, label]) => {
-                      const value = club.leadingCourses.categoryScores?.[key] ?? null;
+                    </td>
+                    {CATEGORY_COLUMNS.map((col) => {
+                      const value = club.leadingCourses.categoryScores?.[col.key] ?? null;
                       return (
-                        <div key={key} className="bg-slate-50 rounded-lg px-2.5 py-1.5">
-                          <p className="text-[9px] uppercase tracking-wide text-slate-400 font-bold truncate">{label}</p>
-                          <p className="text-sm font-black text-slate-800 font-mono">
+                        <td key={col.key} className="px-2 py-2.5 text-center">
+                          <span className={`text-xs font-mono ${value !== null ? "text-slate-700 font-bold" : "text-slate-300"}`}>
                             {value !== null ? value.toFixed(1) : "—"}
-                          </p>
-                        </div>
+                          </span>
+                        </td>
                       );
                     })}
-                  </div>
-                )}
-                </div>
-                );
-              })}
+                    <td className="px-2 py-2.5 text-right">
+                      <a
+                        href={club.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                        title="Veure a Leading Courses"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
         {lcSnapshot && (
           <p className="text-[10px] text-slate-400">
-            Actualitzat {formatDate(lcSnapshot.scrapedAt)}
+            Puntuacions sobre 10 (Leading Courses). Actualitzat {formatDate(lcSnapshot.scrapedAt)}
           </p>
         )}
       </div>
+
+      {/* Reputació Google Maps — mateixa targeta que la de Golf d'Aro, per a tots els competidors */}
+      {lcSnapshot && lcSnapshot.clubs.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div>
+            <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">
+              <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+              Reputació a Google Maps — comparativa
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Puntuació i nombre de ressenyes reals a Google Maps de Golf d'Aro i els competidors.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {sortedByGoogle.map((club) => (
+              <div
+                key={club.slug}
+                className={`border p-5 flex flex-col items-center justify-center text-center ${
+                  club.isOwnClub ? "bg-amber-50/60 border-amber-200" : "bg-white border-slate-200"
+                }`}
+              >
+                <p className={`text-xs truncate max-w-full ${club.isOwnClub ? "font-black text-slate-900" : "font-semibold text-slate-600"}`}>
+                  {club.name}
+                  {club.isOwnClub && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-600 font-bold">(vosaltres)</span>}
+                </p>
+                <div className="flex items-baseline gap-1.5 mt-2">
+                  <span className="text-4xl font-black text-slate-900 font-mono">
+                    {club.google && club.google.rating !== null ? club.google.rating.toFixed(1) : "—"}
+                  </span>
+                  <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {club.google && club.google.reviewCount !== null
+                    ? `sobre ${club.google.reviewCount} ressenyes`
+                    : club.google?.rating === null
+                    ? "sense dades"
+                    : "nombre de ressenyes no disponible"}
+                </p>
+                {club.google?.mapsUrl ? (
+                  <a
+                    href={club.google.mapsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold border border-slate-300 text-slate-700 hover:bg-slate-50"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Veure a Google Maps
+                  </a>
+                ) : club.google?.scrapeDebug ? (
+                  <p className="text-[10px] text-rose-400 mt-3 cursor-help" title={club.google.scrapeDebug}>
+                    error en llegir Google
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Mapa dels camps — fent clic a un pin s'obre la web del club */}
       <div className="space-y-3 pt-2">

@@ -3,7 +3,7 @@ import { Star, RefreshCw, ExternalLink, TrendingUp, TrendingDown, Minus, AlertTr
 import GolfClubsMap from "./GolfClubsMap";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
-import { ReputationSnapshot, RatingBreakdown, LeadingCoursesSnapshot, LeadingCoursesClub, ReviewSourceResult, LeadingCoursesCategoryScores } from "../types";
+import { ReputationSnapshot, LeadingCoursesSnapshot, LeadingCoursesClub, ReviewSourceResult, LeadingCoursesCategoryScores } from "../types";
 
 const NAVY = "#033b7a";
 const CACHE_KEY = "golfsana_reputation_cache";
@@ -232,8 +232,9 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
     return { icon: TrendingDown, label: diff.toFixed(1), color: "text-rose-600" };
   })();
 
-  const breakdown: RatingBreakdown | null = snapshot?.ratingBreakdown || null;
-  const maxBreakdownCount = breakdown ? Math.max(breakdown[5], breakdown[4], breakdown[3], breakdown[2], breakdown[1], 1) : 1;
+  // Dades del propi club (Golf d'Aro) al benchmark de Leading Courses, per
+  // mostrar-les com a targeta al costat de la de Google a "Reputació online".
+  const ownClubLc = lcSnapshot?.clubs.find((c) => c.isOwnClub) ?? null;
 
   // Columnes de la taula de benchmark — "global" és leadingCourses.rating
   // (sobre 10), la resta són les categories de Leading Courses (també sobre
@@ -338,7 +339,7 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
               Reputació online
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Puntuació i ressenyes reals del club a Google Maps.
+              Puntuació i ressenyes reals del club a Google Maps i a Leading Courses.
             </p>
           </div>
           <button
@@ -401,30 +402,38 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
             </a>
           </div>
 
-          {/* Desglossament per estrelles */}
-          <div className="bg-white border border-slate-200 p-6">
-            <p className="text-[10px] uppercase tracking-wide font-bold text-slate-400 mb-3">
-              Desglossament per estrelles
-            </p>
-            {breakdown ? (
-              <div className="space-y-2">
-                {([5, 4, 3, 2, 1] as const).map((star) => (
-                  <div key={star} className="flex items-center gap-2">
-                    <span className="text-xs text-slate-600 font-mono w-3">{star}</span>
-                    <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
-                    <div className="flex-1 h-3 bg-slate-100 relative overflow-hidden">
-                      <div
-                        className="h-full bg-amber-400"
-                        style={{ width: `${(breakdown[star] / maxBreakdownCount) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-slate-500 font-mono w-10 text-right">{breakdown[star]}</span>
-                  </div>
-                ))}
-              </div>
+          {/* Puntuació a Leading Courses del propi club — mateix estil que la targeta de Google, per tenir les dues fonts juntes d'un cop d'ull */}
+          <div className="bg-white border border-slate-200 p-6 flex flex-col items-center justify-center text-center">
+            <p className="text-[10px] uppercase tracking-wide font-bold text-slate-400 mb-1">Leading Courses</p>
+            {ownClubLc && ownClubLc.leadingCourses.rating !== null ? (
+              <>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-black text-slate-900 font-mono">{ownClubLc.leadingCourses.rating.toFixed(1)}</span>
+                  <span className="text-sm text-slate-400 font-bold">/10</span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {ownClubLc.leadingCourses.reviewCount !== null
+                    ? `sobre ${ownClubLc.leadingCourses.reviewCount} ressenyes`
+                    : "nombre de ressenyes no disponible"}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-3">
+                  Actualitzat {formatDate(lcSnapshot?.scrapedAt)}
+                </p>
+                <a
+                  href={ownClubLc.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-4 flex items-center gap-1.5 px-4 py-2 text-xs font-bold border border-slate-300 text-slate-700 hover:bg-slate-50"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Veure la fitxa a Leading Courses
+                </a>
+              </>
             ) : (
-              <p className="text-xs text-slate-400 py-6 text-center">
-                Desglossament no disponible en aquesta sincronització.
+              <p className="text-xs text-slate-400 py-10 text-center">
+                {ownClubLc
+                  ? "Sense dada en aquesta sincronització."
+                  : 'Prem "Sincronitzar benchmark" (més avall) per veure aquesta puntuació.'}
               </p>
             )}
           </div>

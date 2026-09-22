@@ -234,40 +234,87 @@ function parseOneGolf(html: string): { rating: number | null; reviewCount: numbe
   return { rating: null, reviewCount: null };
 }
 
-async function fetchSource(
-  url: string,
-  scrapingBeeKey: string | undefined
-): Promise<{ html: string | null; scrapeDebug?: string }> {
-  // 1r intent: directe, sense ScrapingBee.
-  const direct = await fetchWithRetry(
-    url,
-    { headers: { "Accept-Language": "en-US,en;q=0.9", "User-Agent": CHROME_UA }, signal: AbortSignal.timeout(25000) },
-    2
-  );
+interface ProxyFetchResult {
+  resp: Response | null;
+  lastErr: any;
+  attempts: number;
+  proxyLabel: string;
+}
+
+// Mateix helper que api/rates.ts (mantingut sincronitzat a mà): tria
+// automàticament quin proxy fer servir segons quines variables d'entorn hi
+// ha configurades a Vercel. Bright Data (Web Unlocker) és la PRIMERA opció
+// (crèdits gratuïts recurrents cada mes); ScrapingBee i ScraperAPI es
+// mantenen com a reserva. 1golf.eu bloqueja les peticions directes (HTTP
+// 403) i necessita SEMPRE un proxy — per això aquest fitxer també prova
+// Bright Data abans de rendir-se, cosa que abans no feia.
+async function fetchViaBestProxy(targetUrl: string, directHeaders: Record<string, string>): Promise<ProxyFetchResult> {
+  const brightDataKey = process.env.BRIGHTDATA_API_KEY;
+  const brightDataZone = process.env.BRIGHTDATA_ZONE;
+  const scrapingBeeKey = process.env.SCRAPINGBEE_KEY;
+  const scraperApiKey = process.env.SCRAPERAPI_KEY;
+  const usePremium = process.env.SCRAPERAPI_PREMIUM === "true";
+
+  if (brightDataKey && brightDataZone) {
+    const { resp, lastErr, attempts } = await fetchWithRetry(
+      "https://api.brightdata.com/request",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${brightDataKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ zone: brightDataZone, url: targetUrl, format: "raw" }),
+        signal: AbortSignal.timeout(20000),
+      },
+      3
+    );
+    return { resp, lastErr, attempts, proxyLabel: "via Bright Data (Web Unlocker)" };
+  }
+
+  if (scrapingBeeKey) {
+    const url = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(targetUrl)}&premium_proxy=true&render_js=false`;
+    const { resp, lastErr, attempts } = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(20000) }, 3);
+    return { resp, lastErr, attempts, proxyLabel: "via ScrapingBee (premium)" };
+  }
+
+  if (scraperApiKey) {
+    const url = `https://api.scraperapi.com/?api_key=${scraperApiKey}&url=${encodeURIComponent(targetUrl)}${usePremium ? "&premium=true" : ""}`;
+    const { resp, lastErr, attempts } = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(20000) }, 3);
+    return { resp, lastErr, attempts, proxyLabel: `via ScraperAPI${usePremium ? " premium" : " standard"}` };
+  }
+
+  const { resp, lastErr, attempts } = await fetchWithRetry(targetUrl, { headers: directHeaders, signal: AbortSignal.timeout(8000) }, 1);
+  return { resp, lastErr, attempts, proxyLabel: "" };
+}
+
+async function fetchSource(url: string): Promise<{ html: string | null; scrapeDebug?: string }> {
+  const directHeaders = { "Accept-Language": "en-US,en;q=0.9", "User-Agent": CHROME_UA };
+
+  // 1r intent: directe, sense proxy.
+  const direct = await fetchWithRetry(url, { headers: directHeaders, signal: AbortSignal.timeout(25000) }, 2);
   if (direct.resp?.ok) {
     return { html: await direct.resp.text() };
   }
 
-  // 2n intent (reserva): ScrapingBee, només si hi ha clau configurada.
-  if (scrapingBeeKey) {
-    const beeUrl = `https://app.scrapingbee.com/api/v1/?api_key=${scrapingBeeKey}&url=${encodeURIComponent(
-      url
-    )}&premium_proxy=true&render_js=false`;
-    const bee = await fetchWithRetry(beeUrl, { headers: { "Accept-Language": "en-US,en;q=0.9" }, signal: AbortSignal.timeout(25000) }, 2);
-    if (bee.resp?.ok) {
-      return { html: await bee.resp.text() };
-    }
+  // 2n intent (reserva): el millor proxy disponible (Bright Data →
+  // ScrapingBee → ScraperAPI), només si hi ha alguna clau configurada.
+  const proxy = await fetchViaBestProxy(url, directHeaders);
+  if (proxy.proxyLabel && proxy.resp?.ok) {
+    return { html: await proxy.resp.text() };
+  }
+  if (!proxy.proxyLabel) {
+    // Cap proxy configurat: només tenim el resultat directe.
     return {
       html: null,
-      scrapeDebug: `Directe: ${direct.resp ? `HTTP ${direct.resp.status}` : String(direct.lastErr?.message || direct.lastErr)} · ScrapingBee: ${bee.resp ? `HTTP ${bee.resp.status}` : String(bee.lastErr?.message || bee.lastErr)}`,
+      scrapeDebug: direct.resp
+        ? `HTTP ${direct.resp.status} ${direct.resp.statusText}`
+        : `Error de xarxa: ${String(direct.lastErr?.message || direct.lastErr)}`,
     };
   }
 
   return {
     html: null,
-    scrapeDebug: direct.resp
-      ? `HTTP ${direct.resp.status} ${direct.resp.statusText}`
-      : `Error de xarxa: ${String(direct.lastErr?.message || direct.lastErr)}`,
+    scrapeDebug: `Directe: ${direct.resp ? `HTTP ${direct.resp.status}` : String(direct.lastErr?.message || direct.lastErr)} · ${proxy.proxyLabel}: ${
+      proxy.resp ? `HTTP ${proxy.resp.status}` : String(proxy.lastErr?.message || proxy.lastErr)
+    }`,
   };
 }
 
@@ -275,11 +322,10 @@ async function scrapeSource(
   url: string,
   scale: 5 | 10,
   parser: (html: string) => { rating: number | null; reviewCount: number | null },
-  scrapingBeeKey: string | undefined,
   withCategoryScores: boolean = false
 ): Promise<ReviewSourceResult> {
   try {
-    const { html, scrapeDebug } = await fetchSource(url, scrapingBeeKey);
+    const { html, scrapeDebug } = await fetchSource(url);
     if (!html) {
       return { rating: null, scale, reviewCount: null, source: "error", scrapeDebug };
     }
@@ -294,9 +340,9 @@ async function scrapeSource(
   }
 }
 
-async function scrapeClub(target: ClubTarget, scrapingBeeKey: string | undefined): Promise<ClubResult> {
-  const leadingCourses = await scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, scrapingBeeKey, true);
-  const oneGolf = await scrapeSource(target.oneGolfUrl, 5, parseOneGolf, scrapingBeeKey);
+async function scrapeClub(target: ClubTarget): Promise<ClubResult> {
+  const leadingCourses = await scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, true);
+  const oneGolf = await scrapeSource(target.oneGolfUrl, 5, parseOneGolf);
 
   return {
     slug: target.slug,
@@ -315,8 +361,6 @@ async function scrapeClub(target: ClubTarget, scrapingBeeKey: string | undefined
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const scrapingBeeKey = process.env.SCRAPINGBEE_KEY; // opcional — només com a reserva
-
   // Mode diagnòstic: ?debug=<slug>&source=leadingcourses|onegolf retorna el
   // HTML cru, sense intentar interpretar-lo.
   const debugSlug = typeof req.query.debug === "string" ? req.query.debug : null;
@@ -327,7 +371,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const wantSource = req.query.source === "onegolf" ? "onegolf" : "leadingcourses";
     const url = wantSource === "onegolf" ? target.oneGolfUrl : target.leadingCoursesUrl;
-    const { html, scrapeDebug } = await fetchSource(url, scrapingBeeKey);
+    const { html, scrapeDebug } = await fetchSource(url);
     if (!html) {
       return res.status(200).json({ error: scrapeDebug });
     }
@@ -335,10 +379,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Es llegeixen els 7 clubs D'UN EN UN (no en paral·lel) — el pla de
-  // ScrapingBee (usat només com a reserva) limita a 5 peticions simultànies.
+  // ScrapingBee/Bright Data (usats només com a reserva) limita peticions
+  // simultànies.
   const clubs: ClubResult[] = [];
   for (const target of TARGETS) {
-    const result = await scrapeClub(target, scrapingBeeKey);
+    const result = await scrapeClub(target);
     clubs.push(result);
   }
 

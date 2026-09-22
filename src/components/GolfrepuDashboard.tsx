@@ -335,7 +335,7 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
         </button>
       </header>
 
-      <div className="flex-1 p-6 space-y-6 max-w-5xl w-full mx-auto">
+      <div className="flex-1 p-6 space-y-6 max-w-7xl w-full mx-auto">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h3 className="font-extrabold text-slate-900 text-base uppercase tracking-wider flex items-center gap-2">

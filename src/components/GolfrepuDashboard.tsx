@@ -47,6 +47,9 @@ function normalizeClub(raw: any): LeadingCoursesClub {
         }
       : emptySource(10);
 
+  const google: ReviewSourceResult =
+    raw?.google && typeof raw.google === "object" ? { scale: 5, rating: null, reviewCount: null, source: "error", ...raw.google } : emptySource(5);
+
   return {
     slug: raw?.slug || "unknown",
     name: raw?.name || "Club desconegut",
@@ -57,6 +60,7 @@ function normalizeClub(raw: any): LeadingCoursesClub {
     source: leadingCourses.source,
     scrapeDebug: leadingCourses.scrapeDebug,
     leadingCourses,
+    google,
   };
 }
 
@@ -169,13 +173,31 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
     setIsLcLoading(true);
     setLcError(null);
     try {
-      const resp = await fetch("/api/leading-courses");
-      const data = await resp.json();
+      // Leading Courses i Google es demanen en paral·lel — són endpoints
+      // independents (un fa scraping directe, l'altre crida la Places API
+      // oficial de Google) i es mesclen aquí per club (slug).
+      const [lcResp, googleResp] = await Promise.all([
+        fetch("/api/leading-courses"),
+        fetch("/api/google-reviews").catch(() => null),
+      ]);
+      const data = await lcResp.json();
+      const googleData = googleResp ? await googleResp.json().catch(() => null) : null;
+      const googleBySlug = new Map<string, any>((googleData?.clubs || []).map((g: any) => [g.slug, g]));
+
+      const mergedClubs = (data.clubs || []).map((c: any) => {
+        const g = googleBySlug.get(c.slug);
+        return {
+          ...c,
+          google: g
+            ? { rating: g.rating, scale: 5, reviewCount: g.reviewCount, source: g.source, scrapeDebug: g.scrapeDebug }
+            : { rating: null, scale: 5, reviewCount: null, source: "error", scrapeDebug: googleData?.error || "Sense resposta de Google." },
+        };
+      });
 
       const newSnapshot = normalizeSnapshot({
         id: "current",
         scrapedAt: data.scrapedAt,
-        clubs: data.clubs,
+        clubs: mergedClubs,
       });
       setLcSnapshot(newSnapshot);
       localStorage.setItem(LC_CACHE_KEY, JSON.stringify(newSnapshot));
@@ -423,6 +445,25 @@ export default function GolfrepuDashboard({ onBack }: GolfrepuDashboardProps) {
                           className="text-xs text-rose-400 cursor-help"
                           title={club.leadingCourses.scrapeDebug}
                         >
+                          — error
+                        </span>
+                      )}
+                    </div>
+                    {/* Google Maps — via Places API oficial, no scraping */}
+                    <div className="text-right min-w-[70px]">
+                      <p className="text-[8px] uppercase tracking-wide text-slate-400 font-bold">Google Maps</p>
+                      {club.google && club.google.rating !== null ? (
+                        <>
+                          <div className="flex items-baseline gap-1 justify-end">
+                            <span className="text-lg font-black text-slate-900 font-mono">{club.google.rating.toFixed(1)}</span>
+                            <span className="text-[9px] text-slate-400">/5</span>
+                          </div>
+                          {club.google.reviewCount !== null && (
+                            <p className="text-[9px] text-slate-400">{club.google.reviewCount} ressenyes</p>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-rose-400 cursor-help" title={club.google?.scrapeDebug}>
                           — error
                         </span>
                       )}

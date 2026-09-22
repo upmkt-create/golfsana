@@ -2,14 +2,18 @@
 // VERCEL API ROUTE — /api/leading-courses
 // ============================================================================
 // Llegeix, per a Golf d'Aro i els 6 competidors ja identificats al
-// comparador de tarifes, la puntuació i el nombre de ressenyes a dues fonts
-// de golf (Leading Courses i 1golf.eu / Albrecht Golf Guide).
+// comparador de tarifes, la puntuació, el nombre de ressenyes i les
+// puntuacions per categoria a Leading Courses.
 //
-// Totes dues pàgines són majoritàriament renderitzades al servidor
+// 1golf.eu es va treure (22/09/2026): bloqueja SEMPRE les peticions
+// directes (HTTP 403) i necessitava un proxy en cada sincronització, cosa
+// que allargava l'endpoint i no acabava de donar dades fiables — Isabel va
+// demanar treure-ho en lloc de seguir depenent-ne.
+//
+// La pàgina de Leading Courses és majoritàriament renderitzada al servidor
 // (confirmat manualment abans de construir aquest fitxer) — per això es
-// prova SEMPRE primer una petició directa, SENSE ScrapingBee. Només si això
-// falla (per exemple, si algun dia comencen a bloquejar peticions sense
-// proxy) es fa servir ScrapingBee com a reserva, si hi ha clau configurada.
+// prova SEMPRE primer una petició directa, sense proxy. Només si això
+// falla es fa servir el millor proxy disponible com a reserva.
 //
 // ús: GET /api/leading-courses
 // ============================================================================
@@ -27,7 +31,6 @@ interface ClubTarget {
   name: string;
   isOwnClub: boolean;
   leadingCoursesUrl: string;
-  oneGolfUrl: string;
 }
 
 // Fitxes confirmades manualment (21/08/2026). Mateixos slugs que ja es fan
@@ -38,49 +41,42 @@ const TARGETS: ClubTarget[] = [
     name: "Club Golf d'Aro - Mas Nou",
     isOwnClub: true,
     leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-golf-d-aro-mas-nou",
-    oneGolfUrl: "https://www.1golf.eu/en/club/club-golf-d-aro-mas-nou/reviews/",
   },
   {
     slug: "torremirona",
     name: "Torremirona Golf Club",
     isOwnClub: false,
     leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/torremirona-golf-&-spa-resort",
-    oneGolfUrl: "https://www.1golf.eu/en/club/torremirona-golf-club/reviews/",
   },
   {
     slug: "emporda",
     name: "Empordà Golf Club",
     isOwnClub: false,
     leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/empord%C3%A0-golf-resort",
-    oneGolfUrl: "https://www.1golf.eu/en/club/emporda-golf-club/reviews/",
   },
   {
     slug: "camiral",
     name: "Camiral Golf & Wellness",
     isOwnClub: false,
     leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/camiral-golf-wellness-fka-pga-catalunya",
-    oneGolfUrl: "https://www.1golf.eu/en/club/camiral-a-quinta-do-lago-resort/reviews/",
   },
   {
     slug: "pals",
     name: "Golf de Pals",
     isOwnClub: false,
     leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/golf-de-pals",
-    oneGolfUrl: "https://www.1golf.eu/en/club/golf-de-pals/reviews/",
   },
   {
     slug: "costabrava",
     name: "Golf Costa Brava",
     isOwnClub: false,
     leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-de-golf-costa-brava",
-    oneGolfUrl: "https://www.1golf.eu/en/club/club-de-golf-costa-brava/reviews/",
   },
   {
     slug: "perelada",
     name: "Camp de Golf Perelada",
     isOwnClub: false,
     leadingCoursesUrl: "https://www.leadingcourses.com/clubs/europe+spain+catalonia/club-de-golf-peralada",
-    oneGolfUrl: "https://www.1golf.eu/en/club/golf-club-peralada/reviews/",
   },
 ];
 
@@ -113,7 +109,6 @@ interface ClubResult {
   source: "live" | "error";
   scrapeDebug?: string;
   leadingCourses: ReviewSourceResult;
-  oneGolf: ReviewSourceResult;
 }
 
 const CHROME_UA =
@@ -215,23 +210,6 @@ function parseCategoryScores(html: string): LeadingCoursesCategoryScores | null 
     }
   }
   return foundAny ? (result as LeadingCoursesCategoryScores) : null;
-}
-
-// Confirmat manualment el 21/08/2026: la pàgina porta una etiqueta
-// <meta name="description" content="Read 38 reviews for Club Golf
-// d'Aro-Mas Nou in Platja d'Aro, España, rated 3.6 from 5 by our users."/>
-// — molt més estable que llegir el text visible o taules de la pàgina.
-function parseOneGolf(html: string): { rating: number | null; reviewCount: number | null } {
-  const match = html.match(
-    /Read\s+(\d+)\s+reviews?\s+for[\s\S]*?rated\s+(\d[.,]\d)\s+from\s+5/i
-  );
-  if (match) {
-    return {
-      reviewCount: parseInt(match[1], 10),
-      rating: parseFloat(match[2].replace(",", ".")),
-    };
-  }
-  return { rating: null, reviewCount: null };
 }
 
 interface ProxyFetchResult {
@@ -352,12 +330,7 @@ async function scrapeSource(
 }
 
 async function scrapeClub(target: ClubTarget): Promise<ClubResult> {
-  // Les dues fonts d'un mateix club són independents — es demanen en
-  // paral·lel (abans eren seqüencials) per no duplicar el temps d'espera.
-  const [leadingCourses, oneGolf] = await Promise.all([
-    scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, true),
-    scrapeSource(target.oneGolfUrl, 5, parseOneGolf),
-  ]);
+  const leadingCourses = await scrapeSource(target.leadingCoursesUrl, 10, parseLeadingCourses, true);
 
   return {
     slug: target.slug,
@@ -371,22 +344,19 @@ async function scrapeClub(target: ClubTarget): Promise<ClubResult> {
     source: leadingCourses.source,
     scrapeDebug: leadingCourses.scrapeDebug,
     leadingCourses,
-    oneGolf,
   };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Mode diagnòstic: ?debug=<slug>&source=leadingcourses|onegolf retorna el
-  // HTML cru, sense intentar interpretar-lo.
+  // Mode diagnòstic: ?debug=<slug> retorna el HTML cru de Leading Courses,
+  // sense intentar interpretar-lo.
   const debugSlug = typeof req.query.debug === "string" ? req.query.debug : null;
   if (debugSlug) {
     const target = TARGETS.find((t) => t.slug === debugSlug);
     if (!target) {
       return res.status(200).json({ error: `Slug desconegut: ${debugSlug}` });
     }
-    const wantSource = req.query.source === "onegolf" ? "onegolf" : "leadingcourses";
-    const url = wantSource === "onegolf" ? target.oneGolfUrl : target.leadingCoursesUrl;
-    const { html, scrapeDebug } = await fetchSource(url);
+    const { html, scrapeDebug } = await fetchSource(target.leadingCoursesUrl);
     if (!html) {
       return res.status(200).json({ error: scrapeDebug });
     }
@@ -397,7 +367,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // per no arriscar-se a passar cap límit de concurrència del proxy que no
   // tenim confirmat) — abans es feien D'UN EN UN i, combinat amb els
   // reintents del proxy, l'endpoint podia superar els 60s que permet
-  // Vercel i acabar en timeout total (vist als logs el 22/09/2026).
+  // Vercel i acabar en timeout total (vist als logs el 22/09/2026). Ara amb
+  // només Leading Courses (1golf.eu tret) hi ha molt més marge.
   const CONCURRENCY = 3;
   const clubs: ClubResult[] = [];
   for (let i = 0; i < TARGETS.length; i += CONCURRENCY) {

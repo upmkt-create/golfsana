@@ -1,4 +1,5 @@
 export type UserRole = "admin" | "owner" | "member";
+export type UserAccessScope = "normal" | "caddy_master" | "greenkeeper";
 
 export interface Department {
   id: string;
@@ -26,7 +27,9 @@ export interface UserProfile {
   accessCode?: string; // Custom access code for non-google auth
   notes?: string; // (Antic — format previ d'una sola nota. Es manté per compatibilitat de lectura.)
   notesList?: MemberNote[]; // Notes internes sobre aquest membre — se'n poden afegir vàries
-  restrictedToOwnDepartment?: boolean; // Si és true, aquest membre només veu/pot accedir al(s) seu(s) propi(s) espai(s) de treball — pensat per a rols molt acotats (Caddy Master, Greenkeeper...). Per defecte false/absent = comportament normal (veuen tots els espais no privats, com sempre).
+  restrictedToOwnDepartment?: boolean; // Legacy: es manté per compatibilitat amb perfils ja creats.
+  accessScope?: UserAccessScope; // normal = equip transversal; caddy_master / greenkeeper = accés operatiu restringit.
+  allowedWorkspaceIds?: string[]; // Espais exactes accessibles quan el perfil és restringit.
 }
 
 export interface ActivityLog {

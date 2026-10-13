@@ -13,6 +13,7 @@ import { stripHtmlToText } from "./lib/textUtils";
 import {
   signInAnonymously,
   onAuthStateChanged,
+  signOut,
   GoogleAuthProvider,
   signInWithPopup
 } from "firebase/auth";
@@ -524,6 +525,17 @@ export default function App() {
       logActivity(currentUser, "Tancament de sessió");
     }
     localStorage.removeItem("golfsana_currentUser");
+
+    // Important: the previous implementation only cleared React state and
+    // left the Firebase anonymous session alive in the browser. With
+    // authenticated-only Firestore rules, logout must also invalidate that
+    // Firebase session.
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn("[Auth] No s'ha pogut tancar la sessió Firebase:", err);
+    }
+
     setCurrentUser(null);
     setFirebaseUser(null);
     setIsLogoutConfirmationOpen(false);
@@ -630,7 +642,9 @@ export default function App() {
 
   // 2. Real-time synchronizations from Firestore once authenticated
   useEffect(() => {
-    if (authLoading) return;
+    // Firestore is no longer readable before authentication. Wait until both
+    // the Firebase session and the validated Golfsana profile are present.
+    if (authLoading || !firebaseUser || !currentUser) return;
 
     // A-0. Sync Deleted Items List
     const unsubDeleted = onSnapshot(collection(db, "deletedItems"), (snapshot) => {
@@ -950,7 +964,7 @@ export default function App() {
       unsubGolf();
       unsubDeleted();
     };
-  }, [authLoading]);
+  }, [authLoading, firebaseUser?.uid, currentUser?.id]);
 
   // Automatic Ambient Scraper Service for Competitor Prices
   useEffect(() => {

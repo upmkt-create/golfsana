@@ -28,6 +28,7 @@ export interface UserProfile {
   authUid?: string; // Firebase Authentication UID once this profile has migrated.
   authProvider?: "password"; // Current real Firebase provider for this Golfsana profile.
   authMigratedAt?: string; // ISO timestamp of the first successful real Firebase login.
+  passwordChangedAt?: string; // ISO timestamp after replacing the legacy credential with a private Firebase password.
   notes?: string; // (Antic — format previ d'una sola nota. Es manté per compatibilitat de lectura.)
   notesList?: MemberNote[]; // Notes internes sobre aquest membre — se'n poden afegir vàries
   restrictedToOwnDepartment?: boolean; // Legacy: es manté per compatibilitat amb perfils ja creats.

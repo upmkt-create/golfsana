@@ -278,19 +278,16 @@ export const STARTER_MEMBERS: UserProfile[] = [
     name: "Isabel",
     email: "info@up-mktdigital.com",
     role: "admin",
-    avatar: "I",
-    departmentId: "dep-comercial",
-    departmentIds: ["dep-comercial", "dep-comercial", "dep-marqueting", "dep-esportiu", "dep-comercial", "dep-pitch-putt", "dep-comercial"],
-    accessCode: "1011923Aipa"
+    accessScope: "normal",
+    avatar: "I"
   },
   {
     id: "member_rocio",
     name: "Rocío",
     email: "rocio@golfdaro.com",
     role: "admin",
+    accessScope: "normal",
     avatar: "R",
-    departmentId: "dep-pitch-putt",
-    departmentIds: ["dep-comercial", "dep-comercial", "dep-marqueting", "dep-esportiu", "dep-comercial", "dep-pitch-putt", "dep-comercial"],
     accessCode: "ADMIN-ROCIO-2026"
   },
   {

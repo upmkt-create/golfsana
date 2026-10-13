@@ -598,6 +598,7 @@ export default function App() {
     // First successful legacy login upgrades the account automatically to
     // Firebase Email/Password using the same temporary credential. This lets
     // us migrate the team progressively without locking anyone out.
+    let firebaseAccountAlreadyExists = false;
     try {
       if (auth.currentUser) await signOut(auth);
 
@@ -606,6 +607,7 @@ export default function App() {
         credential = await createUserWithEmailAndPassword(auth, normEmail, normCode);
       } catch (createErr: any) {
         if (createErr?.code !== "auth/email-already-in-use") throw createErr;
+        firebaseAccountAlreadyExists = true;
         credential = await signInWithEmailAndPassword(auth, normEmail, normCode);
       }
 
@@ -614,9 +616,17 @@ export default function App() {
     } catch (migrationErr: any) {
       console.warn("[Auth migration] Could not upgrade legacy account:", migrationErr);
 
-      // Only accounts that have never migrated may temporarily keep using the
-      // old flow. This fallback will be removed after all team accounts have
-      // completed the transition.
+      // If Firebase already has an account for this email, never allow the old
+      // access code to bypass its password. A failed Firebase password login
+      // must remain a failed login even if migration metadata was not saved.
+      if (firebaseAccountAlreadyExists) {
+        if (auth.currentUser?.isAnonymous) await signOut(auth);
+        throw migrationErr;
+      }
+
+      // Only accounts that genuinely do not have a Firebase password identity
+      // yet may temporarily keep using the old flow. This fallback disappears
+      // after the migration is complete.
       try {
         if (!auth.currentUser) await signInAnonymously(auth);
         setCurrentUser(legacyMatch);

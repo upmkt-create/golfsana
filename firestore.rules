@@ -1,154 +1,171 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Safety net default-deny rule
+
+    // Deny by default: every collection must be explicitly authorized below.
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isAdmin() {
-      return isSignedIn();
-    }
-
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string
+        && id.size() > 0
+        && id.size() <= 135
+        && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
       return request.resource.data;
     }
 
-    function existing() {
-      return resource.data;
+    function isValidUser(data, userId) {
+      return isValidId(userId)
+        && data.id is string
+        && data.id == userId
+        && data.id.size() <= 128;
     }
 
-    // --- Entity Validation Helpers ---
-    function isValidUser(data) {
-      return data.id is string && data.id.size() <= 128;
+    function isValidWorkspace(data, workspaceId) {
+      return isValidId(workspaceId)
+        && data.id is string
+        && data.id == workspaceId;
     }
 
-    function isValidWorkspace(data) {
-      return data.id is string && data.id.size() <= 128;
+    function isValidProject(data, projectId) {
+      return isValidId(projectId)
+        && data.id is string
+        && data.id == projectId;
     }
 
-    // Relaxed for robustness and prevent write/rules blockages
-    function isValidProject(data) {
-      return data.id is string && data.id.size() <= 128;
+    function isValidTask(data, taskId) {
+      return isValidId(taskId)
+        && data.id is string
+        && data.id == taskId;
     }
 
-    function isValidTask(data) {
-      return data.id is string && data.id.size() <= 128;
+    function isValidComment(data, commentId) {
+      return isValidId(commentId)
+        && data.id is string
+        && data.id == commentId;
     }
 
-    function isValidComment(data) {
-      return data.id is string && data.id.size() <= 128;
+    function isValidGolfCourse(data, courseId) {
+      return isValidId(courseId)
+        && data.id is string
+        && data.id == courseId;
     }
 
-    function isValidGolfCourse(data) {
-      return data.id is string && data.id.size() <= 128;
+    function isValidNotification(data, notificationId) {
+      return isValidId(notificationId)
+        && data.id is string
+        && data.id == notificationId;
     }
 
-    function isValidNotification(data) {
-      return data.id is string && data.id.size() <= 135;
+    function isValidInfoNote(data, noteId) {
+      return isValidId(noteId)
+        && data.id is string
+        && data.id == noteId;
     }
 
     function isValidLog(data) {
-      return data.userId is string && data.userId.size() <= 128;
+      return data.userId is string
+        && data.userId.size() > 0
+        && data.userId.size() <= 128
+        && data.action is string
+        && data.action.size() > 0;
     }
 
-    function isValidInfoNote(data) {
-      return data.id is string && data.id.size() <= 128;
-    }
+    // -----------------------------------------------------------------------
+    // PHASE 1 SECURITY CONTAINMENT
+    // -----------------------------------------------------------------------
+    // The current app still uses Firebase Anonymous Auth behind its custom
+    // email + access-code screen. Requiring request.auth here closes all
+    // completely unauthenticated Firestore access without breaking the
+    // current application flow.
+    //
+    // This is intentionally NOT the final authorization model. The next
+    // security phase must replace the anonymous/custom-code login so rules
+    // can enforce member/admin/workspace permissions server-side.
+    // -----------------------------------------------------------------------
 
-    // --- Collections Routing Rules ---
-
-    // USERS COLLECTION
     match /users/{userId} {
-      allow list, get: if true;
-      allow create, update: if isValidUser(incoming());
-      allow delete: if true;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidUser(incoming(), userId);
+      allow delete: if isSignedIn() && isValidId(userId);
     }
 
-    // WORKSPACES COLLECTION
     match /workspaces/{workspaceId} {
-      allow list, get: if true;
-      allow create, update: if isValidWorkspace(incoming());
-      allow delete: if true;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidWorkspace(incoming(), workspaceId);
+      allow delete: if isSignedIn() && isValidId(workspaceId);
     }
 
-    // PROJECTS COLLECTION
     match /projects/{projectId} {
-      allow list, get: if true;
-      allow create, update: if isValidProject(incoming());
-      allow delete: if true;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidProject(incoming(), projectId);
+      allow delete: if isSignedIn() && isValidId(projectId);
     }
 
-    // TASKS COLLECTION
     match /tasks/{taskId} {
-      allow list, get: if true;
-      allow create, update: if isValidTask(incoming());
-      allow delete: if true;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidTask(incoming(), taskId);
+      allow delete: if isSignedIn() && isValidId(taskId);
     }
 
-    // COMMENTS COLLECTION
     match /comments/{commentId} {
-      allow list, get: if true;
-      allow create, update: if isValidComment(incoming());
-      allow delete: if true;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidComment(incoming(), commentId);
+      allow delete: if isSignedIn() && isValidId(commentId);
     }
 
-    // GOLF COURSES ANALYSIS COLLECTION
     match /golfCourses/{courseId} {
-      allow list, get: if true;
-      allow create, update: if isValidGolfCourse(incoming());
-      allow delete: if true;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidGolfCourse(incoming(), courseId);
+      allow delete: if isSignedIn() && isValidId(courseId);
     }
 
-    // NOTIFICATIONS COLLECTION
     match /notifications/{notificationId} {
-      allow list, get: if true;
-      allow create, update: if isValidNotification(incoming());
-      allow delete: if true;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidNotification(incoming(), notificationId);
+      allow delete: if isSignedIn() && isValidId(notificationId);
     }
 
-    // INFO NOTES COLLECTION (comunicats de l'equip amb confirmació de lectura)
     match /infoNotes/{noteId} {
-      allow list, get: if true;
-      allow create, update: if isValidInfoNote(incoming());
-      allow delete: if true;
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidInfoNote(incoming(), noteId);
+      allow delete: if isSignedIn() && isValidId(noteId);
     }
 
-    // REPUTATION SNAPSHOTS COLLECTION (Golfrepu — puntuació de Google Maps)
+    match /meetingMinutes/{minuteId} {
+      allow read, write: if isSignedIn() && isValidId(minuteId);
+    }
+
     match /reputationSnapshots/{snapshotId} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn() && isValidId(snapshotId);
     }
 
-    // LEADING COURSES SNAPSHOTS COLLECTION (Golfrepu — benchmark competidors)
     match /leadingCoursesSnapshots/{snapshotId} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn() && isValidId(snapshotId);
     }
 
-    // DELETEDITEMS COLLECTION
     match /deletedItems/{itemId} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn() && isValidId(itemId);
     }
 
-    // AUDIT LOGS COLLECTION
+    // Audit logs remain append-only: authenticated clients can add entries,
+    // but no client can edit or erase the audit trail.
     match /logs/{logId} {
-      allow list, get: if true;
-      allow create: if isValidLog(incoming());
-      allow update, delete: if false; // Audit logs are immutable and permanent
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidLog(incoming());
+      allow update, delete: if false;
     }
 
-    // PRESENCE COLLECTION
     match /presence/{userId} {
-      allow read, write: if true;
+      allow read, write: if isSignedIn() && isValidId(userId);
     }
   }
 }

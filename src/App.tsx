@@ -50,6 +50,8 @@ import {
 } from "./data";
 import { getDepartmentOptions } from "./lib/departments";
 import {
+  CADDY_MASTER_WORKSPACE_ID,
+  GREENKEEPER_WORKSPACE_ID,
   canAccessWorkspace,
   getOwnWorkspaceIds,
   getRestrictedWorkspaceIds,
@@ -2258,6 +2260,7 @@ export default function App() {
       name,
       email: email.trim().toLowerCase(),
       role,
+      accessScope: "normal",
       avatar,
       accessCode: accessCode.trim(),
       createdAt: new Date().toISOString()
@@ -2296,23 +2299,47 @@ export default function App() {
     }
   };
 
-  // Permet a un admin canviar el(s) departament(s) d'un membre i activar/
-  // desactivar l'accés restringit al seu propi espai de treball (Caddy
-  // Master, Greenkeeper...). Genèric: accepta qualsevol subconjunt de camps
-  // del perfil per si en el futur cal editar-ne més des d'aquí.
+  // Actualitza el perfil. Els permisos ja no depenen de departmentId /
+  // departmentIds: els membres normals són transversals i només Caddy Master
+  // / Greenkeeper tenen un allowedWorkspaceIds explícit.
   const handleUpdateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
-    const updated = users.map((u) => (u.id === userId ? { ...u, ...updates } : u));
+    const isAccessUpdate = updates.accessScope !== undefined;
+
+    const updated = users.map((u) => {
+      if (u.id !== userId) return u;
+      const next: UserProfile = { ...u, ...updates };
+
+      if (isAccessUpdate) {
+        delete next.departmentId;
+        delete next.departmentIds;
+        delete next.restrictedToOwnDepartment;
+        if (updates.accessScope === "normal") {
+          delete next.allowedWorkspaceIds;
+        }
+      }
+      return next;
+    });
+
     setUsers(updated);
     localStorage.setItem("golfsana_users", JSON.stringify(updated));
     const target = updated.find((u) => u.id === userId);
     logEnterpriseAction(`Perfil actualitzat per a ${target?.name || userId}`);
 
-    // Aquest canvi és sensible per a la seguretat (departament i accés
-    // restringit), així que si la desada a Firestore falla de veritat,
-    // cal que es vegi amb un avís d'error real — abans es mostrava sempre
-    // "Perfil actualitzat" encara que la desada fallés en silenci.
     try {
-      await saveDoc(doc(db, "users", userId), updates, { merge: true });
+      if (isAccessUpdate) {
+        const firestoreUpdates: any = {
+          ...updates,
+          departmentId: deleteField(),
+          departmentIds: deleteField(),
+          restrictedToOwnDepartment: deleteField()
+        };
+        if (updates.accessScope === "normal") {
+          firestoreUpdates.allowedWorkspaceIds = deleteField();
+        }
+        await updateDoc(doc(db, "users", userId), firestoreUpdates);
+      } else {
+        await saveDoc(doc(db, "users", userId), updates, { merge: true });
+      }
       addToast("Perfil del membre actualitzat", "success");
     } catch (err) {
       console.warn("[Firestore Write Warning] user profile update failed", err);

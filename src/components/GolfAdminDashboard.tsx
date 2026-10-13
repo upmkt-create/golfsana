@@ -1323,104 +1323,61 @@ export default function GolfAdminDashboard({
           const activeCourse = activeDetailCourse;
           if (!activeCourse) return null;
 
-          const slots = [];
+          const slots: Array<{
+            time: string;
+            occupancyLevel: string;
+            availablePlayers: number | null;
+            statusColor: string;
+            rates: Array<{
+              tariff: string;
+              price: number;
+              discountPct?: number;
+              originalPrice?: number;
+            }>;
+          }> = [];
 
-          if (activeCourse.isOurClub) {
-            // Propi club: bucle basat en l'interval configurable de la
-            // pestanya (per defecte 10 min), amb ocupació simulada.
-            const interval = activeCourse.teeTimeInterval || 10;
-            const startMins = 7 * 60; // 07:00
-            const endMins = 20 * 60 + 48; // 20:48
-
-            for (let t = startMins; t <= endMins; t += interval) {
-              const hrs = Math.floor(t / 60);
-              const mins = t % 60;
-              const timeStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-
-              if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
-                continue;
-              }
-
-              let occupancyLevel = "disponible";
-              let availablePlayers = 4;
-              let statusColor = "bg-emerald-500";
-
-              const seedValue = (t * 13 + activeCourse.name.charCodeAt(0)) % 100;
-              if (t >= 510 && t <= 750) { // prime morning slots
-                if (seedValue > 65) {
-                  occupancyLevel = "complet";
-                  availablePlayers = 0;
-                  statusColor = "bg-rose-500";
-                } else if (seedValue > 35) {
-                  occupancyLevel = "ocupat (1 sol lliure)";
-                  availablePlayers = 1;
-                  statusColor = "bg-amber-500";
-                } else {
-                  occupancyLevel = "moderat (2 lliures)";
-                  availablePlayers = 2;
-                  statusColor = "bg-blue-400";
-                }
-              } else {
-                if (seedValue > 85) {
-                  occupancyLevel = "complet";
-                  availablePlayers = 0;
-                  statusColor = "bg-rose-500";
-                } else if (seedValue > 65) {
-                  occupancyLevel = "ocupat";
-                  availablePlayers = 1;
-                  statusColor = "bg-amber-500";
-                } else {
-                  occupancyLevel = "disponible (4 lliures)";
-                  availablePlayers = 4;
-                  statusColor = "bg-emerald-500";
-                }
-              }
-
-              const rates = getOurClubDetailedTeeTimes(t);
-
-              slots.push({
-                time: timeStr,
-                occupancyLevel,
-                availablePlayers,
-                statusColor,
-                rates
-              });
+          // La disponibilitat només és fiable quan /api/rates confirma que la
+          // font és "live". Si el connector cau al model de referència, mantenim
+          // els preus verificats però NO inventem ocupació ni places lliures.
+          const availabilityLabel = (availableSlots: number, isLive: boolean) => {
+            if (!isLive) {
+              return {
+                occupancyLevel: "disponibilitat no disponible",
+                availablePlayers: null,
+                statusColor: "bg-slate-300",
+              };
             }
-          } else if (liveApiTeeTimes) {
-            // Competidor: dades reals via /api/rates — scraping en directe
-            // quan és possible, i si no, el model verificat com a
-            // alternativa (mai la taula genèrica de 7 blocs d'abans, que
-            // ocultava els canvis de tarifa reals entre franges).
+
+            const free = Math.max(0, Math.min(4, Number(availableSlots) || 0));
+            if (free === 0) {
+              return { occupancyLevel: "complet · 0 places lliures", availablePlayers: 0, statusColor: "bg-rose-500" };
+            }
+            if (free === 1) {
+              return { occupancyLevel: "1 plaça lliure", availablePlayers: 1, statusColor: "bg-amber-500" };
+            }
+            if (free === 2) {
+              return { occupancyLevel: "2 places lliures", availablePlayers: 2, statusColor: "bg-blue-400" };
+            }
+            if (free === 3) {
+              return { occupancyLevel: "3 places lliures", availablePlayers: 3, statusColor: "bg-sky-400" };
+            }
+            return { occupancyLevel: "4 places lliures", availablePlayers: 4, statusColor: "bg-emerald-500" };
+          };
+
+          if (liveApiTeeTimes && liveApiTeeTimes.length > 0) {
+            // Tant Golf d'Aro com els competidors passen pel mateix connector.
+            // GolfManager/TeeOne retornen availableSlots reals quan source=live.
+            // Quan source=model, les tarifes són només de referència i la
+            // disponibilitat es mostra explícitament com a desconeguda.
+            const hasLiveAvailability = liveApiSource === "live";
+
             liveApiTeeTimes.forEach((tt) => {
               const timeStr = tt.time;
               if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
                 return;
               }
 
-              const t = tt.minutes;
-              let occupancyLevel = "disponible";
-              let availablePlayers = 4;
-              let statusColor = "bg-emerald-500";
-
-              const seedValue = (t * 13 + activeCourse.name.charCodeAt(0)) % 100;
-              if (seedValue > 80) {
-                occupancyLevel = "complet";
-                availablePlayers = 0;
-                statusColor = "bg-rose-500";
-              } else if (seedValue > 55) {
-                occupancyLevel = "ocupat";
-                availablePlayers = 1;
-                statusColor = "bg-amber-500";
-              } else if (seedValue > 30) {
-                occupancyLevel = "moderat";
-                availablePlayers = 2;
-                statusColor = "bg-blue-400";
-              } else {
-                occupancyLevel = "disponible";
-                availablePlayers = 4;
-                statusColor = "bg-emerald-500";
-              }
-
+              const availability = availabilityLabel(tt.availableSlots, hasLiveAvailability);
               const rates = tt.rates.map((r) => ({
                 tariff: r.tariff,
                 price: r.price,
@@ -1430,12 +1387,35 @@ export default function GolfAdminDashboard({
 
               slots.push({
                 time: timeStr,
-                occupancyLevel,
-                availablePlayers,
-                statusColor,
-                rates
+                ...availability,
+                rates,
               });
             });
+          } else if (activeCourse.isOurClub && liveApiSource === "model") {
+            // Si GolfManager no respon per al nostre club, conservem el model
+            // tarifari local perquè la vista continuï sent útil, però sense
+            // simular cap dada d'ocupació o disponibilitat.
+            const interval = activeCourse.teeTimeInterval || 9;
+            const startMins = 7 * 60;
+            const endMins = 20 * 60 + 48;
+
+            for (let t = startMins; t <= endMins; t += interval) {
+              const hrs = Math.floor(t / 60);
+              const mins = t % 60;
+              const timeStr = `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+
+              if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
+                continue;
+              }
+
+              slots.push({
+                time: timeStr,
+                occupancyLevel: "disponibilitat no disponible",
+                availablePlayers: null,
+                statusColor: "bg-slate-300",
+                rates: getOurClubDetailedTeeTimes(t),
+              });
+            }
           }
 
           return (
@@ -1466,17 +1446,15 @@ export default function GolfAdminDashboard({
                         return activeCourse.teeTimeInterval || 10;
                       })()} minuts
                     </span> • Total sortides visualitzades: <span className="font-extrabold text-[#033b7a]">{slots.length} sortides</span>
-                    {!activeCourse.isOurClub && (
-                      isLoadingLiveRates ? (
-                        <span className="ml-2 text-amber-600 font-bold">• Carregant dades en directe...</span>
-                      ) : liveApiSource === "live" ? (
-                        <span className="ml-2 text-emerald-600 font-bold">• Preus EN DIRECTE (avui)</span>
-                      ) : liveApiSource === "model" ? (
-                        <span className="ml-2 text-slate-450 font-bold" title="No s'ha pogut connectar en directe; es mostren les últimes tarifes verificades">• Model de referència (no en directe)</span>
-                      ) : liveApiSource === "closed" ? (
-                        <span className="ml-2 text-rose-600 font-bold">• Camp tancat aquest dia</span>
-                      ) : null
-                    )}
+                    {isLoadingLiveRates ? (
+                      <span className="ml-2 text-amber-600 font-bold">• Carregant dades...</span>
+                    ) : liveApiSource === "live" ? (
+                      <span className="ml-2 text-emerald-600 font-bold">• Preus i disponibilitat EN DIRECTE</span>
+                    ) : liveApiSource === "model" ? (
+                      <span className="ml-2 text-slate-500 font-bold" title="No s'ha pogut connectar en directe; es mostren preus de referència sense inventar disponibilitat">• Preus de referència · disponibilitat no disponible</span>
+                    ) : liveApiSource === "closed" ? (
+                      <span className="ml-2 text-rose-600 font-bold">• Camp tancat aquest dia</span>
+                    ) : null}
                   </p>
                 </div>
 
@@ -1560,7 +1538,7 @@ export default function GolfAdminDashboard({
                     <thead>
                       <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold uppercase text-[9px] tracking-wider border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                         <th className="p-3 pl-4 w-28">Hora</th>
-                        <th className="p-3 w-40">Ocupació (👤)</th>
+                        <th className="p-3 w-48">Disponibilitat pública (👤)</th>
                         <th className="p-3">Opcions de Tarifes Actives de la Web</th>
                         <th className="p-3 text-right pr-4">Canvis ràpids</th>
                       </tr>
@@ -2062,32 +2040,55 @@ export default function GolfAdminDashboard({
                             />
                           </div>
                         </div>
-                      ) : (
-                        <div className="flex flex-col items-center min-w-[125px] font-sans animate-fade-in">
-                          <div className="flex items-center justify-between w-full mb-1">
-                            <span className={`text-[10px] font-black uppercase ${
-                              (course.occupancyToday ?? 60) >= 85 ? "text-rose-600" :
-                              (course.occupancyToday ?? 60) >= 70 ? "text-amber-600" :
-                              "text-emerald-600"
-                            }`}>
-                              {course.reservationsToday !== undefined ? `${course.reservationsToday} reserves (${course.occupancyToday}%)` : `${course.occupancyToday ?? 60}% Ocupat`}
-                            </span>
-                            <span className="text-[9.5px] text-slate-500 font-bold">
-                              ({course.availableSlotsToday ?? 12} t. lliures)
+                      ) : (() => {
+                        const synced = allCoursesRates?.courses.find((cd) => cd.course === course.name);
+                        if (!synced || synced.source !== "live") {
+                          return (
+                            <div className="flex flex-col items-center min-w-[145px] font-sans">
+                              <span className="text-[9.5px] font-bold uppercase text-slate-400">
+                                Sense dada en directe
+                              </span>
+                              <span className="text-[9px] text-slate-400 mt-0.5">
+                                No es calcula ocupació de referència
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        const occupancy = synced.summary.occupancyPct;
+                        const totalFreeSlots = synced.summary.totalFreeSlots;
+                        const freeTeeTimes = synced.summary.freeTeeTimes;
+
+                        return (
+                          <div className="flex flex-col items-center min-w-[155px] font-sans animate-fade-in">
+                            <div className="flex items-center justify-between w-full mb-1 gap-2">
+                              <span className={`text-[10px] font-black uppercase ${
+                                occupancy >= 85 ? "text-rose-600" :
+                                occupancy >= 70 ? "text-amber-600" :
+                                "text-emerald-600"
+                              }`}>
+                                {occupancy}% ocupació pública estimada
+                              </span>
+                              <span className="text-[9.5px] text-slate-500 font-bold whitespace-nowrap">
+                                {totalFreeSlots} places lliures
+                              </span>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-150 dark:bg-slate-800 rounded-none overflow-hidden border border-slate-200 dark:border-slate-700">
+                              <div
+                                className={`h-full transition-all duration-500 ${
+                                  occupancy >= 85 ? "bg-rose-500" :
+                                  occupancy >= 70 ? "bg-amber-500" :
+                                  "bg-emerald-500"
+                                }`}
+                                style={{ width: `${occupancy}%` }}
+                              />
+                            </div>
+                            <span className="text-[8.5px] text-slate-400 mt-1">
+                              {freeTeeTimes} sortides amb disponibilitat pública
                             </span>
                           </div>
-                          <div className="w-full h-1.5 bg-slate-150 dark:bg-slate-800 rounded-none overflow-hidden border border-slate-200 dark:border-slate-700">
-                            <div 
-                              className={`h-full transition-all duration-500 ${
-                                (course.occupancyToday ?? 60) >= 85 ? "bg-rose-500" :
-                                (course.occupancyToday ?? 60) >= 70 ? "bg-amber-500" :
-                                "bg-emerald-500"
-                              }`}
-                              style={{ width: `${course.occupancyToday ?? 60}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </td>
 
                     {/* Green Fee High */}

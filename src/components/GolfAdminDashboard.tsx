@@ -1364,7 +1364,7 @@ export default function GolfAdminDashboard({
             return { occupancyLevel: "4 places lliures", availablePlayers: 4, statusColor: "bg-emerald-500" };
           };
 
-          if (liveApiTeeTimes) {
+          if (liveApiTeeTimes && liveApiTeeTimes.length > 0) {
             // Tant Golf d'Aro com els competidors passen pel mateix connector.
             // GolfManager/TeeOne retornen availableSlots reals quan source=live.
             // Quan source=model, les tarifes són només de referència i la
@@ -1391,6 +1391,31 @@ export default function GolfAdminDashboard({
                 rates,
               });
             });
+          } else if (activeCourse.isOurClub && liveApiSource === "model") {
+            // Si GolfManager no respon per al nostre club, conservem el model
+            // tarifari local perquè la vista continuï sent útil, però sense
+            // simular cap dada d'ocupació o disponibilitat.
+            const interval = activeCourse.teeTimeInterval || 9;
+            const startMins = 7 * 60;
+            const endMins = 20 * 60 + 48;
+
+            for (let t = startMins; t <= endMins; t += interval) {
+              const hrs = Math.floor(t / 60);
+              const mins = t % 60;
+              const timeStr = `${String(hrs).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+
+              if (detailFilterSearch && !timeStr.includes(detailFilterSearch)) {
+                continue;
+              }
+
+              slots.push({
+                time: timeStr,
+                occupancyLevel: "disponibilitat no disponible",
+                availablePlayers: null,
+                statusColor: "bg-slate-300",
+                rates: getOurClubDetailedTeeTimes(t),
+              });
+            }
           }
 
           return (
@@ -1513,7 +1538,7 @@ export default function GolfAdminDashboard({
                     <thead>
                       <tr className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold uppercase text-[9px] tracking-wider border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
                         <th className="p-3 pl-4 w-28">Hora</th>
-                        <th className="p-3 w-40">Ocupació (👤)</th>
+                        <th className="p-3 w-48">Disponibilitat pública (👤)</th>
                         <th className="p-3">Opcions de Tarifes Actives de la Web</th>
                         <th className="p-3 text-right pr-4">Canvis ràpids</th>
                       </tr>
@@ -2042,7 +2067,7 @@ export default function GolfAdminDashboard({
                                 occupancy >= 70 ? "text-amber-600" :
                                 "text-emerald-600"
                               }`}>
-                                {occupancy}% ocupació estimada
+                                {occupancy}% ocupació pública estimada
                               </span>
                               <span className="text-[9.5px] text-slate-500 font-bold whitespace-nowrap">
                                 {totalFreeSlots} places lliures

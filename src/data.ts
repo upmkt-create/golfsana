@@ -298,9 +298,8 @@ export const STARTER_MEMBERS: UserProfile[] = [
     name: "Marc",
     email: "marc@golfdaro.com",
     role: "member",
+    accessScope: "normal",
     avatar: "M",
-    departmentId: "dep-comercial",
-    departmentIds: ["dep-comercial"],
     accessCode: "MARC-2026"
   },
   {
@@ -308,9 +307,8 @@ export const STARTER_MEMBERS: UserProfile[] = [
     name: "Erika",
     email: "erika@golfdaro.com",
     role: "member",
+    accessScope: "normal",
     avatar: "E",
-    departmentId: "dep-marqueting",
-    departmentIds: ["dep-marqueting"],
     accessCode: "ERIKA-2026"
   },
   {
@@ -318,9 +316,8 @@ export const STARTER_MEMBERS: UserProfile[] = [
     name: "Ester",
     email: "ester@golfdaro.com",
     role: "member",
+    accessScope: "normal",
     avatar: "ES",
-    departmentId: "dep-esportiu",
-    departmentIds: ["dep-esportiu", "dep-pitch-putt"],
     accessCode: "ESTER-2026"
   },
   {
@@ -328,9 +325,8 @@ export const STARTER_MEMBERS: UserProfile[] = [
     name: "Mònica",
     email: "monica@golfdaro.com",
     role: "member",
+    accessScope: "normal",
     avatar: "MO",
-    departmentId: "dep-comercial",
-    departmentIds: ["dep-comercial"],
     accessCode: "MONICA-2026"
   },
   {
@@ -338,9 +334,8 @@ export const STARTER_MEMBERS: UserProfile[] = [
     name: "Saba",
     email: "saba@golfdaro.com",
     role: "member",
+    accessScope: "normal",
     avatar: "S",
-    departmentId: "",
-    departmentIds: [],
     accessCode: "SABA-2026"
   }
 ];

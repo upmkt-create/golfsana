@@ -288,7 +288,6 @@ export const STARTER_MEMBERS: UserProfile[] = [
     role: "admin",
     accessScope: "normal",
     avatar: "R",
-    accessCode: "ADMIN-ROCIO-2026"
   },
   {
     id: "member_marc",
@@ -297,7 +296,6 @@ export const STARTER_MEMBERS: UserProfile[] = [
     role: "member",
     accessScope: "normal",
     avatar: "M",
-    accessCode: "MARC-2026"
   },
   {
     id: "member_erika",
@@ -306,7 +304,6 @@ export const STARTER_MEMBERS: UserProfile[] = [
     role: "member",
     accessScope: "normal",
     avatar: "E",
-    accessCode: "ERIKA-2026"
   },
   {
     id: "member_ester",
@@ -315,7 +312,6 @@ export const STARTER_MEMBERS: UserProfile[] = [
     role: "member",
     accessScope: "normal",
     avatar: "ES",
-    accessCode: "ESTER-2026"
   },
   {
     id: "member_monica",
@@ -324,7 +320,6 @@ export const STARTER_MEMBERS: UserProfile[] = [
     role: "member",
     accessScope: "normal",
     avatar: "MO",
-    accessCode: "MONICA-2026"
   },
   {
     id: "member_saba",
@@ -333,7 +328,6 @@ export const STARTER_MEMBERS: UserProfile[] = [
     role: "member",
     accessScope: "normal",
     avatar: "S",
-    accessCode: "SABA-2026"
   }
 ];
 

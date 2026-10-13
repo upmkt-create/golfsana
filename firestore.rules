@@ -80,16 +80,17 @@ service cloud.firestore {
     }
 
     // -----------------------------------------------------------------------
-    // PHASE 1 SECURITY CONTAINMENT
+    // TRANSITIONAL SECURITY CONTAINMENT
     // -----------------------------------------------------------------------
-    // The current app still uses Firebase Anonymous Auth behind its custom
-    // email + access-code screen. Requiring request.auth here closes all
-    // completely unauthenticated Firestore access without breaking the
-    // current application flow.
+    // Golfsana itself now authenticates users with Firebase Email/Password.
+    // These rules intentionally remain at authenticated-only level because the
+    // external web-upmarketing Portal still uses Firebase Anonymous Auth to
+    // create tasks/incidents in Golfsana. Anonymous Auth must stay enabled
+    // until that integration is replaced by a server-side identity.
     //
-    // This is intentionally NOT the final authorization model. The next
-    // security phase must replace the anonymous/custom-code login so rules
-    // can enforce member/admin/workspace permissions server-side.
+    // This is intentionally NOT the final authorization model. After the
+    // Portal migration, rules must enforce member/admin/workspace permissions
+    // server-side from the authenticated UID.
     // -----------------------------------------------------------------------
 
     match /users/{userId} {

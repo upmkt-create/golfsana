@@ -1,14 +1,12 @@
 import React, { useState } from "react";
-import { UserProfile, UserRole } from "../types";
-import { Users, Plus, Check, Shield, User, X, LogOut, Pencil } from "lucide-react";
+import { UserProfile } from "../types";
+import { Users, Check, Shield, LogOut, Trash2, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface UserSessionSelectorProps {
   users: UserProfile[];
   currentUser: UserProfile;
   onSelectUser: (user: UserProfile) => void;
-  onAddUser: (name: string, email: string, role: UserRole, accessCode: string) => Promise<void>;
-  onUpdateUserCredentials: (userId: string, email: string, accessCode: string) => Promise<void>;
   onDeleteUser: (userId: string) => Promise<void>;
   onLogout: () => void;
 }
@@ -17,25 +15,10 @@ export default function UserSessionSelector({
   users,
   currentUser,
   onSelectUser,
-  onAddUser,
-  onUpdateUserCredentials,
   onDeleteUser,
   onLogout,
 }: UserSessionSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newRole, setNewRole] = useState<UserRole>("member");
-  const [newAccessCode, setNewAccessCode] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  // Edició de credencials d'un usuari ja existent — per poder veure i
-  // corregir exactament l'email/codi que té desat, en lloc d'endevinar
-  // per què no li funciona l'inici de sessió.
-  const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [editEmail, setEditEmail] = useState("");
-  const [editCode, setEditCode] = useState("");
-  const [isSavingCredentials, setIsSavingCredentials] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -44,49 +27,10 @@ export default function UserSessionSelector({
     try {
       await onDeleteUser(userId);
       setConfirmingDeleteId(null);
-      setEditingUserId(null);
     } catch (err) {
       console.error(err);
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const startEditCredentials = (u: UserProfile) => {
-    setEditingUserId(u.id);
-    setEditEmail(u.email || "");
-    setEditCode(u.accessCode || "");
-  };
-
-  const saveCredentials = async () => {
-    if (!editingUserId || !editEmail.trim() || !editCode.trim()) return;
-    setIsSavingCredentials(true);
-    try {
-      await onUpdateUserCredentials(editingUserId, editEmail.trim(), editCode.trim());
-      setEditingUserId(null);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSavingCredentials(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim() || !newEmail.trim() || !newAccessCode.trim()) return;
-
-    setIsSubmitting(true);
-    try {
-      await onAddUser(newName, newEmail, newRole, newAccessCode.trim());
-      setNewName("");
-      setNewEmail("");
-      setNewRole("member");
-      setNewAccessCode("");
-      setShowAddForm(false);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -115,7 +59,6 @@ export default function UserSessionSelector({
       <AnimatePresence>
         {isOpen && (
           <>
-            {/* Backdrop */}
             <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
 
             <motion.div
@@ -136,129 +79,98 @@ export default function UserSessionSelector({
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Canvia de sessió instantàniament per comprovar els rols empresarials o crear tasques per a qualsevol membre.
+                  Canvia de vista per comprovar els rols empresarials o crear tasques per a qualsevol membre.
                 </p>
               </div>
 
-              {/* Users list */}
-              <div className="max-h-60 overflow-y-auto p-2 space-y-1">
+              <div className="max-h-72 overflow-y-auto p-2 space-y-1">
                 {users.map((u) => {
                   const isSelected = u.id === currentUser.id;
-                  if (editingUserId === u.id) {
-                    return (
-                      <div key={u.id} className="p-2.5 bg-amber-50 border border-amber-200 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-bold text-slate-700">Credencials de {u.name}</span>
-                          <button type="button" onClick={() => setEditingUserId(null)} className="text-slate-400 hover:text-slate-600">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <input
-                          type="email"
-                          value={editEmail}
-                          onChange={(e) => setEditEmail(e.target.value)}
-                          placeholder="correu@entitat.com"
-                          className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                        />
-                        <input
-                          type="text"
-                          value={editCode}
-                          onChange={(e) => setEditCode(e.target.value)}
-                          placeholder="Codi d'accés"
-                          className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white font-mono"
-                        />
+                  const isConfirmingDelete = confirmingDeleteId === u.id;
+
+                  return (
+                    <div
+                      key={u.id}
+                      className={`w-full p-2 rounded-none transition-all hover:bg-slate-50 dark:hover:bg-slate-800 ${
+                        isSelected ? "bg-indigo-50/50 dark:bg-indigo-950/20" : ""
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
                         <button
-                          type="button"
-                          onClick={saveCredentials}
-                          disabled={isSavingCredentials}
-                          className="w-full bg-indigo-600 text-white rounded-none py-1.5 text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-50"
+                          onClick={() => {
+                            onSelectUser(u);
+                            setIsOpen(false);
+                          }}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left"
                         >
-                          {isSavingCredentials ? "Desant..." : "Desar credencials"}
+                          <div className="w-8 h-8 rounded-none bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 text-indigo-600 font-bold flex items-center justify-center text-xs shrink-0">
+                            {u.avatar}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                              {u.name}
+                              {u.role === "admin" && (
+                                <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
+                              )}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-mono truncate max-w-[160px]">{u.email}</p>
+                          </div>
                         </button>
 
-                        <div className="border-t border-amber-200 pt-2">
-                          {confirmingDeleteId === u.id ? (
-                            <div className="space-y-1.5">
-                              <p className="text-[10px] text-rose-700 font-semibold">Segur? Aquesta acció no es pot desfer.</p>
-                              <div className="grid grid-cols-2 gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmingDeleteId(null)}
-                                  className="py-1.5 text-[10px] font-bold border border-slate-300 text-slate-600 hover:bg-slate-100"
-                                >
-                                  Cancel·lar
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(u.id)}
-                                  disabled={isDeleting}
-                                  className="py-1.5 text-[10px] font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
-                                >
-                                  {isDeleting ? "Eliminant..." : "Sí, eliminar"}
-                                </button>
-                              </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-none bg-indigo-650 text-white flex items-center justify-center">
+                              <Check className="w-3 animate-pulse" />
                             </div>
-                          ) : (
+                          )}
+                          {!isSelected && (
                             <button
                               type="button"
-                              onClick={() => setConfirmingDeleteId(u.id)}
-                              className="w-full text-[10px] font-semibold text-rose-600 hover:text-rose-800 py-1"
+                              onClick={() => setConfirmingDeleteId(isConfirmingDelete ? null : u.id)}
+                              className="text-slate-300 hover:text-rose-600 p-1"
+                              title="Eliminar usuari"
                             >
-                              Eliminar aquest usuari
+                              {isConfirmingDelete ? <X className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
                             </button>
                           )}
                         </div>
                       </div>
-                    );
-                  }
-                  return (
-                    <div
-                      key={u.id}
-                      className={`w-full flex items-center justify-between p-2 rounded-none transition-all hover:bg-slate-1050 dark:hover:bg-slate-800 ${
-                        isSelected ? "bg-indigo-50/50 dark:bg-indigo-950/20" : ""
-                      }`}
-                    >
-                      <button
-                        onClick={() => {
-                          onSelectUser(u);
-                          setIsOpen(false);
-                        }}
-                        className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                      >
-                        <div className="w-8 h-8 rounded-none bg-slate-100 dark:bg-slate-800 border dark:border-slate-700 text-indigo-600 font-bold flex items-center justify-center text-xs shrink-0">
-                          {u.avatar}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                            {u.name}
-                            {u.role === "admin" && (
-                              <Shield className="w-3.5 h-3.5 text-amber-500 fill-amber-500/20" />
-                            )}
+
+                      {isConfirmingDelete && (
+                        <div className="mt-2 border-t border-rose-100 pt-2 space-y-1.5">
+                          <p className="text-[10px] text-rose-700 font-semibold">
+                            Segur? S'eliminarà el perfil de Golfsana.
                           </p>
-                          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[150px]">{u.email}</p>
-                        </div>
-                      </button>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {isSelected && (
-                          <div className="w-5 h-5 rounded-none bg-indigo-650 text-white flex items-center justify-center">
-                            <Check className="w-3 animate-pulse" />
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingDeleteId(null)}
+                              className="py-1.5 text-[10px] font-bold border border-slate-300 text-slate-600 hover:bg-slate-100"
+                            >
+                              Cancel·lar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(u.id)}
+                              disabled={isDeleting}
+                              className="py-1.5 text-[10px] font-bold bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
+                            >
+                              {isDeleting ? "Eliminant..." : "Sí, eliminar"}
+                            </button>
                           </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => startEditCredentials(u)}
-                          className="text-slate-300 hover:text-indigo-600 p-1"
-                          title="Veure/editar email i codi d'accés"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
 
-              {/* Logout button */}
+              <div className="p-3 bg-slate-50 dark:bg-slate-900/50">
+                <p className="text-[10px] leading-relaxed text-slate-500">
+                  Les altes de nous usuaris queden temporalment desactivades fins que s'implementi el flux d'invitació Firebase server-side.
+                </p>
+              </div>
+
               <div className="p-2 border-t border-slate-100 dark:border-slate-800">
                 <button
                   onClick={() => {
@@ -270,97 +182,6 @@ export default function UserSessionSelector({
                   <LogOut className="w-4 h-4" />
                   <span>Tancar Sessió</span>
                 </button>
-              </div>
-
-              {/* Add Custom User Form Trigger */}
-              <div className="p-3 bg-slate-50 dark:bg-slate-900/50">
-                {!showAddForm ? (
-                  <button
-                    onClick={() => setShowAddForm(true)}
-                    className="w-full py-2 bg-white dark:bg-slate-800 border border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-550 hover:text-indigo-600 rounded-none flex items-center justify-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300 transition-all font-mono"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Afegir Usuari Indefinit</span>
-                  </button>
-                ) : (
-                  <form onSubmit={handleSubmit} className="space-y-3 p-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-750 dark:text-slate-300">Nou Col·laborador</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddForm(false)}
-                        className="text-slate-400 hover:text-slate-600 font-bold"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <div className="space-y-2">
-                      <input
-                        type="text"
-                        placeholder="Nom complet (ex: Pere Joan)"
-                        required
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
-                      />
-
-                      <input
-                        type="email"
-                        placeholder="correu@entitat.com"
-                        required
-                        value={newEmail}
-                        onChange={(e) => setNewEmail(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
-                      />
-
-                      <input
-                        type="text"
-                        placeholder="Codi d'accés (per iniciar sessió)"
-                        required
-                        value={newAccessCode}
-                        onChange={(e) => setNewAccessCode(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs border border-slate-200 dark:border-slate-700 rounded-none focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-mono"
-                      />
-                      <p className="text-[9.5px] text-slate-400 -mt-1">
-                        Comunica aquest codi al nou usuari — el necessitarà per entrar amb el seu email.
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setNewRole("member")}
-                          className={`py-1 rounded-none text-[10px] font-semibold border ${
-                            newRole === "member"
-                              ? "bg-indigo-55/10 text-indigo-600 border-indigo-200"
-                              : "border-slate-200 text-slate-500 hover:bg-slate-100"
-                          }`}
-                        >
-                          Membre Estàndard
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setNewRole("admin")}
-                          className={`py-1 rounded-none text-[10px] font-semibold border ${
-                            newRole === "admin"
-                              ? "bg-amber-50 text-amber-600 border-amber-250"
-                              : "border-slate-200 text-slate-500 hover:bg-slate-100"
-                          }`}
-                        >
-                          Administrador Total
-                        </button>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-indigo-600 text-white rounded-none py-2 text-xs font-bold hover:bg-indigo-750 transition-all disabled:opacity-55"
-                    >
-                      {isSubmitting ? "Registrant..." : "Guardar Usuari"}
-                    </button>
-                  </form>
-                )}
               </div>
             </motion.div>
           </>

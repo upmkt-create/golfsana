@@ -11,10 +11,8 @@ import { logActivity } from "./lib/logger";
 import { stripHtmlToText } from "./lib/textUtils";
 
 import {
-  signInAnonymously,
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  updatePassword,
+  sendPasswordResetEmail,
   onAuthStateChanged,
   signOut,
   GoogleAuthProvider,
@@ -156,7 +154,6 @@ import MeetingMinutes from "./components/MeetingMinutes";
 import golfBallIcon from "./up-icon-light.png";
 
 import LoginScreen from "./components/LoginScreen";
-import ChangePasswordScreen from "./components/ChangePasswordScreen";
 
 export default function App() {
   // Resilient Offline Sandbox Mode state
@@ -178,26 +175,7 @@ export default function App() {
       return [...STARTER_MEMBERS];
     }
   });
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem("golfsana_currentUser");
-      const savedUser = saved ? JSON.parse(saved) : null;
-      if (savedUser) {
-        let targetId = savedUser.id;
-        if (savedUser.email === "info@up-mktdigital.com") {
-          targetId = "member_isabel";
-        } else if (savedUser.email === "rocio@golfdaro.com") {
-          targetId = "member_rocio";
-        }
-        const match = STARTER_MEMBERS.find((s) => s.id === targetId);
-        return match ? { ...savedUser, ...match } : savedUser;
-      }
-      // Sense sessió guardada → null perquè aparegui la pantalla de login.
-      return null;
-    } catch {
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   // Collections state
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
@@ -471,217 +449,132 @@ export default function App() {
     filterAssigneeId
   ]);
 
-  // 1. Authenticate silently or manage google login
+  // Firebase Email/Password is now the only authentication path for Golfsana.
+  // The authenticated UID must match the UID stored in the Golfsana profile.
+  const findProfileForFirebaseUser = async (firebaseAuthUser: any): Promise<UserProfile> => {
+    const q = query(collection(db, "users"), where("authUid", "==", firebaseAuthUser.uid));
+    const snapshot = await getDocs(q);
+    const first = snapshot.docs[0];
+
+    if (!first) {
+      throw new Error("PROFILE_NOT_FOUND");
+    }
+
+    const data = first.data() as UserProfile;
+    const profile: UserProfile = {
+      ...data,
+      id: data.id || first.id
+    };
+
+    const authEmail = (firebaseAuthUser.email || "").trim().toLowerCase();
+    const profileEmail = (profile.email || "").trim().toLowerCase();
+
+    if (
+      profile.authUid !== firebaseAuthUser.uid ||
+      profile.authProvider !== "password" ||
+      (authEmail && profileEmail !== authEmail)
+    ) {
+      throw new Error("PROFILE_IDENTITY_MISMATCH");
+    }
+
+    return profile;
+  };
+
+  const activateAuthenticatedSession = (profile: UserProfile, firebaseAuthUser: any) => {
+    setCurrentUser(profile);
+    setFirebaseUser(firebaseAuthUser);
+    localStorage.setItem("golfsana_currentUser", JSON.stringify(profile));
+    setOfflineMode(false);
+    localStorage.removeItem("golfsana_offline");
+  };
+
+  // Restore only a real Firebase session. A stale anonymous session from the
+  // previous migration phase is explicitly discarded.
   useEffect(() => {
+    let cancelled = false;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setFirebaseUser(user);
-        setAuthLoading(false);
-      } else {
-        setFirebaseUser(null);
-        setAuthLoading(false);
+      if (!user) {
+        if (!cancelled) {
+          setFirebaseUser(null);
+          setCurrentUser(null);
+          setAuthLoading(false);
+        }
+        return;
+      }
+
+      if (user.isAnonymous) {
+        try {
+          await signOut(auth);
+        } catch (err) {
+          console.warn("[Auth] No s'ha pogut eliminar una sessió anònima antiga:", err);
+        }
+        if (!cancelled) {
+          setFirebaseUser(null);
+          setCurrentUser(null);
+          localStorage.removeItem("golfsana_currentUser");
+          setAuthLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const profile = await findProfileForFirebaseUser(user);
+        if (!cancelled) {
+          activateAuthenticatedSession(profile, user);
+        }
+      } catch (err) {
+        console.warn("[Auth] La sessió Firebase no correspon a cap perfil Golfsana vàlid:", err);
+        try {
+          await signOut(auth);
+        } catch (signOutErr) {
+          console.warn("[Auth] No s'ha pogut tancar la sessió Firebase invàlida:", signOutErr);
+        }
+        if (!cancelled) {
+          setFirebaseUser(null);
+          setCurrentUser(null);
+          localStorage.removeItem("golfsana_currentUser");
+        }
+      } finally {
+        if (!cancelled) setAuthLoading(false);
       }
     });
-    return () => unsubscribe();
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, []);
 
-  const handleCustomLogin = async (email: string, code: string) => {
+  const handleCustomLogin = async (email: string, password: string) => {
     const normEmail = email.trim().toLowerCase();
-    const normCode = code.trim();
+    const credential = await signInWithEmailAndPassword(auth, normEmail, password);
 
-    const findLocalProfile = (): UserProfile | null => {
-      return (
-        users.find((u) => u.email?.trim().toLowerCase() === normEmail) ||
-        STARTER_MEMBERS.find((u) => u.email?.trim().toLowerCase() === normEmail) ||
-        null
-      );
-    };
-
-    const findRemoteProfile = async (): Promise<UserProfile | null> => {
-      const q = query(collection(db, "users"), where("email", "==", normEmail));
-      const snapshot = await getDocs(q);
-      const first = snapshot.docs[0];
-      return first ? ({ id: first.id, ...first.data() } as UserProfile) : null;
-    };
-
-    const finishPasswordLogin = async (profile: UserProfile, firebaseUid: string) => {
-      const migratedAt = profile.authMigratedAt || new Date().toISOString();
-      const sessionProfile: UserProfile = {
-        ...profile,
-        authUid: firebaseUid,
-        authProvider: "password",
-        authMigratedAt: migratedAt
-      };
-
-      setCurrentUser(sessionProfile);
-      localStorage.setItem("golfsana_currentUser", JSON.stringify(sessionProfile));
-      setFirebaseUser(auth.currentUser);
-      setOfflineMode(false);
-      localStorage.removeItem("golfsana_offline");
-
-      // During the transition we keep the existing user document ID because
-      // tasks/projects reference it. The Firebase UID is attached as identity
-      // metadata; the next phase will use the authenticated identity in rules.
-      try {
-        await saveDoc(doc(db, "users", profile.id), {
-          authUid: firebaseUid,
-          authProvider: "password",
-          authMigratedAt: migratedAt
-        }, { merge: true });
-      } catch (err) {
-        console.warn("[Auth migration] Login succeeded but identity metadata could not be saved:", err);
-      }
-
+    try {
+      const profile = await findProfileForFirebaseUser(credential.user);
+      activateAuthenticatedSession(profile, credential.user);
       setAuthLoading(false);
-      logActivity(sessionProfile, "Inici de sessió");
-    };
-
-    // Phase 1 of the migration: prefer real Firebase Email/Password auth.
-    // Accounts that have already migrated never fall back to the legacy code.
-    try {
-      const credential = await signInWithEmailAndPassword(auth, normEmail, normCode);
-      const profile = (await findRemoteProfile().catch(() => null)) || findLocalProfile();
-
-      if (!profile) {
-        await signOut(auth);
-        throw new Error("PROFILE_NOT_FOUND");
-      }
-
-      await finishPasswordLogin(profile, credential.user.uid);
-      return;
-    } catch (err: any) {
-      const code = err?.code || "";
-      const canTryLegacy =
-        code === "auth/invalid-credential" ||
-        code === "auth/user-not-found" ||
-        code === "auth/wrong-password" ||
-        code === "auth/invalid-login-credentials";
-
-      if (!canTryLegacy) {
-        throw err;
-      }
-    }
-
-    // Transitional fallback for users not migrated yet. Authenticate
-    // anonymously only long enough to read their existing Golfsana profile.
-    let remoteProfile: UserProfile | null = null;
-    try {
-      if (!auth.currentUser || !auth.currentUser.isAnonymous) {
-        if (auth.currentUser) await signOut(auth);
-        await signInAnonymously(auth);
-      }
-      remoteProfile = await findRemoteProfile();
+      logActivity(profile, "Inici de sessió");
     } catch (err) {
-      console.warn("[Auth migration] Could not read legacy profile remotely:", err);
-    }
-
-    const localProfile = findLocalProfile();
-    const profile = remoteProfile || localProfile;
-
-    // Once a profile has a Firebase UID, the old access code is permanently
-    // disabled for that account. This prevents an old code from bypassing a
-    // changed Firebase password.
-    if (profile?.authUid || profile?.authProvider === "password") {
-      if (auth.currentUser?.isAnonymous) await signOut(auth);
-      throw new Error("PASSWORD_ACCOUNT_REQUIRED");
-    }
-
-    const legacyMatch =
-      profile && profile.accessCode === normCode
-        ? profile
-        : STARTER_MEMBERS.find(
-            (u) =>
-              u.email.trim().toLowerCase() === normEmail &&
-              u.accessCode === normCode
-          ) || null;
-
-    if (!legacyMatch) {
-      if (auth.currentUser?.isAnonymous) await signOut(auth);
-      throw new Error("Invalid credentials");
-    }
-
-    // First successful legacy login upgrades the account automatically to
-    // Firebase Email/Password using the same temporary credential. This lets
-    // us migrate the team progressively without locking anyone out.
-    let firebaseAccountAlreadyExists = false;
-    try {
-      if (auth.currentUser) await signOut(auth);
-
-      let credential;
-      try {
-        credential = await createUserWithEmailAndPassword(auth, normEmail, normCode);
-      } catch (createErr: any) {
-        if (createErr?.code !== "auth/email-already-in-use") throw createErr;
-        firebaseAccountAlreadyExists = true;
-        credential = await signInWithEmailAndPassword(auth, normEmail, normCode);
-      }
-
-      await finishPasswordLogin(legacyMatch, credential.user.uid);
-      return;
-    } catch (migrationErr: any) {
-      console.warn("[Auth migration] Could not upgrade legacy account:", migrationErr);
-
-      // If Firebase already has an account for this email, never allow the old
-      // access code to bypass its password. A failed Firebase password login
-      // must remain a failed login even if migration metadata was not saved.
-      if (firebaseAccountAlreadyExists) {
-        if (auth.currentUser?.isAnonymous) await signOut(auth);
-        throw migrationErr;
-      }
-
-      // Only accounts that genuinely do not have a Firebase password identity
-      // yet may temporarily keep using the old flow. This fallback disappears
-      // after the migration is complete.
-      try {
-        if (!auth.currentUser) await signInAnonymously(auth);
-        setCurrentUser(legacyMatch);
-        localStorage.setItem("golfsana_currentUser", JSON.stringify(legacyMatch));
-        setFirebaseUser(auth.currentUser || { uid: legacyMatch.id, email: legacyMatch.email });
-        setAuthLoading(false);
-        logActivity(legacyMatch, "Inici de sessió (migració pendent)");
-        return;
-      } catch (anonymousErr) {
-        console.warn("[Auth migration] Legacy fallback also failed:", anonymousErr);
-        throw migrationErr;
-      }
+      await signOut(auth).catch(() => undefined);
+      setFirebaseUser(null);
+      setCurrentUser(null);
+      localStorage.removeItem("golfsana_currentUser");
+      throw err;
     }
   };
 
-  const handleRequiredPasswordChange = async (newPassword: string) => {
-    if (!currentUser || !auth.currentUser || auth.currentUser.isAnonymous) {
-      throw new Error("AUTH_SESSION_REQUIRED");
+  const handleForgotPassword = async (email: string) => {
+    const normEmail = email.trim().toLowerCase();
+    if (!normEmail) throw new Error("EMAIL_REQUIRED");
+
+    try {
+      await sendPasswordResetEmail(auth, normEmail);
+    } catch (err: any) {
+      // Do not reveal whether an email exists in Firebase Authentication.
+      if (err?.code === "auth/user-not-found") return;
+      throw err;
     }
-
-    // The new password is sent directly to Firebase Auth. It is never written
-    // to Firestore, localStorage or application logs.
-    await updatePassword(auth.currentUser, newPassword);
-
-    const passwordChangedAt = new Date().toISOString();
-    const hardenedProfile: UserProfile = {
-      ...currentUser,
-      passwordChangedAt
-    };
-    delete hardenedProfile.accessCode;
-
-    // Mark the account as hardened and remove the legacy access code from
-    // Firestore immediately after Firebase accepts the new password.
-    await updateDoc(doc(db, "users", currentUser.id), {
-      passwordChangedAt,
-      accessCode: deleteField()
-    });
-
-    setCurrentUser(hardenedProfile);
-    setUsers((prev) => {
-      const next = prev.map((u) =>
-        u.id === currentUser.id
-          ? { ...u, passwordChangedAt, accessCode: undefined }
-          : u
-      );
-      localStorage.setItem("golfsana_users", JSON.stringify(next));
-      return next;
-    });
-    localStorage.setItem("golfsana_currentUser", JSON.stringify(hardenedProfile));
-    addToast("Contrasenya privada actualitzada correctament", "success");
   };
 
   const handleLogout = () => {
@@ -694,10 +587,8 @@ export default function App() {
     }
     localStorage.removeItem("golfsana_currentUser");
 
-    // Important: the previous implementation only cleared React state and
-    // left the Firebase anonymous session alive in the browser. With
-    // authenticated-only Firestore rules, logout must also invalidate that
-    // Firebase session.
+    // Logout must invalidate the real Firebase session as well as the
+    // application profile cached in React/localStorage.
     try {
       await signOut(auth);
     } catch (err) {
@@ -2314,54 +2205,6 @@ export default function App() {
     });
   };
 
-  // Add Custom User Profile
-  const handleAddUserProfile = async (name: string, email: string, role: UserRole, accessCode: string) => {
-    const id = "user-" + Math.random().toString(36).substring(2, 9);
-    const avatar = name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase() || "PM";
-    const newU: UserProfile = {
-      id,
-      name,
-      email: email.trim().toLowerCase(),
-      role,
-      accessScope: "normal",
-      avatar,
-      accessCode: accessCode.trim(),
-      createdAt: new Date().toISOString()
-    };
-
-    // Resilient Dual-Write
-    const updated = [...users, newU];
-    setUsers(updated);
-    localStorage.setItem("golfsana_users", JSON.stringify(updated));
-    logEnterpriseAction(`Nou col·laborador registrat: ${name} (${role})`);
-
-    try {
-      await saveDoc(doc(db, "users", id), newU);
-    } catch (err) {
-      console.warn("[Firestore Write Warning] users: saved in client sandbox", err);
-    }
-  };
-
-  // Permet veure/corregir l'email i el codi d'accés reals d'un usuari ja
-  // creat — útil quan algú no pot entrar i cal comprovar exactament què hi
-  // ha desat, en lloc d'endevinar-ho.
-  const handleUpdateUserCredentials = async (userId: string, email: string, accessCode: string) => {
-    const normEmail = email.trim().toLowerCase();
-    const normCode = accessCode.trim();
-    const updated = users.map((u) => (u.id === userId ? { ...u, email: normEmail, accessCode: normCode } : u));
-    setUsers(updated);
-    localStorage.setItem("golfsana_users", JSON.stringify(updated));
-    const target = updated.find((u) => u.id === userId);
-    logEnterpriseAction(`Credencials actualitzades per a ${target?.name || userId}`);
-    addToast("Credencials actualitzades", "success");
-
-    try {
-      await saveDoc(doc(db, "users", userId), { email: normEmail, accessCode: normCode }, { merge: true });
-    } catch (err) {
-      console.warn("[Firestore Write Warning] user credentials: saved in client sandbox", err);
-    }
-  };
-
   // Actualitza el perfil. Els permisos ja no depenen de departmentId /
   // departmentIds: els membres normals són transversals i només Caddy Master
   // / Greenkeeper tenen un allowedWorkspaceIds explícit.
@@ -2701,29 +2544,10 @@ export default function App() {
 
   if (authLoading) return <div className="p-10 text-center font-mono text-xs">Carregant sistema...</div>;
   
-  // El login es mostra quan no hi ha usuari REAL de l'app (currentUser).
-  // firebaseUser és només la sessió tècnica anònima de Firestore i pot existir
-  // sense que l'usuari hagi triat el seu perfil — per això no serveix com a condició.
+  // El login es mostra quan no hi ha un perfil Golfsana validat contra
+  // la sessió Firebase Email/Password actual.
   if (!currentUser) {
-    return <LoginScreen onLogin={handleCustomLogin} />;
-  }
-
-  // Any account migrated from the old access-code system must replace that
-  // exposed legacy credential with a new private Firebase password before it
-  // can use Golfsana. Isabel, already migrated in PR #5, is caught here too
-  // because her profile has authProvider=password but no passwordChangedAt.
-  if (
-    currentUser.authProvider === "password" &&
-    !currentUser.passwordChangedAt &&
-    firebaseUser &&
-    !firebaseUser.isAnonymous
-  ) {
-    return (
-      <ChangePasswordScreen
-        email={currentUser.email}
-        onChangePassword={handleRequiredPasswordChange}
-      />
-    );
+    return <LoginScreen onLogin={handleCustomLogin} onForgotPassword={handleForgotPassword} />;
   }
 
   if (isWorkspaceRestricted && !restrictedAllowedTabs.has(activeTab)) {
@@ -3512,8 +3336,6 @@ export default function App() {
                     logEnterpriseAction(`Canvi de sessió: ara actua com ${u.name}`);
                     addToast(`Sessió iniciada com a ${u.name}`, "success");
                   }}
-                  onAddUser={handleAddUserProfile}
-                  onUpdateUserCredentials={handleUpdateUserCredentials}
                   onDeleteUser={handleDeleteUserProfile}
                   onLogout={handleLogout}
                 />

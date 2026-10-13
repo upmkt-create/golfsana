@@ -24,7 +24,10 @@ export interface UserProfile {
   departmentId?: string; // Associated department
   departmentIds?: string[]; // Multiple associated departments
   createdAt?: any; // Firestore Timestamp
-  accessCode?: string; // Custom access code for non-google auth
+  accessCode?: string; // Legacy credential kept only during Firebase Auth migration.
+  authUid?: string; // Firebase Authentication UID once this profile has migrated.
+  authProvider?: "password"; // Current real Firebase provider for this Golfsana profile.
+  authMigratedAt?: string; // ISO timestamp of the first successful real Firebase login.
   notes?: string; // (Antic — format previ d'una sola nota. Es manté per compatibilitat de lectura.)
   notesList?: MemberNote[]; // Notes internes sobre aquest membre — se'n poden afegir vàries
   restrictedToOwnDepartment?: boolean; // Legacy: es manté per compatibilitat amb perfils ja creats.

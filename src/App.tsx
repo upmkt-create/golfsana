@@ -12,6 +12,8 @@ import { stripHtmlToText } from "./lib/textUtils";
 
 import {
   signInAnonymously,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
   GoogleAuthProvider,
@@ -479,65 +481,164 @@ export default function App() {
   }, []);
 
   const handleCustomLogin = async (email: string, code: string) => {
-    // Normalitzem abans de comparar: un espai accidental al davant/darrere,
-    // o una lletra majúscula diferent a l'email, no havien de fer fallar el
-    // login sense cap avís — són errors tipogràfics habituals, no un
-    // problema de seguretat real per l'email (el codi sí es manté sensible
-    // a majúscules, com una contrasenya).
     const normEmail = email.trim().toLowerCase();
     const normCode = code.trim();
 
-    // 1r: comprovar contra els membres de fàbrica (ràpid, sense xarxa)
-    let userMatch = STARTER_MEMBERS.find(m => m.email.trim().toLowerCase() === normEmail && m.accessCode === normCode);
+    const findLocalProfile = (): UserProfile | null => {
+      return (
+        users.find((u) => u.email?.trim().toLowerCase() === normEmail) ||
+        STARTER_MEMBERS.find((u) => u.email?.trim().toLowerCase() === normEmail) ||
+        null
+      );
+    };
 
-    // 2n: comprovar contra els usuaris ja carregats en aquest dispositiu
-    // (per exemple si ja s'hi ha entrat abans, o s'han creat en aquesta sessió)
-    if (!userMatch) {
-      userMatch = users.find(u => u.email?.trim().toLowerCase() === normEmail && u.accessCode === normCode);
-    }
+    const findRemoteProfile = async (): Promise<UserProfile | null> => {
+      const q = query(collection(db, "users"), where("email", "==", normEmail));
+      const snapshot = await getDocs(q);
+      const first = snapshot.docs[0];
+      return first ? ({ id: first.id, ...first.data() } as UserProfile) : null;
+    };
 
-    // 3r: si l'usuari s'ha creat des d'un ALTRE dispositiu (p.ex. Isabel crea
-    // l'Aurora, i l'Aurora entra per primer cop des del seu propi mòbil), el
-    // seu localStorage encara no té res. Consultem Firestore directament
-    // abans de rendir-nos — cal autenticar-se anònimament primer per tenir
-    // permisos de lectura.
-    if (!userMatch) {
+    const finishPasswordLogin = async (profile: UserProfile, firebaseUid: string) => {
+      const migratedAt = profile.authMigratedAt || new Date().toISOString();
+      const sessionProfile: UserProfile = {
+        ...profile,
+        authUid: firebaseUid,
+        authProvider: "password",
+        authMigratedAt: migratedAt
+      };
+
+      setCurrentUser(sessionProfile);
+      localStorage.setItem("golfsana_currentUser", JSON.stringify(sessionProfile));
+      setFirebaseUser(auth.currentUser);
+      setOfflineMode(false);
+      localStorage.removeItem("golfsana_offline");
+
+      // During the transition we keep the existing user document ID because
+      // tasks/projects reference it. The Firebase UID is attached as identity
+      // metadata; the next phase will use the authenticated identity in rules.
       try {
-        if (!auth.currentUser) {
-          await signInAnonymously(auth);
-        }
-        const usersSnap = await getDocs(collection(db, "users"));
-        usersSnap.forEach((docSnap) => {
-          const u = docSnap.data() as UserProfile;
-          if (u.email?.trim().toLowerCase() === normEmail && u.accessCode === normCode) {
-            userMatch = u;
-          }
-        });
+        await saveDoc(doc(db, "users", profile.id), {
+          authUid: firebaseUid,
+          authProvider: "password",
+          authMigratedAt: migratedAt
+        }, { merge: true });
       } catch (err) {
-        console.warn("[Auth] No s'ha pogut consultar Firestore per a l'inici de sessió remot:", err);
+        console.warn("[Auth migration] Login succeeded but identity metadata could not be saved:", err);
       }
-    }
 
-    if (userMatch) {
-      setCurrentUser(userMatch);
-      localStorage.setItem("golfsana_currentUser", JSON.stringify(userMatch));
-      // Sessió ANÒNIMA REAL de Firebase perquè Firestore accepti operacions
-      // (request.auth != null). Sense això → "Missing or insufficient permissions".
-      try {
-        if (!auth.currentUser) {
-          await signInAnonymously(auth);
-        }
-        setFirebaseUser(auth.currentUser || { uid: userMatch.id, email: userMatch.email });
-      } catch (err) {
-        console.warn("[Auth] Sessió anònima Firebase fallida, mode local:", err);
-        setOfflineMode(true);
-        localStorage.setItem("golfsana_offline", "true");
-        setFirebaseUser({ uid: userMatch.id, email: userMatch.email });
-      }
       setAuthLoading(false);
-      logActivity(userMatch, "Inici de sessió"); // Log login
-    } else {
+      logActivity(sessionProfile, "Inici de sessió");
+    };
+
+    // Phase 1 of the migration: prefer real Firebase Email/Password auth.
+    // Accounts that have already migrated never fall back to the legacy code.
+    try {
+      const credential = await signInWithEmailAndPassword(auth, normEmail, normCode);
+      const profile = (await findRemoteProfile().catch(() => null)) || findLocalProfile();
+
+      if (!profile) {
+        await signOut(auth);
+        throw new Error("PROFILE_NOT_FOUND");
+      }
+
+      await finishPasswordLogin(profile, credential.user.uid);
+      return;
+    } catch (err: any) {
+      const code = err?.code || "";
+      const canTryLegacy =
+        code === "auth/invalid-credential" ||
+        code === "auth/user-not-found" ||
+        code === "auth/wrong-password" ||
+        code === "auth/invalid-login-credentials";
+
+      if (!canTryLegacy) {
+        throw err;
+      }
+    }
+
+    // Transitional fallback for users not migrated yet. Authenticate
+    // anonymously only long enough to read their existing Golfsana profile.
+    let remoteProfile: UserProfile | null = null;
+    try {
+      if (!auth.currentUser || !auth.currentUser.isAnonymous) {
+        if (auth.currentUser) await signOut(auth);
+        await signInAnonymously(auth);
+      }
+      remoteProfile = await findRemoteProfile();
+    } catch (err) {
+      console.warn("[Auth migration] Could not read legacy profile remotely:", err);
+    }
+
+    const localProfile = findLocalProfile();
+    const profile = remoteProfile || localProfile;
+
+    // Once a profile has a Firebase UID, the old access code is permanently
+    // disabled for that account. This prevents an old code from bypassing a
+    // changed Firebase password.
+    if (profile?.authUid || profile?.authProvider === "password") {
+      if (auth.currentUser?.isAnonymous) await signOut(auth);
+      throw new Error("PASSWORD_ACCOUNT_REQUIRED");
+    }
+
+    const legacyMatch =
+      profile && profile.accessCode === normCode
+        ? profile
+        : STARTER_MEMBERS.find(
+            (u) =>
+              u.email.trim().toLowerCase() === normEmail &&
+              u.accessCode === normCode
+          ) || null;
+
+    if (!legacyMatch) {
+      if (auth.currentUser?.isAnonymous) await signOut(auth);
       throw new Error("Invalid credentials");
+    }
+
+    // First successful legacy login upgrades the account automatically to
+    // Firebase Email/Password using the same temporary credential. This lets
+    // us migrate the team progressively without locking anyone out.
+    let firebaseAccountAlreadyExists = false;
+    try {
+      if (auth.currentUser) await signOut(auth);
+
+      let credential;
+      try {
+        credential = await createUserWithEmailAndPassword(auth, normEmail, normCode);
+      } catch (createErr: any) {
+        if (createErr?.code !== "auth/email-already-in-use") throw createErr;
+        firebaseAccountAlreadyExists = true;
+        credential = await signInWithEmailAndPassword(auth, normEmail, normCode);
+      }
+
+      await finishPasswordLogin(legacyMatch, credential.user.uid);
+      return;
+    } catch (migrationErr: any) {
+      console.warn("[Auth migration] Could not upgrade legacy account:", migrationErr);
+
+      // If Firebase already has an account for this email, never allow the old
+      // access code to bypass its password. A failed Firebase password login
+      // must remain a failed login even if migration metadata was not saved.
+      if (firebaseAccountAlreadyExists) {
+        if (auth.currentUser?.isAnonymous) await signOut(auth);
+        throw migrationErr;
+      }
+
+      // Only accounts that genuinely do not have a Firebase password identity
+      // yet may temporarily keep using the old flow. This fallback disappears
+      // after the migration is complete.
+      try {
+        if (!auth.currentUser) await signInAnonymously(auth);
+        setCurrentUser(legacyMatch);
+        localStorage.setItem("golfsana_currentUser", JSON.stringify(legacyMatch));
+        setFirebaseUser(auth.currentUser || { uid: legacyMatch.id, email: legacyMatch.email });
+        setAuthLoading(false);
+        logActivity(legacyMatch, "Inici de sessió (migració pendent)");
+        return;
+      } catch (anonymousErr) {
+        console.warn("[Auth migration] Legacy fallback also failed:", anonymousErr);
+        throw migrationErr;
+      }
     }
   };
 

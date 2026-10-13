@@ -24,7 +24,6 @@ export interface UserProfile {
   departmentId?: string; // Associated department
   departmentIds?: string[]; // Multiple associated departments
   createdAt?: any; // Firestore Timestamp
-  accessCode?: string; // Legacy credential kept only during Firebase Auth migration.
   authUid?: string; // Firebase Authentication UID once this profile has migrated.
   authProvider?: "password"; // Current real Firebase provider for this Golfsana profile.
   authMigratedAt?: string; // ISO timestamp of the first successful real Firebase login.

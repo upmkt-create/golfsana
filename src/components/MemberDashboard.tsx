@@ -336,11 +336,7 @@ export default function MemberDashboard({
             const setAccessScope = (scope: "normal" | "caddy_master" | "greenkeeper") => {
               if (scope === "normal") {
                 onUpdateUserProfile(member.id, {
-                  accessScope: "normal",
-                  allowedWorkspaceIds: [],
-                  restrictedToOwnDepartment: false,
-                  departmentIds: [],
-                  departmentId: ""
+                  accessScope: "normal"
                 });
                 return;
               }
@@ -351,10 +347,7 @@ export default function MemberDashboard({
 
               onUpdateUserProfile(member.id, {
                 accessScope: scope,
-                allowedWorkspaceIds: [workspaceId],
-                restrictedToOwnDepartment: true,
-                departmentIds: [workspaceId],
-                departmentId: workspaceId
+                allowedWorkspaceIds: [workspaceId]
               });
             };
 

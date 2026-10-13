@@ -50,6 +50,8 @@ import {
 } from "./data";
 import { getDepartmentOptions } from "./lib/departments";
 import {
+  CADDY_MASTER_WORKSPACE_ID,
+  GREENKEEPER_WORKSPACE_ID,
   canAccessWorkspace,
   getOwnWorkspaceIds,
   getRestrictedWorkspaceIds,
@@ -836,7 +838,8 @@ export default function App() {
     const unsubUsers = onSnapshot(usersSource, (snapshot) => {
       const items: UserProfile[] = [];
       snapshot.forEach((docSnap) => {
-        items.push(docSnap.data() as UserProfile);
+        const data = docSnap.data() as UserProfile;
+        items.push({ ...data, id: data.id || docSnap.id });
       });
       
       // If collection is empty, trigger seed loading (única vegada que
@@ -851,20 +854,82 @@ export default function App() {
         const merged = [...items];
 
         const starterIds = new Set(STARTER_MEMBERS.map(m => m.id));
-        // Ja NO filtrem fora els usuaris que no siguin STARTER_MEMBERS —
-        // abans aquest filtre eliminava qualsevol usuari afegit des del
-        // formulari "Afegir Usuari" a la propera sincronització, fent la
-        // funcionalitat inservible. Mantenim tots els usuaris reals de
-        // Firestore, i només forcem el rol admin per Isabel/Rocío.
-        let filteredMerged = merged
-          .map(u => {
-            const isIsabel = u.email === "info@up-mktdigital.com" || u.id === "member_isabel";
-            const isRocio = u.email === "rocio@golfdaro.com" || u.id === "member_rocio";
-            return {
-              ...u,
-              role: (isIsabel || isRocio) ? ("admin" as UserRole) : u.role
-            };
-          });
+        // Normalització única del model d'accés:
+        // - admins i membres normals NO tenen departaments assignats;
+        // - Caddy Master només conserva ws-wcrm6ca;
+        // - Greenkeeper només conserva ws-u61yrek.
+        // Els camps departmentId/departmentIds/restrictedToOwnDepartment
+        // s'eliminen de Firestore perquè són residus del model antic.
+        let filteredMerged = merged.map((u) => {
+          const isIsabel = u.email === "info@up-mktdigital.com" || u.id === "member_isabel";
+          const isRocio = u.email === "rocio@golfdaro.com" || u.id === "member_rocio";
+          const forcedRole: UserRole = (isIsabel || isRocio) ? "admin" : u.role;
+
+          const legacyIds = new Set([
+            ...(u.allowedWorkspaceIds || []),
+            ...(u.departmentIds || []),
+            ...(u.departmentId ? [u.departmentId] : [])
+          ]);
+
+          let accessScope = u.accessScope;
+          if (forcedRole === "admin") {
+            accessScope = "normal";
+          } else if (accessScope !== "caddy_master" && accessScope !== "greenkeeper") {
+            if (legacyIds.has(CADDY_MASTER_WORKSPACE_ID)) {
+              accessScope = "caddy_master";
+            } else if (legacyIds.has(GREENKEEPER_WORKSPACE_ID)) {
+              accessScope = "greenkeeper";
+            } else {
+              accessScope = "normal";
+            }
+          }
+
+          const desiredAllowedWorkspaceIds =
+            accessScope === "caddy_master"
+              ? [CADDY_MASTER_WORKSPACE_ID]
+              : accessScope === "greenkeeper"
+                ? [GREENKEEPER_WORKSPACE_ID]
+                : undefined;
+
+          const normalized: UserProfile = {
+            ...u,
+            role: forcedRole,
+            accessScope
+          };
+          delete normalized.departmentId;
+          delete normalized.departmentIds;
+          delete normalized.restrictedToOwnDepartment;
+          if (desiredAllowedWorkspaceIds) {
+            normalized.allowedWorkspaceIds = desiredAllowedWorkspaceIds;
+          } else {
+            delete normalized.allowedWorkspaceIds;
+          }
+
+          const patch: any = {};
+          if (u.role !== forcedRole) patch.role = forcedRole;
+          if (u.accessScope !== accessScope) patch.accessScope = accessScope;
+          if (Object.prototype.hasOwnProperty.call(u, "departmentId")) patch.departmentId = deleteField();
+          if (Object.prototype.hasOwnProperty.call(u, "departmentIds")) patch.departmentIds = deleteField();
+          if (Object.prototype.hasOwnProperty.call(u, "restrictedToOwnDepartment")) patch.restrictedToOwnDepartment = deleteField();
+
+          if (desiredAllowedWorkspaceIds) {
+            const currentAllowed = u.allowedWorkspaceIds || [];
+            const sameAllowed =
+              currentAllowed.length === desiredAllowedWorkspaceIds.length &&
+              currentAllowed.every((id, index) => id === desiredAllowedWorkspaceIds[index]);
+            if (!sameAllowed) patch.allowedWorkspaceIds = desiredAllowedWorkspaceIds;
+          } else if (Object.prototype.hasOwnProperty.call(u, "allowedWorkspaceIds")) {
+            patch.allowedWorkspaceIds = deleteField();
+          }
+
+          if (Object.keys(patch).length > 0) {
+            updateDoc(doc(db, "users", u.id), patch).catch((err) =>
+              console.warn("[User access cleanup] No s'han pogut netejar camps antics:", u.id, err)
+            );
+          }
+
+          return normalized;
+        });
 
         // Deduplicate by email (prefer 'member_isabel' over random generated ID)
         const emailMap = new Map();
@@ -2258,6 +2323,7 @@ export default function App() {
       name,
       email: email.trim().toLowerCase(),
       role,
+      accessScope: "normal",
       avatar,
       accessCode: accessCode.trim(),
       createdAt: new Date().toISOString()
@@ -2296,23 +2362,47 @@ export default function App() {
     }
   };
 
-  // Permet a un admin canviar el(s) departament(s) d'un membre i activar/
-  // desactivar l'accés restringit al seu propi espai de treball (Caddy
-  // Master, Greenkeeper...). Genèric: accepta qualsevol subconjunt de camps
-  // del perfil per si en el futur cal editar-ne més des d'aquí.
+  // Actualitza el perfil. Els permisos ja no depenen de departmentId /
+  // departmentIds: els membres normals són transversals i només Caddy Master
+  // / Greenkeeper tenen un allowedWorkspaceIds explícit.
   const handleUpdateUserProfile = async (userId: string, updates: Partial<UserProfile>) => {
-    const updated = users.map((u) => (u.id === userId ? { ...u, ...updates } : u));
+    const isAccessUpdate = updates.accessScope !== undefined;
+
+    const updated = users.map((u) => {
+      if (u.id !== userId) return u;
+      const next: UserProfile = { ...u, ...updates };
+
+      if (isAccessUpdate) {
+        delete next.departmentId;
+        delete next.departmentIds;
+        delete next.restrictedToOwnDepartment;
+        if (updates.accessScope === "normal") {
+          delete next.allowedWorkspaceIds;
+        }
+      }
+      return next;
+    });
+
     setUsers(updated);
     localStorage.setItem("golfsana_users", JSON.stringify(updated));
     const target = updated.find((u) => u.id === userId);
     logEnterpriseAction(`Perfil actualitzat per a ${target?.name || userId}`);
 
-    // Aquest canvi és sensible per a la seguretat (departament i accés
-    // restringit), així que si la desada a Firestore falla de veritat,
-    // cal que es vegi amb un avís d'error real — abans es mostrava sempre
-    // "Perfil actualitzat" encara que la desada fallés en silenci.
     try {
-      await saveDoc(doc(db, "users", userId), updates, { merge: true });
+      if (isAccessUpdate) {
+        const firestoreUpdates: any = {
+          ...updates,
+          departmentId: deleteField(),
+          departmentIds: deleteField(),
+          restrictedToOwnDepartment: deleteField()
+        };
+        if (updates.accessScope === "normal") {
+          firestoreUpdates.allowedWorkspaceIds = deleteField();
+        }
+        await updateDoc(doc(db, "users", userId), firestoreUpdates);
+      } else {
+        await saveDoc(doc(db, "users", userId), updates, { merge: true });
+      }
       addToast("Perfil del membre actualitzat", "success");
     } catch (err) {
       console.warn("[Firestore Write Warning] user profile update failed", err);

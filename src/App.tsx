@@ -14,6 +14,7 @@ import {
   signInAnonymously,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updatePassword,
   onAuthStateChanged,
   signOut,
   GoogleAuthProvider,
@@ -34,7 +35,8 @@ import {
   query,
   where,
   Timestamp,
-  runTransaction
+  runTransaction,
+  deleteField
 } from "firebase/firestore";
 import {
   STARTER_MEMBERS,
@@ -152,6 +154,7 @@ import MeetingMinutes from "./components/MeetingMinutes";
 import golfBallIcon from "./up-icon-light.png";
 
 import LoginScreen from "./components/LoginScreen";
+import ChangePasswordScreen from "./components/ChangePasswordScreen";
 
 export default function App() {
   // Resilient Offline Sandbox Mode state
@@ -640,6 +643,43 @@ export default function App() {
         throw migrationErr;
       }
     }
+  };
+
+  const handleRequiredPasswordChange = async (newPassword: string) => {
+    if (!currentUser || !auth.currentUser || auth.currentUser.isAnonymous) {
+      throw new Error("AUTH_SESSION_REQUIRED");
+    }
+
+    // The new password is sent directly to Firebase Auth. It is never written
+    // to Firestore, localStorage or application logs.
+    await updatePassword(auth.currentUser, newPassword);
+
+    const passwordChangedAt = new Date().toISOString();
+    const hardenedProfile: UserProfile = {
+      ...currentUser,
+      passwordChangedAt
+    };
+    delete hardenedProfile.accessCode;
+
+    // Mark the account as hardened and remove the legacy access code from
+    // Firestore immediately after Firebase accepts the new password.
+    await updateDoc(doc(db, "users", currentUser.id), {
+      passwordChangedAt,
+      accessCode: deleteField()
+    });
+
+    setCurrentUser(hardenedProfile);
+    setUsers((prev) => {
+      const next = prev.map((u) =>
+        u.id === currentUser.id
+          ? { ...u, passwordChangedAt, accessCode: undefined }
+          : u
+      );
+      localStorage.setItem("golfsana_users", JSON.stringify(next));
+      return next;
+    });
+    localStorage.setItem("golfsana_currentUser", JSON.stringify(hardenedProfile));
+    addToast("Contrasenya privada actualitzada correctament", "success");
   };
 
   const handleLogout = () => {
@@ -2576,6 +2616,24 @@ export default function App() {
   // sense que l'usuari hagi triat el seu perfil — per això no serveix com a condició.
   if (!currentUser) {
     return <LoginScreen onLogin={handleCustomLogin} />;
+  }
+
+  // Any account migrated from the old access-code system must replace that
+  // exposed legacy credential with a new private Firebase password before it
+  // can use Golfsana. Isabel, already migrated in PR #5, is caught here too
+  // because her profile has authProvider=password but no passwordChangedAt.
+  if (
+    currentUser.authProvider === "password" &&
+    !currentUser.passwordChangedAt &&
+    firebaseUser &&
+    !firebaseUser.isAnonymous
+  ) {
+    return (
+      <ChangePasswordScreen
+        email={currentUser.email}
+        onChangePassword={handleRequiredPasswordChange}
+      />
+    );
   }
 
   if (isWorkspaceRestricted && !restrictedAllowedTabs.has(activeTab)) {

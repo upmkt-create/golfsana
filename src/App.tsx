@@ -30,7 +30,8 @@ import {
   orderBy,
   query,
   where,
-  Timestamp
+  Timestamp,
+  runTransaction
 } from "firebase/firestore";
 import {
   STARTER_MEMBERS,
@@ -56,7 +57,8 @@ import {
   UserRole,
   MeetingMinute,
   MeetingAgreement,
-  InfoNote
+  InfoNote,
+  MemberNote
 } from "./types";
 import { isInfoNoteLive, isInfoNoteVisibleTo, daysSinceLive } from "./lib/infoNotes";
 import {
@@ -2097,21 +2099,54 @@ export default function App() {
     }
   };
 
+  // Les notes d'un membre viuen dins el seu document d'usuari (camp
+  // notesList). Abans, cada operació agafava la llista de l'estat local de
+  // React, la modificava i la tornava a escriure sencera, i si Firestore
+  // fallava només es feia un console.warn mentre el toast deia "Nota
+  // afegida": la nota es veia un moment i desapareixia a la següent
+  // sincronització o en recarregar. Ara es fa en una transacció que llegeix
+  // la llista ACTUAL del servidor (així dues persones/dispositius no es
+  // trepitgen), i si no es pot desar es veu un error real.
+  const MAX_NOTE_CHARS = 200_000; // el document d'usuari de Firestore té un límit d'1 MB en total
+
+  const mutateUserNotes = async (
+    userId: string,
+    mutate: (current: MemberNote[]) => MemberNote[]
+  ): Promise<boolean> => {
+    const ref = doc(db, "users", userId);
+    try {
+      const nextList = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        const current = ((snap.exists() ? snap.data()?.notesList : null) || []) as MemberNote[];
+        const next = mutate(current);
+        tx.set(ref, { notesList: next }, { merge: true });
+        return next;
+      });
+      // Reflecteix el resultat confirmat a la interfície (el listener de
+      // Firestore també ho farà, però així es veu a l'instant).
+      setUsers((prev) => {
+        const updated = prev.map((u) => (u.id === userId ? { ...u, notesList: nextList } : u));
+        localStorage.setItem("golfsana_users", JSON.stringify(updated));
+        return updated;
+      });
+      return true;
+    } catch (err) {
+      console.error("[Firestore Write Error] user notes", err);
+      addToast("No s'ha pogut desar la nota a Firestore. Revisa la connexió i torna-ho a provar.", "warning");
+      return false;
+    }
+  };
+
   const handleAddUserNote = async (userId: string, content: string) => {
     if (!content.trim()) return;
-    const newNote = { id: "note-" + Date.now() + "-" + Math.floor(Math.random() * 1000), content, createdAt: new Date().toISOString() };
-    const target = users.find((u) => u.id === userId);
-    const nextList = [...(target?.notesList || []), newNote];
-    const updated = users.map((u) => (u.id === userId ? { ...u, notesList: nextList } : u));
-    setUsers(updated);
-    localStorage.setItem("golfsana_users", JSON.stringify(updated));
-    addToast("Nota afegida", "success");
-
-    try {
-      await saveDoc(doc(db, "users", userId), { notesList: nextList }, { merge: true });
-    } catch (err) {
-      console.warn("[Firestore Write Warning] user notes: saved in client sandbox", err);
+    if (content.length > MAX_NOTE_CHARS) {
+      addToast("La nota és massa llarga (probablement conté una imatge enganxada). Treu-ne la imatge o divideix-la en dues notes.", "warning");
+      return;
     }
+    const newNote: MemberNote = { id: "note-" + Date.now() + "-" + Math.floor(Math.random() * 1000), content, createdAt: new Date().toISOString() };
+    const ok = await mutateUserNotes(userId, (current) => [...current, newNote]);
+    if (!ok) return;
+    addToast("Nota afegida", "success");
 
     // Avisa al membre que té una nota nova per llegir.
     if (userId !== currentUser?.id) {
@@ -2120,36 +2155,20 @@ export default function App() {
   };
 
   const handleDeleteUserNote = async (userId: string, noteId: string) => {
-    const target = users.find((u) => u.id === userId);
-    const nextList = (target?.notesList || []).filter((n) => n.id !== noteId);
-    const updated = users.map((u) => (u.id === userId ? { ...u, notesList: nextList } : u));
-    setUsers(updated);
-    localStorage.setItem("golfsana_users", JSON.stringify(updated));
-    addToast("Nota eliminada", "success");
-
-    try {
-      await saveDoc(doc(db, "users", userId), { notesList: nextList }, { merge: true });
-    } catch (err) {
-      console.warn("[Firestore Write Warning] user notes: saved in client sandbox", err);
-    }
+    const ok = await mutateUserNotes(userId, (current) => current.filter((n) => n.id !== noteId));
+    if (ok) addToast("Nota eliminada", "success");
   };
 
   const handleEditUserNote = async (userId: string, noteId: string, content: string) => {
     if (!content.trim()) return;
-    const target = users.find((u) => u.id === userId);
-    const nextList = (target?.notesList || []).map((n) =>
-      n.id === noteId ? { ...n, content, updatedAt: new Date().toISOString() } : n
-    );
-    const updated = users.map((u) => (u.id === userId ? { ...u, notesList: nextList } : u));
-    setUsers(updated);
-    localStorage.setItem("golfsana_users", JSON.stringify(updated));
-    addToast("Nota actualitzada", "success");
-
-    try {
-      await saveDoc(doc(db, "users", userId), { notesList: nextList }, { merge: true });
-    } catch (err) {
-      console.warn("[Firestore Write Warning] user notes: saved in client sandbox", err);
+    if (content.length > MAX_NOTE_CHARS) {
+      addToast("La nota és massa llarga (probablement conté una imatge enganxada). Treu-ne la imatge o divideix-la en dues notes.", "warning");
+      return;
     }
+    const ok = await mutateUserNotes(userId, (current) =>
+      current.map((n) => (n.id === noteId ? { ...n, content, updatedAt: new Date().toISOString() } : n))
+    );
+    if (ok) addToast("Nota actualitzada", "success");
   };
 
   // Elimina un usuari completament (per exemple per tornar-lo a crear net

@@ -8,6 +8,11 @@ import {
   TaskPriority
 } from "../types";
 import { getDepartmentOptions } from "../lib/departments";
+import {
+  CADDY_MASTER_WORKSPACE_ID,
+  GREENKEEPER_WORKSPACE_ID,
+  getRestrictedWorkspaceIds
+} from "../lib/permissions";
 import ProjectCalendar from "./ProjectCalendar";
 import { stripHtmlToText } from "../lib/textUtils";
 import { getTaskUrgency, URGENCY_STYLES } from "../lib/taskUrgency";
@@ -311,70 +316,101 @@ export default function MemberDashboard({
         </div>
       </div>
 
-      {/* Gestió d'accés (només admins) — departament(s) i accés restringit */}
+      {/* Gestió d'accés (només admins). L'equip normal és transversal:
+          només Caddy Master i Greenkeeper queden tancats a un únic espai. */}
       {isAdmin && onUpdateUserProfile && (
         <div className="bg-white border border-slate-200 p-4 space-y-3">
           <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
             <Lock className="w-3.5 h-3.5" />
             Gestió d'accés (només administradors)
           </h3>
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-            <div className="flex-1 space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Espai(s) de treball d'aquest membre
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {departmentOptions.map((d) => {
-                  const active = (member.departmentIds || (member.departmentId ? [member.departmentId] : [])).includes(d.id);
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => {
-                        const current = member.departmentIds || (member.departmentId ? [member.departmentId] : []);
-                        const next = current.includes(d.id) ? current.filter((id) => id !== d.id) : [...current, d.id];
-                        // Firestore rebutja escriptures amb camps a "undefined"
-                        // (per exemple, si es treu l'últim departament i
-                        // next[0] queda buit) — abans això feia fallar la
-                        // desada en silenci, tot i que la pantalla mostrava
-                        // "Perfil actualitzat".
-                        onUpdateUserProfile(member.id, next.length > 0
-                          ? { departmentIds: next, departmentId: next[0] }
-                          : { departmentIds: [], departmentId: "" }
-                        );
-                      }}
-                      className={`px-2.5 py-1 text-[11px] font-semibold border transition-all ${
-                        active ? "text-white border-transparent" : "text-slate-600 border-slate-300 hover:bg-slate-50"
-                      }`}
-                      style={active ? { backgroundColor: d.color } : {}}
-                    >
-                      {d.name}
-                    </button>
-                  );
-                })}
+          {(() => {
+            const restrictedIds = getRestrictedWorkspaceIds(member);
+            const currentScope =
+              member.accessScope === "caddy_master" || restrictedIds.has(CADDY_MASTER_WORKSPACE_ID)
+                ? "caddy_master"
+                : member.accessScope === "greenkeeper" || restrictedIds.has(GREENKEEPER_WORKSPACE_ID)
+                  ? "greenkeeper"
+                  : "normal";
+
+            const setAccessScope = (scope: "normal" | "caddy_master" | "greenkeeper") => {
+              if (scope === "normal") {
+                onUpdateUserProfile(member.id, {
+                  accessScope: "normal",
+                  allowedWorkspaceIds: [],
+                  restrictedToOwnDepartment: false,
+                  departmentIds: [],
+                  departmentId: ""
+                });
+                return;
+              }
+
+              const workspaceId = scope === "caddy_master"
+                ? CADDY_MASTER_WORKSPACE_ID
+                : GREENKEEPER_WORKSPACE_ID;
+
+              onUpdateUserProfile(member.id, {
+                accessScope: scope,
+                allowedWorkspaceIds: [workspaceId],
+                restrictedToOwnDepartment: true,
+                departmentIds: [workspaceId],
+                departmentId: workspaceId
+              });
+            };
+
+            return (
+              <div className="space-y-3">
+                <p className="text-[11px] text-slate-500">
+                  Els membres normals treballen transversalment i no queden assignats a cap departament.
+                  Caddy Master i Greenkeeper només poden entrar al seu espai operatiu.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAccessScope("normal")}
+                    className={`px-3 py-2 text-xs font-semibold border text-left transition-all ${
+                      currentScope === "normal"
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                        : "text-slate-600 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="block font-bold">Equip normal</span>
+                    <span className="block text-[10px] mt-0.5 opacity-80">Accés transversal als espais no privats</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccessScope("caddy_master")}
+                    className={`px-3 py-2 text-xs font-semibold border text-left transition-all ${
+                      currentScope === "caddy_master"
+                        ? "bg-amber-50 text-amber-800 border-amber-300"
+                        : "text-slate-600 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="block font-bold">Caddy Master</span>
+                    <span className="block text-[10px] mt-0.5 opacity-80">Només {CADDY_MASTER_WORKSPACE_ID}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAccessScope("greenkeeper")}
+                    className={`px-3 py-2 text-xs font-semibold border text-left transition-all ${
+                      currentScope === "greenkeeper"
+                        ? "bg-amber-50 text-amber-800 border-amber-300"
+                        : "text-slate-600 border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="block font-bold">Greenkeeper</span>
+                    <span className="block text-[10px] mt-0.5 opacity-80">Només {GREENKEEPER_WORKSPACE_ID}</span>
+                  </button>
+                </div>
+                {currentScope !== "normal" && (
+                  <div className="flex items-center gap-2 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-3 py-2">
+                    <Lock className="w-3.5 h-3.5 shrink-0" />
+                    Perfil operatiu restringit: sense membres, Golfrepu, Golfradar, informes globals, Direcció ni altres espais.
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="sm:w-64 space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                Accés restringit
-              </label>
-              <button
-                type="button"
-                onClick={() => onUpdateUserProfile(member.id, { restrictedToOwnDepartment: !member.restrictedToOwnDepartment })}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold border transition-all ${
-                  member.restrictedToOwnDepartment
-                    ? "bg-amber-50 text-amber-700 border-amber-300"
-                    : "text-slate-600 border-slate-300 hover:bg-slate-50"
-                }`}
-              >
-                {member.restrictedToOwnDepartment ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-                {member.restrictedToOwnDepartment ? "Restringit al seu espai" : "Accés normal (veu tots els espais)"}
-              </button>
-              <p className="text-[10px] text-slate-400">
-                Amb l'accés restringit activat, aquest membre només veu i pot treballar dins del(s) espai(s) triats a l'esquerra.
-              </p>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       )}
 

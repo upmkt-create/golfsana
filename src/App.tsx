@@ -45,7 +45,12 @@ import {
   isAllowedTariff
 } from "./data";
 import { getDepartmentOptions } from "./lib/departments";
-import { canAccessWorkspace, getOwnWorkspaceIds } from "./lib/permissions";
+import {
+  canAccessWorkspace,
+  getOwnWorkspaceIds,
+  getRestrictedWorkspaceIds,
+  isWorkspaceRestrictedUser
+} from "./lib/permissions";
 import {
   UserProfile,
   Workspace,
@@ -418,26 +423,46 @@ export default function App() {
     ))
   );
 
-  // Redirect non-admins from restricted tabs
+  const isWorkspaceRestricted = !!currentUser && !isAdmin && isWorkspaceRestrictedUser(currentUser);
+  const restrictedWorkspaceIds = currentUser ? getRestrictedWorkspaceIds(currentUser) : new Set<string>();
+  const restrictedWorkspaceId = isWorkspaceRestricted ? Array.from(restrictedWorkspaceIds)[0] || "" : "";
+  const viewUsers = isWorkspaceRestricted && currentUser ? [currentUser] : users;
+  const restrictedAllowedTabs = new Set(["summary", "list", "base_tasks", "timeline", "calendar"]);
+
+  // Redirect non-admins from restricted areas. Operational profiles
+  // (Caddy Master / Greenkeeper) are hard-limited to workspace task views.
   useEffect(() => {
     if (!isAdmin && activeTab === "incentives") {
       setActiveTab("summary");
     }
-    // Seguretat: si l'usuari actual no té accés a l'espai actiu (privat de
-    // direcció, o fora del seu propi espai si té restrictedToOwnDepartment),
-    // el treiem cap al primer espai a què sí que té accés.
     if (!currentUser) return;
+
     const activeWs = workspaces.find(w => w.id === activeWorkspaceId);
     if (activeWs && !canAccessWorkspace(currentUser, activeWs, isAdmin)) {
       const firstAllowed = workspaces.find(w => canAccessWorkspace(currentUser, w, isAdmin));
-      setActiveWorkspaceId(firstAllowed?.id || "");
+      setActiveWorkspaceId(firstAllowed?.id || restrictedWorkspaceId || "");
     }
-    // Els usuaris amb accés restringit no poden fer servir les vistes
-    // transversals que barregen tots els departaments.
-    if (currentUser.restrictedToOwnDepartment && (activeTab === "all_tasks_global" || activeTab === "reports" || activeTab === "monitoring" || activeTab === "all_workspaces")) {
-      setActiveTab("summary");
+
+    if (isWorkspaceRestricted) {
+      if (restrictedWorkspaceId && activeWorkspaceId !== restrictedWorkspaceId) {
+        setActiveWorkspaceId(restrictedWorkspaceId);
+        setActiveProjectId(null);
+      }
+      if (!restrictedAllowedTabs.has(activeTab)) {
+        setActiveTab("summary");
+      }
+      if (filterAssigneeId) setFilterAssigneeId(null);
     }
-  }, [isAdmin, activeTab, activeWorkspaceId, workspaces, currentUser]);
+  }, [
+    isAdmin,
+    isWorkspaceRestricted,
+    restrictedWorkspaceId,
+    activeTab,
+    activeWorkspaceId,
+    workspaces,
+    currentUser?.id,
+    filterAssigneeId
+  ]);
 
   // 1. Authenticate silently or manage google login
   useEffect(() => {
@@ -646,6 +671,11 @@ export default function App() {
     // the Firebase session and the validated Golfsana profile are present.
     if (authLoading || !firebaseUser || !currentUser) return;
 
+    const scopedWorkspaceIds = getRestrictedWorkspaceIds(currentUser);
+    const scopedWorkspaceId = !isAdmin && scopedWorkspaceIds.size > 0
+      ? Array.from(scopedWorkspaceIds)[0]
+      : "";
+
     // A-0. Sync Deleted Items List
     const unsubDeleted = onSnapshot(collection(db, "deletedItems"), (snapshot) => {
       const ids = new Set<string>();
@@ -659,7 +689,10 @@ export default function App() {
     });
 
     // A. Sync Team/Users
-    const unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+    const usersSource = scopedWorkspaceId
+      ? query(collection(db, "users"), where("id", "==", currentUser.id))
+      : collection(db, "users");
+    const unsubUsers = onSnapshot(usersSource, (snapshot) => {
       const items: UserProfile[] = [];
       snapshot.forEach((docSnap) => {
         items.push(docSnap.data() as UserProfile);
@@ -671,7 +704,7 @@ export default function App() {
       // reflectim exactament el que hi ha, sense recrear ningú que s'hagi
       // eliminat — amb la rotació de personal del club, qui s'elimina s'ha
       // de quedar eliminat).
-      if (items.length === 0) {
+      if (items.length === 0 && !scopedWorkspaceId) {
         seedInitialUsers();
       } else {
         const merged = [...items];
@@ -725,7 +758,10 @@ export default function App() {
     });
 
     // B. Sync Workspaces
-    const unsubWS = onSnapshot(collection(db, "workspaces"), (snapshot) => {
+    const workspacesSource = scopedWorkspaceId
+      ? query(collection(db, "workspaces"), where("id", "==", scopedWorkspaceId))
+      : collection(db, "workspaces");
+    const unsubWS = onSnapshot(workspacesSource, (snapshot) => {
       const deletedL = JSON.parse(localStorage.getItem("golfsana_deleted") || "[]");
       const deletedSet = new Set<string>(deletedL);
       const items: Workspace[] = [];
@@ -751,7 +787,7 @@ export default function App() {
         // Auto-seed de l'espai "Direcció" (admin-only) si falta i no s'ha eliminat.
         // Es fa una sola vegada, comprovant que no existeixi ja, per evitar duplicats.
         const hasDireccio = items.some(w => w.id === "dep-direccio");
-        if (!hasDireccio && !deletedSet.has("dep-direccio")) {
+        if (!scopedWorkspaceId && !hasDireccio && !deletedSet.has("dep-direccio")) {
           const direccio: Workspace = {
             id: "dep-direccio",
             name: "Direcció",
@@ -769,7 +805,10 @@ export default function App() {
     });
 
     // C. Sync Projects
-    const unsubProj = onSnapshot(collection(db, "projects"), (snapshot) => {
+    const projectsSource = scopedWorkspaceId
+      ? query(collection(db, "projects"), where("workspaceId", "==", scopedWorkspaceId))
+      : collection(db, "projects");
+    const unsubProj = onSnapshot(projectsSource, (snapshot) => {
       const deletedL = JSON.parse(localStorage.getItem("golfsana_deleted") || "[]");
       const deletedSet = new Set<string>(deletedL);
       const items: Project[] = [];
@@ -823,7 +862,7 @@ export default function App() {
       }
       
       const hasSeeded = localStorage.getItem("golfsana_projects_seeded") === "true";
-      if (items.length === 0 && !hasSeeded) {
+      if (items.length === 0 && !hasSeeded && !scopedWorkspaceId) {
         localStorage.setItem("golfsana_projects_seeded", "true");
         seedInitialProjects();
       } else {
@@ -839,7 +878,10 @@ export default function App() {
     });
 
     // D. Sync Tasks
-    const unsubTasks = onSnapshot(collection(db, "tasks"), (snapshot) => {
+    const tasksSource = scopedWorkspaceId
+      ? query(collection(db, "tasks"), where("workspaceId", "==", scopedWorkspaceId))
+      : collection(db, "tasks");
+    const unsubTasks = onSnapshot(tasksSource, (snapshot) => {
       const deletedL = JSON.parse(localStorage.getItem("golfsana_deleted") || "[]");
       const deletedSet = new Set<string>(deletedL);
       const items: Task[] = [];
@@ -854,7 +896,7 @@ export default function App() {
       });
       
       const hasSeeded = localStorage.getItem("golfsana_tasks_seeded") === "true";
-      if (items.length === 0 && !hasSeeded) {
+      if (items.length === 0 && !hasSeeded && !scopedWorkspaceId) {
         localStorage.setItem("golfsana_tasks_seeded", "true");
         seedInitialTasks();
       } else {
@@ -870,7 +912,13 @@ export default function App() {
     });
 
     // E. Sync Golf Rates
-    const unsubGolf = onSnapshot(collection(db, "golfCourses"), (snapshot) => {
+    const unsubGolf = scopedWorkspaceId
+      ? (() => {
+          setGolfCourses([]);
+          localStorage.removeItem("golfsana_golfCourses");
+          return () => {};
+        })()
+      : onSnapshot(collection(db, "golfCourses"), (snapshot) => {
       const items: GolfCourse[] = [];
       snapshot.forEach((docSnap) => {
         items.push({ ...docSnap.data(), id: docSnap.id } as GolfCourse);
@@ -964,7 +1012,15 @@ export default function App() {
       unsubGolf();
       unsubDeleted();
     };
-  }, [authLoading, firebaseUser?.uid, currentUser?.id]);
+  }, [
+    authLoading,
+    firebaseUser?.uid,
+    currentUser?.id,
+    currentUser?.accessScope,
+    currentUser?.restrictedToOwnDepartment,
+    JSON.stringify(currentUser?.allowedWorkspaceIds || []),
+    JSON.stringify(currentUser?.departmentIds || [])
+  ]);
 
   // Automatic Ambient Scraper Service for Competitor Prices
   useEffect(() => {
@@ -1103,6 +1159,11 @@ export default function App() {
   // Sincronització d'Actes de Reunió (meetingMinutes)
   useEffect(() => {
     if (!currentUser) return;
+    if (isWorkspaceRestrictedUser(currentUser)) {
+      setMeetingMinutes([]);
+      localStorage.removeItem("golfsana_minutes");
+      return;
+    }
     const unsubMinutes = onSnapshot(collection(db, "meetingMinutes"), (snapshot) => {
       const list: MeetingMinute[] = [];
       snapshot.forEach((docSnap) => {
@@ -1126,6 +1187,11 @@ export default function App() {
   // Sincronització de Notes Informatives (comunicats de tot l'equip)
   useEffect(() => {
     if (!currentUser) return;
+    if (isWorkspaceRestrictedUser(currentUser)) {
+      setInfoNotes([]);
+      localStorage.removeItem("golfsana_infonotes");
+      return;
+    }
     const unsubInfoNotes = onSnapshot(collection(db, "infoNotes"), (snapshot) => {
       const list: InfoNote[] = [];
       snapshot.forEach((docSnap) => {
@@ -2391,7 +2457,7 @@ export default function App() {
       const titleMatch = (t.title || "").toLowerCase().includes(q);
       const descMatch = (t.description || "").toLowerCase().includes(q);
       
-      const assigneeName = users.find(u => t.assigneeIds?.includes(u.id) || u.id === t.assigneeId)?.name || "";
+      const assigneeName = viewUsers.find(u => t.assigneeIds?.includes(u.id) || u.id === t.assigneeId)?.name || "";
       const assigneeMatch = assigneeName.toLowerCase().includes(q);
 
       const deptMatch = (t.departmentId || "").toLowerCase().includes(q);
@@ -2409,6 +2475,10 @@ export default function App() {
   // sense que l'usuari hagi triat el seu perfil — per això no serveix com a condició.
   if (!currentUser) {
     return <LoginScreen onLogin={handleCustomLogin} />;
+  }
+
+  if (isWorkspaceRestricted && !restrictedAllowedTabs.has(activeTab)) {
+    return <div className="p-10 text-center font-mono text-xs">Carregant espai de treball autoritzat...</div>;
   }
 
   // Golfrepu obre com un espai propi de GolfSana: pantalla completa, sense
@@ -3170,7 +3240,7 @@ export default function App() {
                   onUpdateCourse={handleUpdateGolfCourse}
                 />
                 <UserSessionSelector
-                  users={users}
+                  users={viewUsers}
                   currentUser={currentUser}
                   onSelectUser={(u) => {
                     setCurrentUser(u);
@@ -3290,7 +3360,7 @@ export default function App() {
               {filterAssigneeId ? (
                 <MemberDashboard
                   memberId={filterAssigneeId}
-                  users={users}
+                  users={viewUsers}
                   tasks={visibleTasks}
                   projects={projects}
                   workspaces={workspaces}
@@ -3457,7 +3527,7 @@ export default function App() {
                     projects={projects}
                     onSelectTask={(task) => setSelectedTask(task)}
                     mode={currentUser.role === "admin" ? "team" : "personal"}
-                    users={users}
+                    users={viewUsers}
                     personId={currentUser.id}
                   />
 
@@ -4039,7 +4109,7 @@ export default function App() {
                       return (
                         <ProjectSummary
                           project={proj}
-                          users={users}
+                          users={viewUsers}
                           onUpdateProject={handleUpdateProject}
                           onDeleteProject={handleDeleteProject}
                           logAction={logEnterpriseAction}
@@ -4433,7 +4503,7 @@ export default function App() {
                   {taskListViewMode === "list" ? (
                     <TaskList
                       tasks={applyTaskFilters(displayedTasks.filter((t) => !t.isBaseTask))}
-                      users={users}
+                      users={viewUsers}
                       projects={accessibleProjects}
                       workspaces={accessibleWorkspaces}
                       activeProjectId={activeProjectId}
@@ -4471,7 +4541,7 @@ export default function App() {
                   ) : (
                     <TaskBoard
                       tasks={displayedTasks}
-                      users={users}
+                      users={viewUsers}
                       projects={accessibleProjects}
                       workspaces={accessibleWorkspaces}
                       activeProjectId={activeProjectId}
@@ -4487,7 +4557,7 @@ export default function App() {
               {activeTab === "base_tasks" && (
                 <TaskList
                   tasks={applyTaskFilters(displayedTasks.filter((t) => t.isBaseTask))}
-                  users={users}
+                  users={viewUsers}
                   projects={accessibleProjects}
                   workspaces={accessibleWorkspaces}
                   activeProjectId={activeProjectId}
@@ -4527,8 +4597,8 @@ export default function App() {
               {activeTab === "timeline" && (
                 <TaskTimeline
                   tasks={displayedTasks}
-                  users={users}
-                  projects={projects}
+                  users={viewUsers}
+                  projects={accessibleProjects}
                   activeProjectId={activeProjectId}
                   activeWorkspaceId={activeWorkspaceId}
                 />
@@ -4538,7 +4608,7 @@ export default function App() {
                 <AllTasksGlobalView
                   tasks={visibleTasks}
                   projects={projects}
-                  users={users}
+                  users={viewUsers}
                   workspaces={getDepartmentOptions(workspaces)}
                   onSelectTask={(task) => setSelectedTask(task)}
                   onBack={() => setActiveTab("inici")}
@@ -4548,7 +4618,7 @@ export default function App() {
               {activeTab === "incentives" && (
                 <IncentivesDashboard
                   tasks={visibleTasks}
-                  users={users}
+                  users={viewUsers}
                   projects={projects}
                   workspaces={workspaces}
                 />
@@ -4557,7 +4627,7 @@ export default function App() {
               {activeTab === "reports" && (
                 <ReportsDashboard
                   tasks={visibleTasks}
-                  users={users}
+                  users={viewUsers}
                   projects={projects}
                   workspaces={workspaces}
                   defaultDepartmentId="all"
@@ -4568,7 +4638,7 @@ export default function App() {
                 <div className="p-6">
                   <InfoNotesDashboard
                     notes={infoNotes}
-                    users={users}
+                    users={viewUsers}
                     currentUser={currentUser}
                     isAdmin={isAdmin}
                     onSaveNote={handleSaveInfoNote}
@@ -4581,7 +4651,7 @@ export default function App() {
 
               {activeTab === "monitoring" && (
                 <div className="p-6">
-                  <AdminMonitoringDashboard users={users} />
+                  <AdminMonitoringDashboard users={viewUsers} />
                 </div>
               )}
               {activeTab === "calendar" && (
@@ -4589,7 +4659,7 @@ export default function App() {
                   <ProjectCalendar 
                     tasks={applyTaskFilters(displayedTasks)}
                     projects={accessibleProjects}
-                    users={users}
+                    users={viewUsers}
                     workspaces={accessibleWorkspaces}
                     activeWorkspaceId={activeWorkspaceId}
                     activeProjectId={activeProjectId}
@@ -4617,7 +4687,7 @@ export default function App() {
               {activeTab === "minutes" && (
                 <MeetingMinutes
                   minutes={meetingMinutes}
-                  users={users}
+                  users={viewUsers}
                   tasks={visibleTasks}
                   projects={projects.filter((p) => {
                     const ws = workspaces.find((w) => w.id === p.workspaceId);
@@ -4665,7 +4735,7 @@ export default function App() {
                   {/* Executive Workload & Department Productivity Dashboard via Recharts */}
                   <WorkloadDashboard 
                     tasks={visibleTasks}
-                    users={users}
+                    users={viewUsers}
                     projects={projects}
                     workspaces={workspaces}
                   />

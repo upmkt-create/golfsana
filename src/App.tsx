@@ -2544,9 +2544,8 @@ export default function App() {
 
   if (authLoading) return <div className="p-10 text-center font-mono text-xs">Carregant sistema...</div>;
   
-  // El login es mostra quan no hi ha usuari REAL de l'app (currentUser).
-  // firebaseUser és només la sessió tècnica anònima de Firestore i pot existir
-  // sense que l'usuari hagi triat el seu perfil — per això no serveix com a condició.
+  // El login es mostra quan no hi ha un perfil Golfsana validat contra
+  // la sessió Firebase Email/Password actual.
   if (!currentUser) {
     return <LoginScreen onLogin={handleCustomLogin} onForgotPassword={handleForgotPassword} />;
   }

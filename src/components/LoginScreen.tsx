@@ -19,7 +19,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
     try {
       await onLogin(email, code);
     } catch (err) {
-      setError("Dades d'accés incorrectes. Si us plau, verifica el teu correu i codi.");
+      setError("Dades d'accés incorrectes. Verifica el correu i la contrasenya.");
     } finally {
       setLoading(false);
     }
@@ -48,7 +48,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="Codi d'accés"
+            placeholder="Contrasenya"
             className="w-full border border-slate-200 p-3 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
             required
             type={showPassword ? "text" : "password"}

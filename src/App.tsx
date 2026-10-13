@@ -2613,6 +2613,7 @@ export default function App() {
           </div>
 
           {/* Inici / Taulell Principal */}
+          {!isWorkspaceRestricted && (
           <div className="space-y-1">
             <button
               onClick={() => {
@@ -2709,15 +2710,18 @@ export default function App() {
               </div>
             </button>
           </div>
+          )}
 
           {/* Active Workspace Selector */}
           <div className="space-y-2">
             <div 
               onClick={() => {
                 setIsWorkspacesExpanded(!isWorkspacesExpanded);
-                setActiveTab("all_workspaces");
-                setActiveProjectId(null);
-                setFilterAssigneeId(null);
+                if (!isWorkspaceRestricted) {
+                  setActiveTab("all_workspaces");
+                  setActiveProjectId(null);
+                  setFilterAssigneeId(null);
+                }
                 if(window.innerWidth < 1024) setIsMobileSidebarOpen(false);
               }} 
               className={`flex items-center justify-between px-1 cursor-pointer hover:bg-[#1d3d4c]/40 py-1 transition-all ${activeTab === 'all_workspaces' ? 'bg-[#1d3d4c]/40' : ''}`}
@@ -2728,6 +2732,7 @@ export default function App() {
                 <Layers className="w-3 h-3 text-blue-300 shrink-0" />
                 <span>Espais de treball</span>
               </span>
+              {!isWorkspaceRestricted && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2738,11 +2743,12 @@ export default function App() {
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
+              )}
             </div>
 
             {isWorkspacesExpanded && (
               <div className="space-y-1 pl-1.5">
-                {workspaces.map((ws) => {
+                {accessibleWorkspaces.map((ws) => {
                   const isActive = ws.id === activeWorkspaceId;
                   const isLocked = !!currentUser && !canAccessWorkspace(currentUser, ws, isAdmin); // Espai restringit (privat de direcció, o fora de l'espai propi si l'usuari té accés restringit)
                   return (
@@ -2782,7 +2788,7 @@ export default function App() {
                       </button>
                       
                       <div className="flex items-center gap-1.5 pr-2">
-                        {!isLocked && (
+                        {!isLocked && !isWorkspaceRestricted && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -2821,6 +2827,7 @@ export default function App() {
                 <Folder className="w-3 h-3 text-blue-300 shrink-0" />
                 <span>Projectes del Grup</span>
               </span>
+              {!isWorkspaceRestricted && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -2831,6 +2838,7 @@ export default function App() {
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
+              )}
             </div>
 
             {isProjectsExpanded && (
@@ -2888,6 +2896,7 @@ export default function App() {
           </div>
 
           {/* Anàlisis de Dades */}
+          {!isWorkspaceRestricted && (
           <div className="space-y-2 pt-3 border-t border-[#1d3d4c]">
             <div 
               onClick={() => setIsDataAnalysisExpanded(!isDataAnalysisExpanded)}
@@ -2990,8 +2999,10 @@ export default function App() {
               </div>
             )}
           </div>
+          )}
 
           {/* Membres de l'Equip & Filtre de Responsables */}
+          {!isWorkspaceRestricted && (
           <div className="space-y-2 pt-3 border-t border-[#1d3d4c]">
             <div 
               onClick={() => setIsMembersExpanded(!isMembersExpanded)}
@@ -3058,6 +3069,7 @@ export default function App() {
               </div>
             )}
           </div>
+          )}
         </div>
 
         {/* Corporate bottom info & admin switcher status */}
@@ -3222,6 +3234,7 @@ export default function App() {
             </button>
 
             {/* Onboarding Guide "?" Button (Improvement 2) — amagat en mòbil, hi ha poc espai i no és crític */}
+            {!isWorkspaceRestricted && (
             <button
               onClick={() => setShowHelpGuide(true)}
               className="p-1.5 bg-slate-150 hover:bg-indigo-100 border border-slate-200 hover:border-indigo-300 rounded text-slate-500 hover:text-indigo-600 transition-all focus:outline-none shrink-0 hidden sm:block"
@@ -3229,6 +3242,7 @@ export default function App() {
             >
               <HelpCircle className="w-4 h-4 text-slate-600" />
             </button>
+            )}
 
             {/* Session switcher */}
             {isAdmin && (
@@ -3320,6 +3334,7 @@ export default function App() {
               <span>Calendari</span>
             </button>
 
+            {!isWorkspaceRestricted && (
             <button
               onClick={() => setActiveTab("minutes")}
               className={`py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border ${
@@ -3331,7 +3346,9 @@ export default function App() {
               <FileText className="w-3.5 h-3.5 text-slate-500" />
               <span>Acta de Reunió</span>
             </button>
+            )}
 
+            {!isWorkspaceRestricted && (
             {/* Golf pricing matrix (Super Admin workspace) */}
             <button
               onClick={() => setActiveTab("golf")}
@@ -3343,6 +3360,7 @@ export default function App() {
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-none bg-amber-500 animate-pulse" title="S'adverteix accés restringit"></span>
               )}
             </button>
+            )}
           </nav>
         )}
 
@@ -3362,8 +3380,8 @@ export default function App() {
                   memberId={filterAssigneeId}
                   users={viewUsers}
                   tasks={visibleTasks}
-                  projects={projects}
-                  workspaces={workspaces}
+                  projects={accessibleProjects}
+                  workspaces={accessibleWorkspaces}
                   isAdmin={isAdmin}
                   onClose={() => setFilterAssigneeId(null)}
                   onUpdateTaskStatus={async (taskId, newStatus) => {

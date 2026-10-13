@@ -774,7 +774,7 @@ export default function App() {
           } as Workspace);
         }
       });
-      if (snapshot.size === 0 && deletedSet.size === 0) {
+      if (snapshot.size === 0 && deletedSet.size === 0 && !scopedWorkspaceId) {
         seedInitialWorkspaces();
       } else {
         // Direct, resilient synchronization with workspaces in Firestore
@@ -2574,7 +2574,9 @@ export default function App() {
                 <h1 className="text-sm font-bold text-white tracking-tight leading-4">
                   GolfSana Enterprise
                 </h1>
-                <p className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">GolfSana & Tariff Monitor</p>
+                <p className="text-[10px] text-blue-200 font-semibold uppercase tracking-wider">
+                  {isWorkspaceRestricted ? "Espai operatiu restringit" : "GolfSana & Tariff Monitor"}
+                </p>
               </div>
             </div>
             
@@ -3349,17 +3351,19 @@ export default function App() {
             )}
 
             {!isWorkspaceRestricted && (
-            {/* Golf pricing matrix (Super Admin workspace) */}
-            <button
-              onClick={() => setActiveTab("golf")}
-              className="py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border relative text-slate-505 border-transparent hover:bg-slate-50 hover:text-emerald-700"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span>Golfradar (Comparador)</span>
-              {!isAdmin && (
-                <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-none bg-amber-500 animate-pulse" title="S'adverteix accés restringit"></span>
-              )}
-            </button>
+              <>
+                {/* Golf pricing matrix (Super Admin workspace) */}
+                <button
+                  onClick={() => setActiveTab("golf")}
+                  className="py-1.5 px-3.5 rounded-none text-xs font-bold transition-all flex items-center gap-2 border relative text-slate-505 border-transparent hover:bg-slate-50 hover:text-emerald-700"
+                >
+                  <Activity className="w-3.5 h-3.5" />
+                  <span>Golfradar (Comparador)</span>
+                  {!isAdmin && (
+                    <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-none bg-amber-500 animate-pulse" title="S'adverteix accés restringit"></span>
+                  )}
+                </button>
+              </>
             )}
           </nav>
         )}
